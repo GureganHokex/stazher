@@ -1,6 +1,8 @@
 // Редактор кода для игровой IDE: моноширинный текст с подсветкой при наборе, номера строк и точки остановки,
 // выделение, отмена, автоотступы и парные скобки, волнистое подчёркивание ошибок, автодополнение,
 // подсказки при наведении и миникарта. Ввод приходит из IdeScreen (события OnGUI в координатах панели).
+// Язык задаёт Language (python по умолчанию): подсветка и автодополнение — через Syntax; подсказки с документацией,
+// выравнивание else/elif и отступы по «:»/return — только для python.
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -29,6 +31,7 @@ namespace Intern.Game
         readonly VisualElement gutter, viewport, content, curLine, selLayer, linesBox, caret, squiggles, debugBg, minimap, vthumb, popup, tipBox, gutterMarks;
         readonly List<Label> labels = new List<Label>(), numbers = new List<Label>();
         readonly List<List<Span>> spans = new List<List<Span>>();
+        readonly List<string> lineStates = new List<string>();   // состояние токенайзера на входе в строку (для Syntax.Line)
         bool textDirty = true;
         float blink, lastEdit = -10f;
 
@@ -91,12 +94,31 @@ namespace Intern.Game
             set
             {
                 L.Clear();
-                L.AddRange((value ?? "").Replace("\r\n", "\n").Replace("\r", "\n").Replace("\t", "    ").Split('\n'));
+                L.AddRange((value ?? "").Replace("\r\n", "\n").Replace("\r", "\n").Replace("\t", new string(' ', IndW)).Split('\n'));
                 if (L.Count == 0) L.Add("");
                 CurL = CurC = AncL = AncC = 0; ScrollY = ScrollX = 0; undo.Clear(); redo.Clear();
                 textDirty = true; HidePopup(); Place();
             }
         }
+
+        // Язык подсветки: python, javascript, typescript, jsx, tsx, sql, yaml, bash, dockerfile, html, css, nginx, hcl, promql, text.
+        // Синонимы (js, ts, yml, sh, tf…) приводятся к каноническому имени; null и неизвестные — text (без подсветки).
+        string lang = "python";
+        public string Language
+        {
+            get { return lang; }
+            set
+            {
+                string v = Syntax.Norm(value);
+                if (v == lang) return;
+                lang = v; textDirty = true; HidePopup(); HideTooltip(); hoverKey = null; Place();
+            }
+        }
+        bool Py { get { return lang == "python"; } }
+        int IndW { get { return Syntax.IndentWidth(lang); } }
+        bool IsWord(char c) { return Syntax.IsWordChar(lang, c); }
+        string Pairs { get { return Syntax.IsJs(lang) ? "([{\"'`" : "([{\"'"; } }       // открывающие автопары
+        string Closes { get { return Syntax.IsJs(lang) ? ")]}\"'`" : ")]}\"'"; } }      // и парные им
 
         public void SetCursor(int line, int col, bool extend = false)
         {
@@ -160,7 +182,7 @@ namespace Intern.Game
         public void Insert(string s)
         {
             DeleteSel();
-            s = s.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\t", "    ");
+            s = s.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\t", new string(' ', IndW));
             var parts = s.Split('\n');
             string line = L[CurL], before = line.Substring(0, CurC), after = line.Substring(CurC);
             if (parts.Length == 1) { L[CurL] = before + s + after; CurC += s.Length; }
@@ -223,7 +245,7 @@ namespace Intern.Game
             if (ch >= ' ' && (!ctrl || e.alt))
             {
                 Push(true); TypeChar(ch); Edited();
-                if (PySyntax.IsId(ch)) ShowCompletions(false); else if (ch != '.') HidePopup();
+                if (IsWord(ch)) ShowCompletions(false); else if (ch != '.') HidePopup();
                 return true;
             }
             return false;
@@ -238,14 +260,14 @@ namespace Intern.Game
             if (guard) return;
             string line = L[CurL];
             char next = CurC < line.Length ? line[CurC] : '\0';
-            const string open = "([{\"'", close = ")]}\"'";
+            string open = Pairs, close = Closes;
             if (!HasSel && close.IndexOf(ch) >= 0 && next == ch && (ch == ')' || ch == ']' || ch == '}' || (CurC > 0 && line[CurC - 1] != '\\')))
             { CurC++; AncC = CurC; return; }                                 // перепрыгиваем через закрывающую
             int oi = open.IndexOf(ch);
-            bool quote = ch == '"' || ch == '\'';
+            bool quote = ch == '"' || ch == '\'' || ch == '`';
             bool freeAfter = next == '\0' || next == ' ' || close.IndexOf(next) >= 0 || next == ':' || next == ',';
             bool freeBefore = !quote || CurC == 0 || !PySyntax.IsId(line[CurC - 1]);
-            if (oi >= 0 && !HasSel && freeAfter && freeBefore && !InStringOrComment(line, CurC))
+            if (oi >= 0 && !HasSel && freeAfter && freeBefore && !InStringOrComment(CurL, CurC))
             {
                 Insert(ch.ToString() + close[oi]); CurC--; AncC = CurC; return;   // парная скобка/кавычка
             }
@@ -254,8 +276,10 @@ namespace Intern.Game
                 string s = Selected(); Insert(ch + s + close[oi]); return;         // обернуть выделение
             }
             Insert(ch.ToString());
-            // «else:», «elif …:», «except:» — выравниваем по ближайшему if/try выше, как VS Code
-            if (ch == ':')
+            // «}» (и «]», «)») в начале строки — выравниваем по строке с парной скобкой (не python)
+            if (!Py && (ch == '}' || ch == ']' || ch == ')') && Syntax.UsesBraces(lang)) AlignCloser();
+            // «else:», «elif …:», «except:» — выравниваем по ближайшему if/try выше, как VS Code (только python)
+            if (ch == ':' && Py)
             {
                 string t = L[CurL].Trim();
                 bool isElse = t == "else:" || (t.StartsWith("elif ") && t.EndsWith(":"));
@@ -281,10 +305,79 @@ namespace Intern.Game
             }
         }
 
-        static bool InStringOrComment(string line, int col)
+        bool InStringOrComment(int li, int col)
         {
-            string st = null; var sp = PySyntax.Line(line, ref st);
-            foreach (var s in sp) if ((s.Kind == Tok.Str || s.Kind == Tok.Comment) && col > s.Start && col < s.Start + s.Len) return true;
+            string line = L[li];
+            if (Py)   // как было: строка разбирается сама по себе
+            {
+                string st = null; var sp = PySyntax.Line(line, ref st);
+                foreach (var s in sp) if ((s.Kind == Tok.Str || s.Kind == Tok.Comment) && col > s.Start && col < s.Start + s.Len) return true;
+                return false;
+            }
+            foreach (var s in LineSpans(li))
+            {
+                int end = s.Start + s.Len;
+                if (col <= s.Start || col > end) continue;
+                bool atEol = col == end && end == line.Length;                   // курсор в конце строки сразу за токеном
+                if (s.Kind == Tok.Comment && (col < end || (atEol && !line.EndsWith("*/") && !line.EndsWith("-->")))) return true;
+                if (s.Kind == Tok.Str && (col < end || (atEol && Unclosed(line, s)))) return true;
+            }
+            return false;
+        }
+
+        // строковый литерал без закрывающей кавычки в конце строки: курсор за ним ещё внутри строки
+        static bool Unclosed(string line, Span s)
+        {
+            char q = line[s.Start];
+            if (q != '"' && q != '\'' && q != '`') return false;
+            int end = s.Start + s.Len;
+            return s.Len == 1 || line[end - 1] != q || (end >= 2 && line[end - 2] == '\\');
+        }
+
+        // Токены строки li с правильным входным состоянием (многострочные комментарии, шаблонные строки, JSX…)
+        List<Span> LineSpans(int li)
+        {
+            string st = null;
+            if (!textDirty && li < lineStates.Count) st = lineStates[li];
+            else for (int i = 0; i < li; i++) Syntax.Line(lang, L[i], ref st);
+            return Syntax.Line(lang, L[li], ref st);
+        }
+
+        // Текст строки до col без комментария в конце (для решений об отступе)
+        string CodeBefore(int li, int col)
+        {
+            string s = L[li].Substring(0, col);
+            foreach (var sp in LineSpans(li)) if (sp.Kind == Tok.Comment && sp.Start < col) { s = s.Substring(0, sp.Start); break; }
+            return s.TrimEnd();
+        }
+
+        // Закрывающая скобка, перед которой в строке только пробелы, встаёт на отступ строки с парной открывающей
+        void AlignCloser()
+        {
+            int fns = FirstNonSpace(L[CurL]);
+            if (CurC - 1 != fns) return;
+            int depth = 0;
+            for (int li = CurL; li >= 0 && li > CurL - 5000; li--)
+            {
+                string s = L[li];
+                List<Span> sp = li < CurL && !textDirty && li < spans.Count ? spans[li] : null;
+                for (int c = li == CurL ? fns - 1 : s.Length - 1; c >= 0; c--)
+                {
+                    char ch = s[c];
+                    bool opener = ch == '{' || ch == '[' || ch == '(', closer = ch == '}' || ch == ']' || ch == ')';
+                    if (!opener && !closer) continue;
+                    if (sp != null && InStrOrComment(sp, c)) continue;
+                    if (closer) { depth++; continue; }
+                    if (depth > 0) { depth--; continue; }
+                    int target = FirstNonSpace(s);
+                    L[CurL] = new string(' ', target) + L[CurL].Substring(fns);
+                    CurC = target + 1; AncC = CurC; return;
+                }
+            }
+        }
+        static bool InStrOrComment(List<Span> sp, int c)
+        {
+            foreach (var s in sp) if ((s.Kind == Tok.Str || s.Kind == Tok.Comment) && c >= s.Start && c < s.Start + s.Len) return true;
             return false;
         }
 
@@ -295,8 +388,8 @@ namespace Intern.Game
             string line = L[CurL];
             int from = CurC - 1;
             if (word) from = WordLeft().y;
-            else if (CurC <= FirstNonSpace(line) && CurC % 4 == 0 && CurC >= 4 && line.Substring(CurC - 4, 4) == "    ") from = CurC - 4;
-            else if (CurC < line.Length && "([{\"'".IndexOf(line[CurC - 1]) >= 0 && ")]}\"'"["([{\"'".IndexOf(line[CurC - 1])] == line[CurC])
+            else if (CurC <= FirstNonSpace(line) && CurC % IndW == 0 && CurC >= IndW && line.Substring(CurC - IndW, IndW) == new string(' ', IndW)) from = CurC - IndW;
+            else if (CurC < line.Length && Pairs.IndexOf(line[CurC - 1]) >= 0 && Closes[Pairs.IndexOf(line[CurC - 1])] == line[CurC])
             { L[CurL] = line.Remove(CurC - 1, 2); CurC--; AncC = CurC; return; }
             L[CurL] = line.Remove(from, CurC - from); CurC = from; AncC = CurC;
         }
@@ -310,6 +403,7 @@ namespace Intern.Game
 
         void NewLine()
         {
+            if (!Py) { NewLineOther(); return; }
             DeleteSel();
             string line = L[CurL], before = line.Substring(0, CurC);
             int ind = FirstNonSpace(line); if (ind > CurC) ind = CurC;
@@ -328,13 +422,66 @@ namespace Intern.Game
             CurL++; CurC = ind; AncL = CurL; AncC = CurC;
         }
 
+        // Enter для не-python: отступ после { [ ( (скобочные языки), после «:» в YAML, после открывающего тега в HTML/JSX,
+        // после then/do/else в bash; между парными скобками/тегами — три строки с курсором в середине
+        void NewLineOther()
+        {
+            DeleteSel();
+            string line = L[CurL], before = line.Substring(0, CurC), after = line.Substring(CurC).TrimStart(' ');
+            int w = IndW, ind = Mathf.Min(FirstNonSpace(line), CurC);
+            string code = CodeBefore(CurL, CurC);
+            char last = code.Length > 0 ? code[code.Length - 1] : '\0';
+            char prev = CurC > 0 ? line[CurC - 1] : '\0', next = CurC < line.Length ? line[CurC] : '\0';
+            bool braces = Syntax.UsesBraces(lang), markup = lang == "html" || lang == "jsx" || lang == "tsx" || lang == "javascript";
+            char pair = last == '(' ? ')' : last == '[' ? ']' : last == '{' ? '}' : '\0';
+            bool split = (prev == '(' && next == ')') || (prev == '[' && next == ']') || (prev == '{' && next == '}')
+                || (braces && pair != '\0' && after.Length > 0 && after[0] == pair)
+                || (markup && last == '>' && after.StartsWith("</") && OpensTag(code));
+            if (split)
+            {
+                L[CurL] = before.TrimEnd(' ');
+                L.Insert(CurL + 1, new string(' ', ind + w));
+                L.Insert(CurL + 2, new string(' ', ind) + after);
+                CurL++; CurC = ind + w; AncL = CurL; AncC = CurC; return;
+            }
+            if (braces && pair != '\0') ind += w;
+            else if (lang == "yaml") ind = YamlIndent(code, ind, w);
+            else if (markup && last == '>' && OpensTag(code)) ind += w;
+            else if (lang == "bash" && System.Text.RegularExpressions.Regex.IsMatch(code, @"(^|[;\s])(then|do|else)$")) ind += w;
+            L[CurL] = before; L.Insert(CurL + 1, new string(' ', ind) + after);
+            CurL++; CurC = ind; AncL = CurL; AncC = CurC;
+        }
+
+        // строка кончается открывающим тегом: <div class="x">, <Foo>, <> (но не <br>, <a/>, </b>)
+        static readonly System.Text.RegularExpressions.Regex OpenTagRx = new System.Text.RegularExpressions.Regex(@"<([A-Za-z][\w.:-]*)?(\s[^<>]*)?>$");
+        static readonly HashSet<string> VoidTags = new HashSet<string> { "br", "hr", "img", "input", "meta", "link", "area", "base", "col", "embed", "source", "track", "wbr", "param" };
+        static bool OpensTag(string code)
+        {
+            var m = OpenTagRx.Match(code);
+            if (!m.Success || code.EndsWith("/>") || code.EndsWith("=>")) return false;
+            if (!m.Groups[1].Success && m.Groups[2].Success) return false;
+            return !VoidTags.Contains(m.Groups[1].Value.ToLowerInvariant());
+        }
+
+        // YAML: после «ключ:» и «ключ: |» — глубже ключа; после «- ключ: значение» — на уровень ключа (продолжаем элемент списка)
+        int YamlIndent(string code, int ind, int w)
+        {
+            int kc = FirstNonSpace(code);
+            while (kc + 1 < code.Length && code[kc] == '-' && code[kc + 1] == ' ') { kc += 2; while (kc < code.Length && code[kc] == ' ') kc++; }
+            if (kc >= code.Length) return code.TrimStart().StartsWith("-") ? kc : ind;   // «- » без содержимого
+            bool item = kc > FirstNonSpace(code);
+            if (code.EndsWith(":") || System.Text.RegularExpressions.Regex.IsMatch(code, @"(:|^\s*-)\s+[|>][-+0-9]*$")) return kc + w;
+            if (item && Syntax.YamlKeyEnd(code, kc, code.Length) >= 0) return kc;
+            return ind;
+        }
+
         void Tab()
         {
-            if (HasSel && CurL != AncL) { IndentLines(4); return; }
+            if (HasSel && CurL != AncL) { IndentLines(IndW); return; }
             DeleteSel();
-            int n = 4 - CurC % 4; Insert(new string(' ', n));
+            int n = IndW - CurC % IndW; Insert(new string(' ', n));
         }
-        void Unindent() { IndentLines(-4); }
+        void Unindent() { IndentLines(-IndW); }
         void IndentLines(int d)
         {
             int l0 = Mathf.Min(CurL, AncL), l1 = Mathf.Max(CurL, AncL);
@@ -347,8 +494,12 @@ namespace Intern.Game
             CurC = Mathf.Clamp(CurC + d, 0, L[CurL].Length); AncC = Mathf.Clamp(AncC + d, 0, L[AncL].Length);
         }
 
+        // Ctrl+/: строчный комментарий языка (# // --); в HTML и CSS каждая строка оборачивается в <!-- --> или /* */
         void ToggleComment()
         {
+            string lc = Syntax.LineComment(lang), bo, bc;
+            bool block = Syntax.BlockComment(lang, out bo, out bc);
+            if (lc == null && !block) return;
             Push(false);
             int l0 = Mathf.Min(CurL, AncL), l1 = Mathf.Max(CurL, AncL);
             bool all = true; int minInd = int.MaxValue;
@@ -356,14 +507,31 @@ namespace Intern.Game
             {
                 if (L[i].Trim().Length == 0) continue;
                 minInd = Mathf.Min(minInd, FirstNonSpace(L[i]));
-                if (!L[i].TrimStart().StartsWith("#")) all = false;
+                string t = L[i].Trim();
+                if (lc != null ? !t.StartsWith(lc) : !(t.StartsWith(bo) && t.EndsWith(bc) && t.Length >= bo.Length + bc.Length)) all = false;
             }
             if (minInd == int.MaxValue) return;
             for (int i = l0; i <= l1; i++)
             {
                 if (L[i].Trim().Length == 0) continue;
-                if (all) { int p = L[i].IndexOf('#'); int n = p + 1 < L[i].Length && L[i][p + 1] == ' ' ? 2 : 1; L[i] = L[i].Remove(p, n); if (i == CurL) CurC = Mathf.Max(0, CurC - n); }
-                else { L[i] = L[i].Insert(minInd, "# "); if (i == CurL) CurC += 2; }
+                if (lc != null)
+                {
+                    if (all) { int p = L[i].IndexOf(lc, StringComparison.Ordinal); int n = p + lc.Length < L[i].Length && L[i][p + lc.Length] == ' ' ? lc.Length + 1 : lc.Length; L[i] = L[i].Remove(p, n); if (i == CurL) CurC = Mathf.Max(0, CurC - n); }
+                    else { L[i] = L[i].Insert(minInd, lc + " "); if (i == CurL) CurC += lc.Length + 1; }
+                }
+                else if (all)
+                {
+                    int p = L[i].IndexOf(bo, StringComparison.Ordinal), n = p + bo.Length < L[i].Length && L[i][p + bo.Length] == ' ' ? bo.Length + 1 : bo.Length;
+                    L[i] = L[i].Remove(p, n); if (i == CurL && CurC > p) CurC = Mathf.Max(p, CurC - n);
+                    string t = L[i].TrimEnd(); int e = t.Length - bc.Length, m = bc.Length;
+                    if (e > 0 && t[e - 1] == ' ') { e--; m++; }
+                    L[i] = t.Remove(e, m);
+                }
+                else
+                {
+                    L[i] = L[i].TrimEnd().Insert(minInd, bo + " ") + " " + bc;
+                    if (i == CurL && CurC >= minInd) CurC += bo.Length + 1;
+                }
             }
             CurC = Mathf.Clamp(CurC, 0, L[CurL].Length); AncC = Mathf.Clamp(AncC, 0, L[AncL].Length);
             Edited();
@@ -383,7 +551,7 @@ namespace Intern.Game
             if (CurC == 0) return Left();
             string s = L[CurL]; int i = CurC;
             while (i > 0 && s[i - 1] == ' ') i--;
-            if (i > 0 && PySyntax.IsId(s[i - 1])) while (i > 0 && PySyntax.IsId(s[i - 1])) i--;
+            if (i > 0 && IsWord(s[i - 1])) while (i > 0 && IsWord(s[i - 1])) i--;
             else if (i > 0) i--;
             return new Vector2Int(CurL, i);
         }
@@ -391,7 +559,7 @@ namespace Intern.Game
         {
             string s = L[CurL]; int i = CurC;
             if (i >= s.Length) return Right();
-            if (PySyntax.IsId(s[i])) while (i < s.Length && PySyntax.IsId(s[i])) i++;
+            if (IsWord(s[i])) while (i < s.Length && IsWord(s[i])) i++;
             else i++;
             while (i < s.Length && s[i] == ' ') i++;
             return new Vector2Int(CurL, i);
@@ -424,8 +592,8 @@ namespace Intern.Game
             if (clicks == 2)
             {
                 string s = L[line]; int a = Mathf.Min(col, s.Length), b = a;
-                while (a > 0 && PySyntax.IsId(s[a - 1])) a--;
-                while (b < s.Length && PySyntax.IsId(s[b])) b++;
+                while (a > 0 && IsWord(s[a - 1])) a--;
+                while (b < s.Length && IsWord(s[b])) b++;
                 AncL = CurL = line; AncC = a; CurC = b; Place(); return;
             }
             wantCol = -1; SetCursor(line, col, shift); dragging = true;
@@ -467,12 +635,12 @@ namespace Intern.Game
                         if (col >= 0 && col < s.Length)
                         {
                             if (line + 1 == ErrorLine && ErrorText != null && col >= FirstNonSpace(s)) { key = "err" + line; text = ErrorText; }
-                            else if (PySyntax.IsId(s[col]))
+                            else if (IsWord(s[col]))
                             {
-                                int a = col, b = col; while (a > 0 && PySyntax.IsId(s[a - 1])) a--; while (b < s.Length && PySyntax.IsId(s[b])) b++;
+                                int a = col, b = col; while (a > 0 && IsWord(s[a - 1])) a--; while (b < s.Length && IsWord(s[b])) b++;
                                 string w = s.Substring(a, b - a); key = line + ":" + a;
                                 string[] doc;
-                                if (PySyntax.Docs.TryGetValue(w, out doc)) text = "<color=#DCDCAA>" + K.Esc(doc[0]) + "</color>\n" + K.Esc(doc[1]);
+                                if (Py && PySyntax.Docs.TryGetValue(w, out doc)) text = "<color=#DCDCAA>" + K.Esc(doc[0]) + "</color>\n" + K.Esc(doc[1]);
                                 else if (ExtraHover != null) text = ExtraHover(w);
                             }
                         }
@@ -499,15 +667,15 @@ namespace Intern.Game
         // ================= автодополнение =================
         string WordBefore()
         {
-            string s = L[CurL]; int a = CurC; while (a > 0 && PySyntax.IsId(s[a - 1])) a--;
+            string s = L[CurL]; int a = CurC; while (a > 0 && IsWord(s[a - 1])) a--;
             return s.Substring(a, CurC - a);
         }
         void ShowCompletions(bool force)
         {
-            if (InStringOrComment(L[CurL], CurC)) { HidePopup(); return; }
+            if (InStringOrComment(CurL, CurC)) { HidePopup(); return; }
             string w = WordBefore();
             if (!force && w.Length < 1) { HidePopup(); return; }
-            items = PySyntax.Complete(w, Text);
+            items = Syntax.Complete(lang, w, Text);
             if (items.Count == 0) { HidePopup(); return; }
             itemSel = 0; RenderPopup();
         }
@@ -530,6 +698,7 @@ namespace Intern.Game
         void Accept(Completion c)
         {
             Push(false);
+            AncL = CurL;   // выделение, сделанное при открытом списке (Ctrl+A), не должно ломать вставку
             string w = WordBefore();
             L[CurL] = L[CurL].Remove(CurC - w.Length, w.Length); CurC -= w.Length; AncC = CurC;
             string ins = c.Insert;
@@ -592,9 +761,9 @@ namespace Intern.Game
         void Rebuild()
         {
             textDirty = false;
-            spans.Clear();
+            spans.Clear(); lineStates.Clear();
             string st = null;
-            for (int i = 0; i < L.Count; i++) spans.Add(PySyntax.Line(L[i], ref st));
+            for (int i = 0; i < L.Count; i++) { lineStates.Add(st); spans.Add(Syntax.Line(lang, L[i], ref st)); }
             while (labels.Count < L.Count)
             {
                 var lb = K.T("", FontSize, K.Text, true); lb.style.whiteSpace = WhiteSpace.Pre; lb.style.position = Position.Absolute; lb.style.height = LineH;

@@ -44,6 +44,7 @@ namespace Intern.Game
         public static bool DebugSit() { return KD(Key.F8); }
         public static bool DebugDump() { return KD(Key.F7); }
         public static bool DebugClose() { return KD(Key.F6); }
+        public static bool DebugCareer() { return KD(Key.F9); }
 #else
         public static Vector2 Move()
         {
@@ -67,6 +68,7 @@ namespace Intern.Game
         public static bool DebugSit() { return Input.GetKeyDown(KeyCode.F8); }
         public static bool DebugDump() { return Input.GetKeyDown(KeyCode.F7); }
         public static bool DebugClose() { return Input.GetKeyDown(KeyCode.F6); }
+        public static bool DebugCareer() { return Input.GetKeyDown(KeyCode.F9); }
 #endif
     }
 
@@ -80,6 +82,36 @@ namespace Intern.Game
         public TestCase[] tests = new TestCase[0];
         public int deadline = 240, reward = 100;
         public bool isBugHunt;
+
+        // --- задачи направлений (Resources/Tasks/tracks/*.json) ---
+        public string type = "write_code";   // quiz find_bug write_code code_review architecture incident estimation
+        public string language = "python";   // python javascript typescript tsx jsx sql yaml bash dockerfile html css nginx hcl promql text
+        public string entry;                 // функция для проверки (python/javascript), пусто — программа (stdin/stdout)
+        public string track, topic, grade, character, key, explanation;
+        public int difficulty = 1, xp = 20, timeLimit;   // timeLimit — минуты (0 — без таймера)
+        public string[] options;             // варианты ответа (задачи с выбором)
+        public int[] answer;                 // индексы верных вариантов
+        public bool multi;                   // верных несколько
+        public bool legacy;
+        public string legacyId;              // id задачи в старом python.json (py01…) — для переноса сохранений
+        [NonSerialized] public List<object> testCases;   // test_cases из JSON как есть
+
+        public bool IsChoice { get { return options != null && options.Length > 0; } }
+        // Как проверяется: choice | py | js | sql | static
+        public string Mode
+        {
+            get
+            {
+                if (IsChoice) return "choice";
+                switch (language)
+                {
+                    case "python": return "py";
+                    case "javascript": return "js";
+                    case "sql": return "sql";
+                    default: return "static";
+                }
+            }
+        }
     }
 
     [Serializable]
@@ -99,6 +131,9 @@ namespace Intern.Game
         public List<string> owned = new List<string>();
         public bool firstPerson;
         public bool hasCharacter;
+        public string profession = "";   // backend frontend devops fullstack
+        public int xp;
+        public int version;              // 2 — id задач из направлений
 
         public string GetCode(string id) { int i = codeIds.IndexOf(id); return i >= 0 ? codeTexts[i] : null; }
         public void SetCode(string id, string code)

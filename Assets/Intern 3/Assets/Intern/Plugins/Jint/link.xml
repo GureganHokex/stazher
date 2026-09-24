@@ -1,0 +1,8 @@
+<!-- Не вырезать код Jint и его зависимостей при Managed Stripping / IL2CPP:
+     движок создаёт встроенные объекты JS через отражение и обобщённые типы, которые анализатор не видит.
+     JsRun читает состояние Promise (Jint.Native.JsPromise.State/Value) через отражение — тоже нужно сохранить. -->
+<linker>
+  <assembly fullname="Jint" preserve="all"/>
+  <assembly fullname="Acornima" preserve="all"/>
+  <assembly fullname="System.Runtime.CompilerServices.Unsafe" preserve="all"/>
+</linker>

@@ -1,0 +1,372 @@
+{
+ "track": "backend",
+ "part": "examples",
+ "topics": [],
+ "tasks": [
+  {
+   "task_id": "be-py-functions-90",
+   "topic_id": "be-py-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "story": "Стас, продакт «Лампового Маркета»: «Маркетинг хочет промокоды со скидкой в процентах. Нужна функция, которая считает итоговую цену. Скидка не больше 50%, копейки округляем до двух знаков».",
+   "content": {
+    "question": "Напиши функцию apply_discount(price, percent): верни цену со скидкой, округлённую до 2 знаков. Если percent больше 50 — считай, что скидка 50. Если percent отрицательный — скидки нет.",
+    "code": "def apply_discount(price, percent):\n    # твой код\n    pass\n",
+    "language": "python",
+    "entry": "apply_discount",
+    "options": null,
+    "correct_answer": "def apply_discount(price, percent):\n    percent = max(0, min(percent, 50))\n    return round(price * (100 - percent) / 100, 2)\n",
+    "test_cases": [
+     {
+      "input": [
+       1000,
+       10
+      ],
+      "expected": 900.0
+     },
+     {
+      "input": [
+       999.99,
+       15
+      ],
+      "expected": 849.99
+     },
+     {
+      "input": [
+       200,
+       80
+      ],
+      "expected": 100.0
+     },
+     {
+      "input": [
+       200,
+       -5
+      ],
+      "expected": 200.0
+     }
+    ]
+   },
+   "explanation": "Сначала ограничиваем процент в допустимых рамках: max(0, ...) убирает отрицательные значения, min(..., 50) не даёт скидке превысить 50%. Такой приём называется clamp — зажать значение между границами. Потом считаем долю, которую платит клиент (100 - percent), и округляем через round(..., 2). Граничные случаи (отрицательная и слишком большая скидка) — именно то, что QA проверит первым делом.",
+   "hints": [
+    "Сначала приведи percent к диапазону от 0 до 50.",
+    "max(0, min(percent, 50)) делает это в одну строку.",
+    "Итог: round(price * (100 - percent) / 100, 2)."
+   ]
+  },
+  {
+   "task_id": "be-sql-basics-90",
+   "topic_id": "be-sql-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "story": "Ира из QA: «В админке не видно, какие заказы висят в статусе new дольше всех. Дай запрос — выведу в отчёт».",
+   "content": {
+    "question": "Допиши запрос: выведи id и created_at заказов со статусом 'new', самые старые сверху.",
+    "code": "CREATE TABLE orders (id INTEGER PRIMARY KEY, status TEXT, created_at TEXT);\nINSERT INTO orders VALUES (1, 'new', '2026-09-01'), (2, 'paid', '2026-08-30'), (3, 'new', '2026-08-28'), (4, 'new', '2026-09-03');\n\n-- твой запрос ниже\n",
+    "language": "sql",
+    "options": null,
+    "correct_answer": "CREATE TABLE orders (id INTEGER PRIMARY KEY, status TEXT, created_at TEXT);\nINSERT INTO orders VALUES (1, 'new', '2026-09-01'), (2, 'paid', '2026-08-30'), (3, 'new', '2026-08-28'), (4, 'new', '2026-09-03');\n\n-- твой запрос ниже\nSELECT id, created_at FROM orders WHERE status = 'new' ORDER BY created_at;\n",
+    "test_cases": [
+     {
+      "input": null,
+      "expected": [
+       [
+        3,
+        "2026-08-28"
+       ],
+       [
+        1,
+        "2026-09-01"
+       ],
+       [
+        4,
+        "2026-09-03"
+       ]
+      ]
+     }
+    ]
+   },
+   "explanation": "WHERE оставляет только нужный статус, ORDER BY created_at сортирует по возрастанию — самые старые первыми (ASC — порядок по умолчанию). Даты в формате ГГГГ-ММ-ДД сортируются правильно даже как строки, поэтому ISO-формат так любят в базах.",
+   "hints": [
+    "Отфильтруй по статусу через WHERE.",
+    "Сортировка — ORDER BY, по умолчанию по возрастанию."
+   ]
+  },
+  {
+   "task_id": "fe-js-async-90",
+   "topic_id": "fe-js-async",
+   "grade": "junior",
+   "type": "find_bug",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "story": "Ира: «Корзина показывает сумму 0, хотя товары есть. Похоже, считаем до того, как цены пришли с сервера».",
+   "content": {
+    "question": "cartTotal(ids, prices) должна вернуть сумму цен товаров из корзины. Цены «приходят с сервера» через fetchPrice. Найди и исправь ошибку.",
+    "code": "function fetchPrice(prices, id) {\n  // имитация запроса к API\n  return Promise.resolve(prices[id]);\n}\n\nasync function cartTotal(ids, prices) {\n  let total = 0;\n  ids.forEach(async (id) => {\n    total += await fetchPrice(prices, id);\n  });\n  return total;\n}\n",
+    "language": "javascript",
+    "entry": "cartTotal",
+    "options": null,
+    "correct_answer": "function fetchPrice(prices, id) {\n  // имитация запроса к API\n  return Promise.resolve(prices[id]);\n}\n\nasync function cartTotal(ids, prices) {\n  const list = await Promise.all(ids.map((id) => fetchPrice(prices, id)));\n  return list.reduce((sum, p) => sum + p, 0);\n}\n",
+    "test_cases": [
+     {
+      "input": [
+       [
+        "lamp",
+        "cable"
+       ],
+       {
+        "lamp": 1490,
+        "cable": 350
+       }
+      ],
+      "expected": 1840
+     },
+     {
+      "input": [
+       [
+        "lamp"
+       ],
+       {
+        "lamp": 990
+       }
+      ],
+      "expected": 990
+     },
+     {
+      "input": [
+       [],
+       {}
+      ],
+      "expected": 0
+     }
+    ]
+   },
+   "explanation": "forEach не ждёт асинхронные колбэки: он запускает их и сразу идёт дальше, поэтому return total срабатывает раньше, чем пришли цены. Нужно собрать промисы через map и дождаться всех через Promise.all — заодно запросы пойдут параллельно, а не по очереди.",
+   "hints": [
+    "Что возвращает forEach, если внутри async-функция?",
+    "Собери массив промисов через map и дождись их через Promise.all."
+   ]
+  },
+  {
+   "task_id": "do-dockerfile-90",
+   "topic_id": "do-dockerfile",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "devops_colleague",
+   "story": "Дима, наш DevOps: «Образ КофеБота весит 1,2 ГБ и собирается 6 минут, потому что зависимости ставятся заново при любой правке кода. Перепиши Dockerfile нормально».",
+   "content": {
+    "question": "Перепиши Dockerfile: базовый образ python:3.12-slim, сначала копируй requirements.txt и ставь зависимости без кэша pip, потом копируй код, запускай не от root.",
+    "code": "FROM python:3.12\nWORKDIR /app\nCOPY . .\nRUN pip install -r requirements.txt\nCMD [\"python\", \"bot.py\"]\n",
+    "language": "dockerfile",
+    "options": null,
+    "correct_answer": "FROM python:3.12-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nRUN useradd --create-home app\nUSER app\nCMD [\"python\", \"bot.py\"]\n",
+    "test_cases": [
+     {
+      "input": "Базовый образ — slim",
+      "expected": {
+       "regex": "^FROM\\s+python:3\\.12-slim",
+       "flags": "im"
+      }
+     },
+     {
+      "input": "requirements.txt копируется до остального кода",
+      "expected": {
+       "regex": "COPY\\s+requirements\\.txt[^\\n]*\\n(?:.*\\n)*?RUN\\s+pip\\s+install[^\\n]*\\n(?:.*\\n)*?COPY\\s+\\.\\s",
+       "flags": "i"
+      }
+     },
+     {
+      "input": "pip без кэша",
+      "expected": {
+       "regex": "pip\\s+install\\s+[^\\n]*--no-cache-dir",
+       "flags": "i"
+      }
+     },
+     {
+      "input": "Процесс запускается не от root",
+      "expected": {
+       "regex": "^USER\\s+(?!root\\b)\\w+",
+       "flags": "im"
+      }
+     }
+    ]
+   },
+   "explanation": "Docker кэширует слои по порядку: если сначала скопировать только requirements.txt и поставить зависимости, то правка кода не сбрасывает этот слой — пересобирается только последний COPY. slim-образ в разы меньше полного, --no-cache-dir не оставляет в образе кэш pip, а USER убирает запуск от root: если сервис взломают, у атакующего не будет прав суперпользователя в контейнере.",
+   "hints": [
+    "Слои с редко меняющимися файлами ставь выше.",
+    "Отдельный COPY requirements.txt перед pip install, потом COPY . .",
+    "Создай пользователя (useradd) и переключись на него через USER."
+   ]
+  },
+  {
+   "task_id": "c-git-conflicts-90",
+   "topic_id": "c-git-conflicts",
+   "grade": "junior",
+   "type": "quiz",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «Ты закоммитил пароль от тестовой базы и уже запушил в общую ветку main. Без паники — что делаем в первую очередь?»",
+   "content": {
+    "question": "Пароль попал в запушенный коммит общей ветки. Какой шаг самый важный и первый?",
+    "code": null,
+    "language": null,
+    "options": [
+     "Сделать git reset --hard и git push --force, чтобы коммит исчез",
+     "Сменить (отозвать) пароль, а уже потом убрать его из кода",
+     "Удалить строку с паролем новым коммитом — этого достаточно",
+     "Написать в чат, чтобы никто не смотрел историю"
+    ],
+    "correct_answer": 1,
+    "test_cases": null
+   },
+   "explanation": "Всё, что попало в удалённый репозиторий, уже могли скачать: клоны, форки, CI, кэш. Поэтому секрет считается скомпрометированным, и первое действие — ротация: сменить пароль. Переписывание истории (force push, filter-repo) — второй шаг и в общей ветке ломает работу коллегам, а новый коммит с удалением оставляет пароль в истории.",
+   "hints": [
+    "Представь, что коммит уже кто-то скачал.",
+    "Что делает утёкший пароль безопасным, даже если он останется в истории?"
+   ]
+  },
+  {
+   "task_id": "be-n-plus-one-90",
+   "topic_id": "be-n-plus-one",
+   "grade": "middle",
+   "type": "code_review",
+   "difficulty": 4,
+   "xp_reward": 120,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Марина, сеньор: «Посмотри PR джуна с эндпоинтом списка заказов. На стейдже 50 заказов открываются 2 секунды. Отметь, что реально нужно поправить перед мерджем».",
+   "content": {
+    "question": "Выбери все замечания, которые действительно стоит оставить в ревью.",
+    "code": "@router.get(\"/orders\")\ndef list_orders(user_id: int, db: Session = Depends(get_db)):\n    orders = db.query(Order).filter(Order.user_id == user_id).all()\n    result = []\n    for order in orders:\n        items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()\n        result.append({\"id\": order.id, \"items\": [i.name for i in items]})\n    return result\n",
+    "language": "python",
+    "options": [
+     "Для каждого заказа отдельный запрос за позициями — N+1, нужен selectinload или один запрос с JOIN",
+     "Нет пагинации: у активного клиента тысячи заказов вернутся одним ответом",
+     "user_id берётся из параметра запроса — любой может посмотреть чужие заказы, нужен текущий пользователь из авторизации",
+     "Переменную result стоит назвать res — так короче",
+     "Нужно заменить FastAPI на Django — там ORM быстрее"
+    ],
+    "correct_answer": [
+     0,
+     1,
+     2
+    ],
+    "test_cases": null
+   },
+   "explanation": "Главная причина тормозов — N+1: один запрос за заказами и ещё по одному на каждый заказ, при 50 заказах это 51 поход в базу. Лечится жадной загрузкой (selectinload) или JOIN. Без пагинации ответ растёт вместе с историей клиента. А user_id из параметра — это уязвимость IDOR: пользователя надо брать из токена. Переименование переменной — вкусовщина, а смена фреймворка проблему не решит.",
+   "hints": [
+    "Посчитай, сколько SQL-запросов уйдёт для 50 заказов.",
+    "Кто решает, чьи заказы смотреть: клиент или сервер?"
+   ]
+  },
+  {
+   "task_id": "do-k8s-debug-90",
+   "topic_id": "do-k8s-debug",
+   "grade": "middle",
+   "type": "incident",
+   "difficulty": 4,
+   "xp_reward": 120,
+   "time_limit_minutes": 15,
+   "character": "devops_colleague",
+   "story": "Дима пишет в 3 часа ночи: «Каталог Маркета лежит, поды перезапускаются по кругу. Я в отпуске в горах, связь плохая. Глянь вывод и скажи, что это».",
+   "content": {
+    "question": "Что происходит с подом и какое действие правильное?",
+    "code": "$ kubectl get pods\nNAME                       READY   STATUS             RESTARTS   AGE\ncatalog-7c9d8f6b5-x2lqp    0/1     CrashLoopBackOff   14         38m\n\n$ kubectl describe pod catalog-7c9d8f6b5-x2lqp | grep -A3 'Last State'\n    Last State:     Terminated\n      Reason:       OOMKilled\n      Exit Code:    137\n\n$ kubectl top pod catalog-7c9d8f6b5-x2lqp\nNAME                       CPU(cores)   MEMORY(bytes)\ncatalog-7c9d8f6b5-x2lqp    210m         255Mi\n\n# limits: memory 256Mi\n",
+    "language": "text",
+    "options": [
+     "Образ не скачивается — проверить доступ к registry",
+     "Контейнер упирается в лимит памяти и его убивает OOM killer — поднять limit и искать, что съедает память",
+     "Упала liveness-проба — увеличить initialDelaySeconds",
+     "Нода переполнена — удалить соседние поды"
+    ],
+    "correct_answer": 1,
+    "test_cases": null
+   },
+   "explanation": "OOMKilled и код выхода 137 (128 + сигнал 9, SIGKILL) означают, что процесс превысил лимит памяти контейнера и ядро его убило. Потребление 255Mi при лимите 256Mi это подтверждает. Быстрое смягчение — поднять limit, чтобы вернуть сервис, а затем искать причину роста памяти: утечку, выросший кэш, большой ответ. ImagePullBackOff и проблемы с пробами выглядели бы иначе.",
+   "hints": [
+    "Посмотри на Reason и Exit Code.",
+    "137 = 128 + 9. Какой это сигнал?"
+   ]
+  },
+  {
+   "task_id": "c-estimation-90",
+   "topic_id": "c-estimation",
+   "grade": "junior",
+   "type": "estimation",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": 10,
+   "character": "manager",
+   "story": "Стас: «Клиенту пекарни “Батон” нужен экспорт заказов в Excel. Сколько сделаешь? Мне к обеду нужна цифра для клиента».",
+   "content": {
+    "question": "Прежде чем назвать срок, выбери вопросы, которые обязательно нужно задать Стасу.",
+    "code": null,
+    "language": null,
+    "options": [
+     "Какие поля заказа нужны в выгрузке и в каком порядке?",
+     "За какой период выгружать и сколько заказов бывает за этот период?",
+     "Какой цвет у кнопки экспорта?",
+     "Кто может выгружать — все сотрудники или только администратор?",
+     "Нужен именно .xlsx или подойдёт CSV, который открывается в Excel?",
+     "Можно ли поработать над этим в выходные?"
+    ],
+    "correct_answer": [
+     0,
+     1,
+     3,
+     4
+    ],
+    "test_cases": null
+   },
+   "explanation": "Срок зависит от объёма и рисков. Поля и формат определяют саму работу (CSV — полдня, .xlsx с форматированием — дольше). Период и объём данных показывают, хватит ли синхронной выгрузки или нужна фоновая задача. Права доступа — вопрос безопасности, который часто забывают. Цвет кнопки на оценку почти не влияет, а работа в выходные — не вопрос к требованиям. Хорошая оценка звучит так: «CSV за 1 день, xlsx — 2–3 дня, если заказов до 10 тысяч».",
+   "hints": [
+    "Какие ответы изменят объём работы в разы?",
+    "Не забудь про безопасность и объём данных."
+   ]
+  },
+  {
+   "task_id": "be-caching-90",
+   "topic_id": "be-caching",
+   "grade": "middle",
+   "type": "architecture",
+   "difficulty": 4,
+   "xp_reward": 120,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «Страница товара открывается 900 мс. В профайлере видно: 700 мс — запрос отзывов с сортировкой по дате по таблице на 40 млн строк. Отзывы добавляются часто. Что делаем?»",
+   "content": {
+    "question": "Какое решение правильное в первую очередь?",
+    "code": "EXPLAIN ANALYZE SELECT * FROM reviews WHERE product_id = 812 ORDER BY created_at DESC LIMIT 20;\n-- Seq Scan on reviews  (rows=40112345)  Filter: (product_id = 812)\n-- Execution Time: 702.311 ms\n",
+    "language": "sql",
+    "options": [
+     "Положить ответ в Redis на 24 часа",
+     "Создать составной индекс (product_id, created_at DESC)",
+     "Перенести отзывы в отдельную базу",
+     "Увеличить сервер базы вдвое"
+    ],
+    "correct_answer": 1,
+    "test_cases": null
+   },
+   "explanation": "EXPLAIN показывает Seq Scan — база читает все 40 млн строк, чтобы найти 20 отзывов одного товара. Составной индекс (product_id, created_at DESC) позволяет сразу найти нужный товар и взять 20 свежих записей в правильном порядке — запрос станет выполняться за миллисекунды. Кэш на сутки спрячет проблему и покажет устаревшие отзывы, а переезд и апгрейд дороги и не лечат причину. Сначала индекс, кэш — когда запрос уже быстрый, но нагрузка огромная.",
+   "hints": [
+    "Что значит Seq Scan в плане запроса?",
+    "Какой индекс покроет и фильтр, и сортировку?"
+   ]
+  }
+ ]
+}

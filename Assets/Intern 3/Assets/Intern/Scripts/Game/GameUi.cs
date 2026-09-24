@@ -28,6 +28,9 @@ namespace Intern.Game
         Label toastText, promptText, rankLabel, moneyLabel, taskCode, taskTitle, progressLabel, bugLabel, fpsLabel, pauseTask, pauseDiffDesc;
         UiBtn pauseCamera;
         readonly List<VisualElement> pauseDiffPills = new List<VisualElement>();
+        readonly List<VisualElement> pauseProfPills = new List<VisualElement>();
+        Label pauseProfDesc;
+        string newProf = "backend";
         ScrollBox settingsScroll;
         readonly List<VisualElement> tabPills = new List<VisualElement>();
 
@@ -213,6 +216,7 @@ namespace Intern.Game
             if (g.Tasks != null && g.Tasks.tasks != null)
                 foreach (var t in g.Tasks.tasks)
                 {
+                    if (t.language != "python" || t.IsChoice) continue;   // подсветка фона — питоновская
                     foreach (var src in new[] { t.solution, t.starter })
                         if (!string.IsNullOrEmpty(src)) { list.Add(""); list.AddRange(src.Replace("\r", "").Split('\n')); }
                 }
@@ -303,7 +307,7 @@ def deploy(env=""staging""):
             var tsh = K.B("Стажёр", 132f, new Color(0.03f, 0.03f, 0.1f, 0.85f), true); tsh.style.position = Position.Absolute; tsh.style.top = 9f; tsh.style.left = 0f; tw.Add(tsh);
             var title = K.B("Стажёр", 132f, Sun, true); tw.Add(title);
             layer.Add(tw);
-            var sub = K.T("Решай тикеты на Python, лови баги и дорасти до Junior+.", 20f, Muted); sub.style.marginTop = -6f; sub.style.marginBottom = 30f;
+            var sub = K.T("Выбери направление — Backend, Frontend или DevOps — и дорасти от стажёра до Middle.", 20f, Muted); sub.style.marginTop = -6f; sub.style.marginBottom = 30f;
             layer.Add(sub);
 
             VisualElement wrap;
@@ -313,7 +317,7 @@ def deploy(env=""staging""):
             layer.Add(wrap);
 
             var foot = K.Box(true); foot.style.alignItems = Align.Center; foot.style.marginTop = 30f; foot.pickingMode = PickingMode.Ignore; foot.style.opacity = 0.8f;
-            foot.Add(K.T("v0.5", 14f, Muted)); foot.Add(Dot());
+            foot.Add(K.T("v0.7", 14f, Muted)); foot.Add(Dot());
             foot.Add(Keycap("Esc", 0.8f)); var fb = K.T("назад", 14f, Muted); foot.Add(fb);
             layer.Add(foot);
             return layer;
@@ -332,7 +336,7 @@ def deploy(env=""staging""):
                 if (has)
                 {
                     var c = new UiBtn("Продолжить", () => g.UiContinue(), Sun, SunHover, SunLip, Ink, "play",
-                        g.RankName + "  ·  " + g.DoneCount + " из " + g.TotalCount + " задач  ·  " + Progress.DifficultyName((Difficulty)g.Save.difficulty), 76f);
+                        g.RankFull + "  ·  " + g.DoneCount + " из " + g.TotalCount + " задач  ·  " + Progress.DifficultyName((Difficulty)g.Save.difficulty), 76f);
                     c.style.marginTop = 0f; menuMain.Add(c);
                     menuMain.Add(new UiBtn("Новая игра", () => OpenNewGame(), Indigo, IndigoHover, IndigoLip, Text, "plus"));
                 }
@@ -350,42 +354,82 @@ def deploy(env=""staging""):
             head.Add(SmallIconButton("chevL", () => CloseNewGame()));
             var ht = K.B("Новая игра", 28f, Text); ht.style.marginLeft = 12f; head.Add(ht);
             menuNew.Add(head);
-            menuNew.Add(Caption("Выбери сложность — её можно поменять потом в паузе."));
-            AddChoice(Difficulty.Easy, "Каждая строка объясняется, подсказки бесплатно, можно подсмотреть решение.", "×1.0", Sun);
-            AddChoice(Difficulty.Medium, "Разбор строк — только в отладчике, подсказки за монеты.", "×1.2", Sky);
-            AddChoice(Difficulty.Hard, "Дедлайны, без теории и подсказок, ошибки без перевода.", "×1.6", Pink);
+            var pl = SectionLabel("НАПРАВЛЕНИЕ"); pl.style.marginTop = 10f; menuNew.Add(pl);
+            menuNew.Add(Caption("Сначала у всех общая база: терминал, Git, HTTP, дебаг. Потом — задачи профессии до уровня Middle."));
+            var grid = K.Box(true); grid.style.flexWrap = Wrap.Wrap; grid.style.justifyContent = Justify.SpaceBetween; grid.pickingMode = PickingMode.Ignore; grid.style.marginTop = 4f;
+            foreach (var pid in Professions.Ids) grid.Add(ProfessionCard(pid));
+            menuNew.Add(grid);
+            var dl = SectionLabel("СЛОЖНОСТЬ — МОЖНО ПОМЕНЯТЬ В ПАУЗЕ"); dl.style.marginTop = 18f; menuNew.Add(dl);
+            var seg = K.Box(true); seg.style.marginTop = 8f; seg.style.backgroundColor = Well; K.Radius(seg, 12f); K.Pad(seg, 4f); Border(seg, Line, 1f);
+            string[] mults = { "×1.0", "×1.2", "×1.6" };
+            foreach (Difficulty d in Enum.GetValues(typeof(Difficulty)))
+            {
+                int id = (int)d; bool sel = newDiff == id;
+                var pill = K.Box(true); K.Grow(pill); pill.style.height = 44f; K.Radius(pill, 9f); pill.style.justifyContent = Justify.Center; pill.style.alignItems = Align.Center;
+                pill.style.backgroundColor = sel ? Sun : Color.clear;
+                pill.Add(K.B(Progress.DifficultyName(d), 17f, sel ? Ink : Text));
+                var ml = K.T(mults[id], 13f, sel ? Ink : Muted); ml.style.marginLeft = 8f; pill.Add(ml);
+                pill.RegisterCallback<PointerEnterEvent>(e => { if (newDiff != id) pill.style.backgroundColor = Ghost; });
+                pill.RegisterCallback<PointerLeaveEvent>(e => { pill.style.backgroundColor = newDiff == id ? Sun : Color.clear; });
+                pill.RegisterCallback<ClickEvent>(e => { newDiff = id; RefreshMenu(); });
+                seg.Add(pill);
+            }
+            menuNew.Add(seg);
+            string[] ddesc = { "Каждая строка объясняется, подсказки бесплатно, после трёх попыток можно подсмотреть решение.", "Разбор строк — только в отладчике, подсказки за монеты.", "Дедлайны, без теории и подсказок, ошибки без перевода." };
+            var dd = K.T(ddesc[Mathf.Clamp(newDiff, 0, 2)], 14f, Muted, false, false, true); dd.style.marginTop = 6f; menuNew.Add(dd);
             if (g.HasProgress)
             {
                 var w = K.Box(true); w.style.alignItems = Align.Center; w.style.marginTop = 14f; w.pickingMode = PickingMode.Ignore;
                 w.Add(new Icon("warning", Pink, 18f));
-                var wl = K.T("Текущий прогресс (" + g.RankName + ", " + g.DoneCount + " из " + g.TotalCount + ") будет сброшен.", 14f, Pink, false, false, true); wl.style.marginLeft = 8f; wl.style.flexShrink = 1f;
+                var wl = K.T("Текущий прогресс (" + g.RankFull + ", " + g.DoneCount + " из " + g.TotalCount + ") будет сброшен. Пройденные направления останутся.", 14f, Pink, false, false, true); wl.style.marginLeft = 8f; wl.style.flexShrink = 1f;
                 w.Add(wl); menuNew.Add(w);
             }
             var row = K.Box(true); row.pickingMode = PickingMode.Ignore; row.style.marginTop = 8f;
             var back = new UiBtn("Назад", () => CloseNewGame(), Ghost, GhostHover, GhostLip, Muted, null, null, 58f, false, true); back.style.width = 150f; back.style.marginRight = 12f;
-            var go = new UiBtn("Начать", () => g.UiNewGame((Difficulty)newDiff), Sun, SunHover, SunLip, Ink, "play", null, 58f, true); K.Grow(go);
+            var go = new UiBtn("Начать: " + Professions.Name(newProf), () => g.UiNewGame((Difficulty)newDiff, newProf), Sun, SunHover, SunLip, Ink, "play", null, 58f, true); K.Grow(go);
             row.Add(back); row.Add(go); menuNew.Add(row);
         }
 
-        void AddChoice(Difficulty d, string desc, string mult, Color accent)
+        public void RefreshMenuPublic() { if (g.CurMode == GameRoot.Mode.Menu && !settingsOpen) RefreshMenu(); }
+
+        public static Color ProfColor(string id)
         {
-            int id = (int)d; bool sel = newDiff == id;
-            var c = K.Box(true); c.style.marginTop = 10f; K.Radius(c, 14f); K.Pad(c, 14f, 16f, 14f, 14f); c.style.alignItems = Align.Center;
-            c.style.backgroundColor = sel ? CardHi : Well; Border(c, sel ? accent : Line, sel ? 2f : 1f);
-            var stripe = K.Box(); stripe.pickingMode = PickingMode.Ignore; stripe.style.width = 6f; stripe.style.alignSelf = Align.Stretch; K.Radius(stripe, 3f); stripe.style.backgroundColor = accent; c.Add(stripe);
-            var col = K.Box(); col.pickingMode = PickingMode.Ignore; col.style.marginLeft = 14f; K.Grow(col);
-            col.Add(K.B(Progress.DifficultyName(d), 20f, Text));
-            var dl = K.T(desc, 14f, Muted, false, false, true); dl.style.marginTop = 3f; col.Add(dl);
-            c.Add(col);
-            var badge = K.B(mult, 15f, accent); badge.style.marginLeft = 12f; c.Add(badge);
-            c.RegisterCallback<PointerEnterEvent>(e => { if (newDiff != id) c.style.backgroundColor = Ghost; });
-            c.RegisterCallback<PointerLeaveEvent>(e => { c.style.backgroundColor = newDiff == id ? CardHi : Well; });
-            c.RegisterCallback<ClickEvent>(e => { newDiff = id; RefreshMenu(); });
-            menuNew.Add(c);
+            switch (id) { case "backend": return Mint; case "frontend": return Sky; case "devops": return Sun; default: return Pink; }
         }
 
-        void OpenNewGame() { newGamePage = true; newDiff = g.HasProgress ? g.Save.difficulty : 0; RefreshMenu(); Pop(menuCard); }
-        void CloseNewGame() { newGamePage = false; RefreshMenu(); Pop(menuCard); }
+        VisualElement ProfessionCard(string id)
+        {
+            bool locked = !Career.CanPick(id), sel = newProf == id && !locked, done = Career.Done(id);
+            var accent = ProfColor(id);
+            var c = K.Box(); c.style.width = Length.Percent(49f); c.style.marginTop = 10f; K.Radius(c, 14f); K.Pad(c, 14f, 14f, 14f, 14f);
+            c.style.backgroundColor = sel ? CardHi : Well; Border(c, sel ? accent : Line, sel ? 2f : 1f);
+            if (locked) c.style.opacity = 0.6f;
+            var top = K.Box(true); top.style.alignItems = Align.Center; top.pickingMode = PickingMode.Ignore;
+            var ic = K.Box(); ic.pickingMode = PickingMode.Ignore; ic.style.width = 38f; ic.style.height = 38f; K.Radius(ic, 11f); ic.style.justifyContent = Justify.Center; ic.style.alignItems = Align.Center;
+            ic.style.backgroundColor = new Color(accent.r, accent.g, accent.b, 0.18f); ic.Add(new Icon(locked ? "lock" : Professions.Icon(id), accent, 22f)); top.Add(ic);
+            var nm = K.B(Professions.Name(id), 20f, Text); nm.style.marginLeft = 12f; top.Add(nm);
+            top.Add(K.Spacer());
+            if (done) { var b = K.B("ПРОЙДЕНО", 11f, Ink); K.Pad(b, 3f, 7f, 3f, 7f); K.Radius(b, 6f); b.style.backgroundColor = Mint; top.Add(b); }
+            c.Add(top);
+            string desc = locked ? "Откроется, когда пройдёшь Backend, Frontend и DevOps (" + Career.Count + " из 3)." : Professions.Stack(id);
+            var dl = K.T(desc, 13f, Muted, false, false, true); dl.style.marginTop = 8f; c.Add(dl);
+            if (!locked)
+            {
+                c.RegisterCallback<PointerEnterEvent>(e => { if (newProf != id) c.style.backgroundColor = Ghost; });
+                c.RegisterCallback<PointerLeaveEvent>(e => { c.style.backgroundColor = newProf == id ? CardHi : Well; });
+                c.RegisterCallback<ClickEvent>(e => { newProf = id; RefreshMenu(); });
+            }
+            return c;
+        }
+
+        void OpenNewGame()
+        {
+            newGamePage = true; newDiff = g.HasProgress ? g.Save.difficulty : 0;
+            newProf = g.HasProgress && Career.CanPick(g.Profession) ? g.Profession : "backend";
+            menuCard.parent.style.width = 700f;
+            RefreshMenu(); Pop(menuCard);
+        }
+        void CloseNewGame() { newGamePage = false; menuCard.parent.style.width = 540f; RefreshMenu(); Pop(menuCard); }
 
         static Label Caption(string s) { var l = K.T(s, 14f, Muted, false, false, true); l.style.marginTop = 2f; return l; }
 
@@ -431,6 +475,22 @@ def deploy(env=""staging""):
             pauseCard.Add(seg);
             pauseDiffDesc = K.T("", 13f, Muted, false, false, true); pauseDiffDesc.style.marginTop = 6f; pauseCard.Add(pauseDiffDesc);
 
+            var pl = SectionLabel("НАПРАВЛЕНИЕ — ПРОГРЕСС СОХРАНЯЕТСЯ"); pl.style.marginTop = 18f; pauseCard.Add(pl);
+            var pseg = K.Box(true); pseg.style.marginTop = 8f; pseg.style.backgroundColor = Well; K.Radius(pseg, 12f); K.Pad(pseg, 4f); Border(pseg, Line, 1f);
+            foreach (var pid in Professions.Ids)
+            {
+                var id = pid;
+                var pill = K.Box(true); K.Grow(pill); pill.style.height = 40f; K.Radius(pill, 9f); pill.style.justifyContent = Justify.Center; pill.style.alignItems = Align.Center;
+                pill.Add(new Icon(Professions.Icon(id), Text, 16f)); var pn = K.B(Professions.Name(id), 15f, Text); pn.style.marginLeft = 6f; pill.Add(pn);
+                pill.userData = id;
+                pill.RegisterCallback<ClickEvent>(e => { if (!Career.CanPick(id)) { pauseProfDesc.text = "Fullstack откроется, когда пройдёшь Backend, Frontend и DevOps (" + Career.Count + " из 3)."; return; } g.UiSetProfession(id); RefreshPause(); });
+                pill.RegisterCallback<PointerEnterEvent>(e => { if (g.Profession != id && Career.CanPick(id)) pill.style.backgroundColor = Ghost; });
+                pill.RegisterCallback<PointerLeaveEvent>(e => RefreshPause());
+                pauseProfPills.Add(pill); pseg.Add(pill);
+            }
+            pauseCard.Add(pseg);
+            pauseProfDesc = K.T("", 13f, Muted, false, false, true); pauseProfDesc.style.marginTop = 6f; pauseCard.Add(pauseProfDesc);
+
             var sep = K.Box(); sep.pickingMode = PickingMode.Ignore; sep.style.height = 1f; sep.style.backgroundColor = Line; sep.style.marginTop = 18f; sep.style.marginBottom = 2f; pauseCard.Add(sep);
             var row = K.Box(true); row.pickingMode = PickingMode.Ignore;
             var home = new UiBtn("В главное меню", () => g.UiToMenu(), Ghost, GhostHover, GhostLip, Text, "home", null, 52f, false); K.Grow(home); home.style.marginRight = 10f;
@@ -445,7 +505,17 @@ def deploy(env=""staging""):
         void RefreshPause()
         {
             var t = g.CurrentTaskPublic;
-            pauseTask.text = (t != null && g.DoneCount < g.TotalCount ? g.TaskCodeOf(t) + "  ·  " + K.Esc(t.title) + "  ·  " : "Спринт закрыт  ·  ") + g.Save.money + " монет";
+            pauseTask.text = g.RankFull + "  ·  " + (t != null && !g.PathComplete ? g.TaskCodeOf(t) + " " + K.Esc(t.title) + "  ·  " : "направление пройдено  ·  ") + g.Save.money + " монет";
+            foreach (var pill in pauseProfPills)
+            {
+                string id = pill.userData as string;
+                bool sel = g.Profession == id, can = Career.CanPick(id);
+                pill.style.backgroundColor = sel ? ProfColor(id) : Color.clear;
+                pill.style.opacity = can ? 1f : 0.45f;
+                var l = pill.Q<Label>(); if (l != null) l.style.color = sel ? Ink : Text;
+                var ic = pill.Q<Icon>(); if (ic != null) ic.Set(can ? Professions.Icon(id) : "lock", sel ? Ink : Text);
+            }
+            pauseProfDesc.text = Professions.About(g.Profession) + " Сдано " + g.DoneCount + " из " + g.TotalCount + ".";
             pauseCamera.SetTitle(g.FirstPerson ? "Камера: от первого лица" : "Камера: от третьего лица");
             for (int i = 0; i < pauseDiffPills.Count; i++)
             {
@@ -822,15 +892,15 @@ def deploy(env=""staging""):
         void UpdateHud()
         {
             var t = g.CurrentTaskPublic;
-            bool sprintDone = g.DoneCount >= g.TotalCount;
-            string key = g.RankName + "|" + g.Save.money + "|" + (t != null ? t.id : "") + "|" + g.DoneCount + "|" + g.BugCount + "|" + sprintDone;
+            bool sprintDone = g.PathComplete;
+            string key = g.RankFull + "|" + g.Save.money + "|" + (t != null ? t.id : "") + "|" + g.DoneCount + "|" + g.BugCount + "|" + sprintDone;
             if (key != lastHud)
             {
                 lastHud = key;
-                rankLabel.text = g.RankName.ToUpperInvariant();
+                rankLabel.text = g.RankFull.ToUpperInvariant();
                 moneyLabel.text = g.Save.money.ToString();
                 taskCode.text = t != null && !sprintDone ? g.TaskCodeOf(t) : "ГОТОВО";
-                taskTitle.text = t != null && !sprintDone ? K.Esc(t.title) : "Спринт закрыт!";
+                taskTitle.text = t != null && !sprintDone ? K.Esc(t.title) : "Направление пройдено!";
                 float p = g.TotalCount > 0 ? (float)g.DoneCount / g.TotalCount : 0f;
                 progressFill.style.width = Length.Percent(p * 100f);
                 progressLabel.text = g.DoneCount + " / " + g.TotalCount;
@@ -871,7 +941,7 @@ def deploy(env=""staging""):
             {
                 toastText.text = K.Esc(t);
                 var ic = toastPill.Q<Icon>();
-                if (ic != null) ic.Set(t.StartsWith("Задача сдана") ? "coin" : t.StartsWith("Новая задача") ? "task" : t.StartsWith("ПОВЫШЕНИЕ") ? "kodzilla" : "bell", Ink);
+                if (ic != null) ic.Set(t.StartsWith("Задача сдана") ? "coin" : t.StartsWith("Новая задача") ? "task" : t.StartsWith("ПОВЫШЕНИЕ") || t.StartsWith("НАПРАВЛЕНИЕ") || t.StartsWith("ОТКРЫТ") ? "kodzilla" : t.StartsWith("Тема закрыта") ? "check" : "bell", Ink);
             }
             float age = g.ToastAge, left = g.ToastLeft;
             float k = Mathf.Clamp01(age / 0.18f) * Mathf.Clamp01(left / 0.25f);

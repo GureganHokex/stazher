@@ -1,0 +1,611 @@
+{
+ "track": "backend",
+ "part": "b1",
+ "topics": [],
+ "tasks": [
+  {
+   "task_id": "be-py-basics-01",
+   "topic_id": "be-py-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "story": "Привет! Добро пожаловать в «Кодзилла Софт». Первое задание у всех одинаковое: пусть твоя программа поздоровается с офисом.",
+   "content": {
+    "question": "Выведи ровно: Привет, офис!",
+    "code": "# Строки, начинающиеся с #, — комментарии. Python их пропускает.\n# Напиши свою первую команду ниже:\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "print(\"Привет, офис!\")",
+    "test_cases": [
+     {
+      "input": "",
+      "expected": "Привет, офис!"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "Нужна команда print с текстом в кавычках внутри скобок.",
+    "Пример: print(\"Текст\") — только текст должен быть другим.",
+    "Проверь запятую и восклицательный знак: Привет, офис!"
+   ],
+   "legacy": true,
+   "legacy_id": "py01",
+   "title": "Hello, офис!",
+   "sender": "HR Оля",
+   "theory": "Программа — это список команд, которые компьютер выполняет сверху вниз.\n\nprint(...) — команда «выведи на экран». То, что внутри скобок, появится в консоли.\n\nТекст в Python пишут в кавычках: \"вот так\" или 'вот так'. Такой текст называется строкой (str).\n\nПример:\nprint(\"Мяу\")  # выведет: Мяу"
+  },
+  {
+   "task_id": "be-py-basics-02",
+   "topic_id": "be-py-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "story": "Надо напечатать тебе бейджик. Я уже сохранила твоё имя в переменной, осталось вывести надпись.",
+   "content": {
+    "question": "Выведи: Меня зовут Стажёр — используя переменную name, а не копируя текст.",
+    "code": "name = \"Стажёр\"\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "name = \"Стажёр\"\nprint(\"Меня зовут\", name)",
+    "test_cases": [
+     {
+      "input": "",
+      "expected": "Меня зовут Стажёр"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "Используй print с двумя значениями через запятую.",
+    "Первое — строка \"Меня зовут\", второе — переменная name без кавычек."
+   ],
+   "legacy": true,
+   "legacy_id": "py02",
+   "title": "Бейджик",
+   "sender": "HR Оля",
+   "theory": "Переменная — это коробка с названием, в которую кладут значение:\nname = \"Стажёр\"\n\nЗнак = в программировании значит «положи справа налево», а не «равно».\n\nЧтобы вывести значение переменной, пиши её имя БЕЗ кавычек:\nprint(name)\n\nprint может вывести несколько значений через запятую — между ними встанет пробел:\nprint(\"Меня зовут\", name)"
+  },
+  {
+   "task_id": "be-py-basics-03",
+   "topic_id": "be-py-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Я Гена, твой тимлид. Бухгалтерия спрашивает, сколько кофе мы пьём. Нас 12 человек, каждый пьёт 3 чашки в день. Посчитай, сколько чашек уходит за день и за рабочую неделю (5 дней).",
+   "content": {
+    "question": "Выведи две строки: сначала чашки за день, потом за неделю.",
+    "code": "people = 12\ncups_per_person = 3\n# посчитай и выведи\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "people = 12\ncups_per_person = 3\nday = people * cups_per_person\nprint(day)\nprint(day * 5)",
+    "test_cases": [
+     {
+      "input": "",
+      "expected": "36\n180"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "Чашки в день = people * cups_per_person.",
+    "Сохрани результат в переменную day, а потом выведи day и day * 5 двумя print."
+   ],
+   "legacy": true,
+   "legacy_id": "py03",
+   "title": "Кофейная арифметика",
+   "sender": "Тимлид Гена",
+   "theory": "Python — отличный калькулятор:\n+ сложение, - вычитание, * умножение, / деление.\n\nВычисления можно сохранять в переменные:\npeople = 12\ncups = people * 3\n\nprint(cups) выведет результат вычисления, а не слово cups."
+  },
+  {
+   "task_id": "be-py-basics-04",
+   "topic_id": "be-py-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Стажёрам платят 500 монет в час. Напиши программу: пользователь вводит количество часов, программа печатает, сколько он заработал.",
+   "content": {
+    "question": "Считай количество часов и выведи заработок (часы × 500).",
+    "code": "hours = input()\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "hours = int(input())\nprint(hours * 500)",
+    "test_cases": [
+     {
+      "input": "8",
+      "expected": "4000"
+     },
+     {
+      "input": "0",
+      "expected": "0"
+     },
+     {
+      "input": "13",
+      "expected": "6500"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "input() вернул строку. Её надо превратить в число через int(...).",
+    "hours = int(input()), а потом print(hours * 500)."
+   ],
+   "legacy": true,
+   "legacy_id": "py04",
+   "title": "Калькулятор зарплаты",
+   "sender": "Тимлид Гена",
+   "theory": "input() останавливает программу и ждёт, пока человек что-то введёт. Результат — всегда СТРОКА, даже если ввели цифры!\n\n\"8\" (строка) и 8 (число) — разные вещи. \"8\" * 2 даст \"88\".\n\nЧтобы превратить строку в целое число, есть int():\nhours = int(input())\n\nВ проверке игра сама «вводит» данные за пользователя."
+  },
+  {
+   "task_id": "be-py-basics-05",
+   "topic_id": "be-py-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Я Марина, сеньор. Нам нужен бот для новичков: вводишь имя — он здоровается. Давай через f-строку, так красивее.",
+   "content": {
+    "question": "Считай имя и выведи: Добро пожаловать, ИМЯ!",
+    "code": "name = input()\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "name = input()\nprint(f\"Добро пожаловать, {name}!\")",
+    "test_cases": [
+     {
+      "input": "Аня",
+      "expected": "Добро пожаловать, Аня!"
+     },
+     {
+      "input": "Стажёр",
+      "expected": "Добро пожаловать, Стажёр!"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "Используй f-строку: f\"...{name}...\"",
+    "print(f\"Добро пожаловать, {name}!\")"
+   ],
+   "legacy": true,
+   "legacy_id": "py05",
+   "title": "Приветственный бот",
+   "sender": "Сеньор Марина",
+   "theory": "f-строка — удобный способ вставить значения в текст. Ставишь букву f перед кавычками, а переменные пишешь в фигурных скобках:\n\nname = \"Аня\"\nprint(f\"Привет, {name}!\")  # Привет, Аня!\n\nВнутри {} можно писать даже вычисления: f\"{2 + 2}\""
+  },
+  {
+   "task_id": "be-py-basics-06",
+   "topic_id": "be-py-basics",
+   "grade": "junior",
+   "type": "find_bug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "ЧП! Бот поздравления с днём рождения упал в продакшене. Пользователь вводит возраст, бот должен сказать, сколько ему исполнится в следующем году. Найди баг. Запусти код и почитай ошибку — она подскажет.",
+   "content": {
+    "question": "Исправь код: для ввода 20 программа должна вывести 21.",
+    "code": "age = input()\nprint(age + 1)\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "age = int(input())\nprint(age + 1)",
+    "test_cases": [
+     {
+      "input": "20",
+      "expected": "21"
+     },
+     {
+      "input": "99",
+      "expected": "100"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "Запусти в режиме «Отладка» и посмотри на тип переменной age.",
+    "age — строка (str), а к строке нельзя прибавить число.",
+    "Преврати ввод в число: age = int(input())"
+   ],
+   "legacy": true,
+   "legacy_id": "py06",
+   "title": "Первый баг в проде",
+   "sender": "Тимлид Гена",
+   "theory": "Ошибки — это нормально, их видят все программисты каждый день. Главное — уметь их читать:\n\n• Тип ошибки (TypeError, NameError...) говорит, ЧТО сломалось.\n• Номер строки говорит, ГДЕ.\n• Сообщение подсказывает, ПОЧЕМУ.\n\nОтладчик (кнопка «Отладка») выполняет программу по одной строке и показывает все переменные. Посмотри, какой тип у переменной age."
+  },
+  {
+   "task_id": "be-py-control-01",
+   "topic_id": "be-py-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "story": "Я Стас, продакт. В офисе жарко, и все ругаются. Сделай умный кондиционер: если температура выше 25 градусов — включаем, иначе всё ок.",
+   "content": {
+    "question": "Считай температуру (целое число). Если больше 25 — выведи «Включить кондиционер», иначе — «Всё ок».",
+    "code": "t = int(input())\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "t = int(input())\nif t > 25:\n    print(\"Включить кондиционер\")\nelse:\n    print(\"Всё ок\")",
+    "test_cases": [
+     {
+      "input": "30",
+      "expected": "Включить кондиционер"
+     },
+     {
+      "input": "25",
+      "expected": "Всё ок"
+     },
+     {
+      "input": "-5",
+      "expected": "Всё ок"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "Нужны if и else с двоеточиями.",
+    "Строго больше 25 — это t > 25. Ровно 25 — это «Всё ок»."
+   ],
+   "legacy": true,
+   "legacy_id": "py07",
+   "title": "Кондиционер",
+   "sender": "Продакт Стас",
+   "theory": "if — это развилка. Код с отступом под if выполняется, только если условие истинно:\n\nif t > 25:\n    print(\"Жарко\")\nelse:\n    print(\"Норм\")\n\nВажно:\n• после условия — двоеточие :\n• строки внутри — с отступом в 4 пробела (клавиша Tab)\n• сравнения: >  <  >=  <=  == (равно)  != (не равно)"
+  },
+  {
+   "task_id": "be-py-control-02",
+   "topic_id": "be-py-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Мониторинг показывает только цифры, и никто не понимает, что они значат. Сделай расшифровщик HTTP-кодов.",
+   "content": {
+    "question": "200 → OK, 404 → Не найдено, 500 → Ошибка сервера, любой другой → Неизвестный код",
+    "code": "code = int(input())\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "code = int(input())\nif code == 200:\n    print(\"OK\")\nelif code == 404:\n    print(\"Не найдено\")\nelif code == 500:\n    print(\"Ошибка сервера\")\nelse:\n    print(\"Неизвестный код\")",
+    "test_cases": [
+     {
+      "input": "200",
+      "expected": "OK"
+     },
+     {
+      "input": "404",
+      "expected": "Не найдено"
+     },
+     {
+      "input": "500",
+      "expected": "Ошибка сервера"
+     },
+     {
+      "input": "418",
+      "expected": "Неизвестный код"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "Цепочка: if ... elif ... elif ... else.",
+    "Сравнение пишется двумя знаками: code == 200."
+   ],
+   "legacy": true,
+   "legacy_id": "py08",
+   "title": "Коды ответа сервера",
+   "sender": "Сеньор Марина",
+   "theory": "Когда вариантов больше двух, используют elif (сокращение от else if):\n\nif code == 200:\n    ...\nelif code == 404:\n    ...\nelse:\n    ...\n\nPython проверяет условия сверху вниз и выполняет ПЕРВОЕ истинное. else срабатывает, если не подошло ничего.\n\n== сравнивает, = присваивает. Путать их — классическая ошибка."
+  },
+  {
+   "task_id": "be-py-control-03",
+   "topic_id": "be-py-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Сегодня релиз! Нужен обратный отсчёт на большом экране: вводим число N, программа выводит N, N-1, ... 1, а потом «Релиз!».",
+   "content": {
+    "question": "Выведи числа от N до 1 (каждое на новой строке), затем «Релиз!».",
+    "code": "n = int(input())\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "n = int(input())\nwhile n > 0:\n    print(n)\n    n -= 1\nprint(\"Релиз!\")",
+    "test_cases": [
+     {
+      "input": "3",
+      "expected": "3\n2\n1\nРелиз!"
+     },
+     {
+      "input": "1",
+      "expected": "1\nРелиз!"
+     },
+     {
+      "input": "0",
+      "expected": "Релиз!"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "while n > 0: ... и уменьшай n внутри цикла.",
+    "print(\"Релиз!\") должен стоять ПОСЛЕ цикла — без отступа."
+   ],
+   "legacy": true,
+   "legacy_id": "py09",
+   "title": "Обратный отсчёт до релиза",
+   "sender": "Тимлид Гена",
+   "theory": "while повторяет блок, пока условие истинно:\n\nn = 3\nwhile n > 0:\n    print(n)\n    n = n - 1   # или n -= 1\n\nВнутри цикла обязательно что-то должно меняться, иначе условие никогда не станет ложным и цикл будет бесконечным.\n\nСовет: пройди этот цикл в отладчике по шагам и смотри, как меняется n."
+  },
+  {
+   "task_id": "be-py-control-04",
+   "topic_id": "be-py-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "В спринте N дней. В первый день ты написал 1 строку кода, во второй — 2, и так далее. Сколько строк всего за спринт? Посчитай циклом.",
+   "content": {
+    "question": "Считай N и выведи сумму 1 + 2 + ... + N.",
+    "code": "n = int(input())\ntotal = 0\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "n = int(input())\ntotal = 0\nfor i in range(1, n + 1):\n    total += i\nprint(total)",
+    "test_cases": [
+     {
+      "input": "10",
+      "expected": "55"
+     },
+     {
+      "input": "1",
+      "expected": "1"
+     },
+     {
+      "input": "100",
+      "expected": "5050"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "Перебери числа от 1 до n включительно: range(1, n + 1).",
+    "Внутри цикла: total += i. Выведи total после цикла."
+   ],
+   "legacy": true,
+   "legacy_id": "py10",
+   "title": "Строки кода за спринт",
+   "sender": "Тимлид Гена",
+   "theory": "for перебирает значения по очереди:\n\nfor i in range(1, 4):\n    print(i)   # 1, 2, 3\n\nrange(a, b) — числа от a до b-1. Последнее число НЕ включается!\n\nЧтобы что-то накопить, заводят переменную-счётчик до цикла:\ntotal = 0\nfor i in range(1, 4):\n    total += i"
+  },
+  {
+   "task_id": "be-py-collections-01",
+   "topic_id": "be-py-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "QA завели баги и проставили приоритеты числами в одну строку. Мне нужно три числа: самый высокий приоритет, самый низкий и сколько всего багов.",
+   "content": {
+    "question": "Считай строку чисел через пробел. Выведи max, min и количество — каждое на своей строке.",
+    "code": "nums = [int(x) for x in input().split()]\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "nums = [int(x) for x in input().split()]\nprint(max(nums))\nprint(min(nums))\nprint(len(nums))",
+    "test_cases": [
+     {
+      "input": "3 1 4 1 5",
+      "expected": "5\n1\n5"
+     },
+     {
+      "input": "7",
+      "expected": "7\n7\n1"
+     },
+     {
+      "input": "-2 10 0",
+      "expected": "10\n-2\n3"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "Тебе нужны функции max(), min(), len().",
+    "Три print подряд: print(max(nums)) и т.д."
+   ],
+   "legacy": true,
+   "legacy_id": "py11",
+   "title": "Приоритеты багов",
+   "sender": "Сеньор Марина",
+   "theory": "Список хранит много значений по порядку:\nbugs = [3, 1, 4]\n\nПолезное:\nlen(bugs) — сколько элементов\nmax(bugs), min(bugs) — наибольший и наименьший\nbugs[0] — первый элемент (счёт с нуля!)\n\nСтрока \"3 1 4\".split() превращается в список строк ['3', '1', '4']. Чтобы получить числа:\nnums = [int(x) for x in input().split()]"
+  },
+  {
+   "task_id": "be-py-collections-02",
+   "topic_id": "be-py-collections",
+   "grade": "junior",
+   "type": "find_bug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Функция average считает неправильно: для «2 4 6» выдаёт 3.3333333333333335, а должно быть 4.0. Где-то закрался баг. Используй отладчик и смотри, какие индексы берёт цикл.",
+   "content": {
+    "question": "Исправь average так, чтобы она считала среднее всех чисел.",
+    "code": "def average(nums):\n    total = 0\n    for i in range(1, len(nums)):\n        total += nums[i]\n    return total / len(nums)\n\nnums = [int(x) for x in input().split()]\nprint(average(nums))\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "def average(nums):\n    total = 0\n    for i in range(len(nums)):\n        total += nums[i]\n    return total / len(nums)\n\nnums = [int(x) for x in input().split()]\nprint(average(nums))",
+    "test_cases": [
+     {
+      "input": "2 4 6",
+      "expected": "4.0"
+     },
+     {
+      "input": "10",
+      "expected": "10.0"
+     },
+     {
+      "input": "1 2",
+      "expected": "1.5"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "Поставь точку остановки на строку total += nums[i] и посмотри, чему равно i в первый раз.",
+    "Первый элемент списка — nums[0], а цикл начинается с 1.",
+    "range(len(nums)) или вообще for x in nums: total += x"
+   ],
+   "legacy": true,
+   "legacy_id": "py12",
+   "title": "Средний чек (баг)",
+   "sender": "Сеньор Марина",
+   "theory": "Функция — именованный кусок кода, который можно вызывать много раз:\n\ndef double(x):\n    return x * 2\n\nprint(double(5))  # 10\n\nreturn отдаёт результат туда, где функцию вызвали.\n\nИндексы списка начинаются с 0. range(1, len(nums)) пропускает первый элемент — частая ошибка «на единицу» (off-by-one)."
+  },
+  {
+   "task_id": "be-py-functions-01",
+   "topic_id": "be-py-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "story": "Мы вводим бонусы! За каждые полные 100 строк кода — 10 монет. Оформи это функцией bonus(lines), она ещё пригодится в других местах.",
+   "content": {
+    "question": "Напиши функцию bonus(lines). Программа считывает число строк и выводит бонус.",
+    "code": "def bonus(lines):\n    # твой код\n    pass\n\nlines = int(input())\nprint(bonus(lines))\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "def bonus(lines):\n    return lines // 100 * 10\n\nlines = int(input())\nprint(bonus(lines))",
+    "test_cases": [
+     {
+      "input": "350",
+      "expected": "30"
+     },
+     {
+      "input": "99",
+      "expected": "0"
+     },
+     {
+      "input": "1000",
+      "expected": "100"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "Сколько полных сотен в lines? Это lines // 100.",
+    "return lines // 100 * 10"
+   ],
+   "legacy": true,
+   "legacy_id": "py13",
+   "title": "Бонус за код",
+   "sender": "Продакт Стас",
+   "theory": "Целочисленное деление // отбрасывает дробную часть:\n250 // 100 = 2\n\nОстаток от деления %:\n250 % 100 = 50\n\nФункция с параметром:\ndef bonus(lines):\n    return ...\n\nФункцию сначала объявляют (def), потом вызывают: bonus(250)."
+  },
+  {
+   "task_id": "be-py-collections-03",
+   "topic_id": "be-py-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Хочу понять, кто в команде сколько коммитит. Тебе дают строку с авторами коммитов через пробел. Выведи каждого автора и число его коммитов в порядке первого появления.",
+   "content": {
+    "question": "Для «anna bob anna» выведи:\nanna 2\nbob 1",
+    "code": "authors = input().split()\ncounts = {}\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "authors = input().split()\ncounts = {}\nfor a in authors:\n    counts[a] = counts.get(a, 0) + 1\nfor name, n in counts.items():\n    print(name, n)",
+    "test_cases": [
+     {
+      "input": "anna bob anna",
+      "expected": "anna 2\nbob 1"
+     },
+     {
+      "input": "kim",
+      "expected": "kim 1"
+     },
+     {
+      "input": "x y z y x x",
+      "expected": "x 3\ny 2\nz 1"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "Пройди циклом по authors и увеличивай счётчик для каждого имени.",
+    "counts[a] = counts.get(a, 0) + 1",
+    "В конце: for name, n in counts.items(): print(name, n)"
+   ],
+   "legacy": true,
+   "legacy_id": "py14",
+   "title": "Кто больше коммитит",
+   "sender": "Тимлид Гена",
+   "theory": "Словарь хранит пары «ключ: значение»:\ncounts = {\"anna\": 2}\ncounts[\"anna\"]  # 2\n\nДобавить или изменить: counts[\"bob\"] = 1\nПроверить ключ: if \"bob\" in counts:\nБезопасно прочитать: counts.get(\"kim\", 0) — вернёт 0, если ключа нет.\n\nПеребор пар:\nfor name, n in counts.items():\n    print(name, n)"
+  },
+  {
+   "task_id": "be-py-functions-02",
+   "topic_id": "be-py-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Экзамен перед повышением до Junior. На стендапе каждый пишет «имя:часы». Первая строка — сколько будет записей. Бот должен сложить часы по каждому человеку, вывести людей по алфавиту в формате «имя — N ч», а последней строкой — «Итого: N ч». Это настоящая маленькая программа: используй всё, что уже знаешь.",
+   "content": {
+    "question": "Выведи часы по людям в алфавитном порядке и строку «Итого».",
+    "code": "n = int(input())\nhours = {}\n# 1) прочитай n строк вида имя:часы\n# 2) накопи часы в словаре hours\n# 3) выведи результат\n",
+    "language": "python",
+    "options": null,
+    "correct_answer": "n = int(input())\nhours = {}\nfor _ in range(n):\n    name, h = input().split(\":\")\n    hours[name] = hours.get(name, 0) + int(h)\nfor name in sorted(hours):\n    print(f\"{name} — {hours[name]} ч\")\nprint(f\"Итого: {sum(hours.values())} ч\")",
+    "test_cases": [
+     {
+      "input": "3\nmarina:4\nanna:3\nmarina:2",
+      "expected": "anna — 3 ч\nmarina — 6 ч\nИтого: 9 ч"
+     },
+     {
+      "input": "1\ngena:8",
+      "expected": "gena — 8 ч\nИтого: 8 ч"
+     }
+    ]
+   },
+   "explanation": "",
+   "hints": [
+    "for _ in range(n): line = input()",
+    "name, h = line.split(\":\") — и не забудь int(h).",
+    "for name in sorted(hours): print(f\"{name} — {hours[name]} ч\")",
+    "В конце: print(f\"Итого: {sum(hours.values())} ч\")"
+   ],
+   "legacy": true,
+   "legacy_id": "py15",
+   "title": "Бот для стендапа",
+   "sender": "Сеньор Марина",
+   "theory": "Собери всё вместе:\n• input() в цикле — для N строк\n• строка.split(\":\") — разрезать «anna:3» на [\"anna\", \"3\"]\n• словарь для накопления часов\n• sorted(словарь) — ключи по алфавиту\n• sum(словарь.values()) — сумма значений\n• f-строки для красивого вывода\n\nНе торопись: сначала напиши план в комментариях, потом код. Так делают и сеньоры."
+  }
+ ]
+}

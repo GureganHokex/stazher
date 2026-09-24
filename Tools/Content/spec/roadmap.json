@@ -1,0 +1,827 @@
+{
+ "common": [
+  {
+   "topic_id": "c-terminal",
+   "title": "Терминал и Linux для разработчика",
+   "grade": "intern",
+   "requires": [],
+   "description": "Навигация по файлам, права, пайпы, grep, переменные окружения — всё, что нужно разработчику в консоли каждый день."
+  },
+  {
+   "topic_id": "c-git-basics",
+   "title": "Git: коммиты и история",
+   "grade": "intern",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "init, clone, status, add, commit, log, diff, .gitignore и хорошие сообщения коммитов."
+  },
+  {
+   "topic_id": "c-http",
+   "title": "HTTP: запросы и ответы",
+   "grade": "intern",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "Методы, коды статусов, заголовки, тело запроса, JSON, curl и вкладка Network."
+  },
+  {
+   "topic_id": "c-debugging",
+   "title": "Дебаг: как искать ошибки",
+   "grade": "intern",
+   "requires": [],
+   "description": "Читать трейсбек, воспроизводить баг, сужать поиск, логи и точки останова."
+  },
+  {
+   "topic_id": "c-docs",
+   "title": "Документация и вопросы коллегам",
+   "grade": "intern",
+   "requires": [
+    "c-debugging"
+   ],
+   "description": "Как искать ответ, читать официальную документацию и задавать вопрос так, чтобы на него ответили."
+  },
+  {
+   "topic_id": "c-git-branches",
+   "title": "Git: ветки, merge и pull request",
+   "grade": "junior",
+   "requires": [
+    "c-git-basics"
+   ],
+   "description": "Ветки, merge, fast-forward, pull request, git flow в команде."
+  },
+  {
+   "topic_id": "c-git-conflicts",
+   "title": "Git: конфликты, rebase и откат",
+   "grade": "junior",
+   "requires": [
+    "c-git-branches"
+   ],
+   "description": "Разрешение конфликтов, rebase и interactive rebase, revert, reset, cherry-pick, stash."
+  },
+  {
+   "topic_id": "c-networks",
+   "title": "Основы сетей: DNS, порты, TCP",
+   "grade": "junior",
+   "requires": [
+    "c-http"
+   ],
+   "description": "IP, порты, DNS, TCP и UDP, TLS/HTTPS, localhost и что происходит при вводе адреса в браузер."
+  },
+  {
+   "topic_id": "c-estimation",
+   "title": "Оценка задач и уточняющие вопросы",
+   "grade": "junior",
+   "requires": [
+    "c-docs"
+   ],
+   "description": "Декомпозиция, стори-поинты, риски, неизвестные и вопросы менеджеру до начала работы."
+  },
+  {
+   "topic_id": "c-code-review",
+   "title": "Код-ревью: как давать и принимать",
+   "grade": "junior_plus",
+   "requires": [
+    "c-git-branches",
+    "c-estimation"
+   ],
+   "description": "Что смотреть на ревью, как писать комментарии, размер PR, как отвечать на замечания."
+  }
+ ],
+ "backend": [
+  {
+   "topic_id": "be-py-basics",
+   "title": "Python: переменные, ввод и вывод",
+   "grade": "junior",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "print, input, переменные, числа и строки, преобразование типов, f-строки."
+  },
+  {
+   "topic_id": "be-py-control",
+   "title": "Python: условия и циклы",
+   "grade": "junior",
+   "requires": [
+    "be-py-basics"
+   ],
+   "description": "if/elif/else, логические операторы, while, for, range, break и continue."
+  },
+  {
+   "topic_id": "be-py-collections",
+   "title": "Python: списки, словари, множества",
+   "grade": "junior",
+   "requires": [
+    "be-py-control"
+   ],
+   "description": "list, dict, set, tuple, методы коллекций, срезы, генераторы списков, сортировка по ключу."
+  },
+  {
+   "topic_id": "be-py-functions",
+   "title": "Python: функции",
+   "grade": "junior",
+   "requires": [
+    "be-py-collections"
+   ],
+   "description": "Параметры и значения по умолчанию, *args/**kwargs, возврат значений, области видимости, lambda, чистые функции."
+  },
+  {
+   "topic_id": "be-py-oop",
+   "title": "Python: ООП",
+   "grade": "junior",
+   "requires": [
+    "be-py-functions"
+   ],
+   "description": "Классы, объекты, __init__, методы, наследование, инкапсуляция, магические методы, композиция."
+  },
+  {
+   "topic_id": "be-py-exceptions",
+   "title": "Python: исключения",
+   "grade": "junior",
+   "requires": [
+    "be-py-functions"
+   ],
+   "description": "try/except/else/finally, raise, свои исключения, когда ловить и когда пробрасывать."
+  },
+  {
+   "topic_id": "be-unit-tests",
+   "title": "Unit-тесты (pytest)",
+   "grade": "junior",
+   "requires": [
+    "be-py-exceptions"
+   ],
+   "description": "assert, pytest, фикстуры, параметризация, моки, что и как тестировать."
+  },
+  {
+   "topic_id": "be-rest-crud",
+   "title": "REST и CRUD",
+   "grade": "junior",
+   "requires": [
+    "c-http",
+    "be-py-functions"
+   ],
+   "description": "Ресурсы, методы, коды ответов, CRUD-операции, идемпотентность GET/PUT/DELETE."
+  },
+  {
+   "topic_id": "be-fastapi",
+   "title": "Фреймворк FastAPI",
+   "grade": "junior",
+   "requires": [
+    "be-rest-crud",
+    "be-py-oop"
+   ],
+   "description": "Роуты, path/query параметры, тело запроса, модели ответа, зависимости, автодокументация."
+  },
+  {
+   "topic_id": "be-sql-basics",
+   "title": "SQL: основы",
+   "grade": "junior",
+   "requires": [
+    "be-py-collections"
+   ],
+   "description": "SELECT, WHERE, ORDER BY, LIMIT, INSERT, UPDATE, DELETE, NULL, типы данных."
+  },
+  {
+   "topic_id": "be-orm",
+   "title": "ORM: модели и запросы",
+   "grade": "junior",
+   "requires": [
+    "be-sql-basics",
+    "be-py-oop"
+   ],
+   "description": "SQLAlchemy/Django ORM: модели, сессии, фильтры, связи, миграции."
+  },
+  {
+   "topic_id": "be-sql-joins",
+   "title": "SQL: JOIN и GROUP BY",
+   "grade": "junior_plus",
+   "requires": [
+    "be-sql-basics"
+   ],
+   "description": "INNER/LEFT JOIN, GROUP BY, HAVING, агрегаты, подзапросы."
+  },
+  {
+   "topic_id": "be-validation",
+   "title": "Валидация данных",
+   "grade": "junior_plus",
+   "requires": [
+    "be-fastapi"
+   ],
+   "description": "Pydantic-модели, валидаторы, ограничения полей, понятные ошибки валидации."
+  },
+  {
+   "topic_id": "be-api-errors",
+   "title": "Обработка ошибок в API",
+   "grade": "junior_plus",
+   "requires": [
+    "be-validation",
+    "be-py-exceptions"
+   ],
+   "description": "Коды 4xx/5xx, единый формат ошибок, обработчики исключений, не отдавать трейсбек клиенту."
+  },
+  {
+   "topic_id": "be-auth",
+   "title": "Аутентификация: сессии и JWT",
+   "grade": "junior_plus",
+   "requires": [
+    "be-api-errors"
+   ],
+   "description": "Хеширование паролей, сессии и куки, JWT, access/refresh токены, авторизация по ролям."
+  },
+  {
+   "topic_id": "be-docker-local",
+   "title": "Docker для локального запуска",
+   "grade": "junior_plus",
+   "requires": [
+    "c-terminal",
+    "be-fastapi"
+   ],
+   "description": "Dockerfile для Python-сервиса, docker compose с базой, переменные окружения, тома."
+  },
+  {
+   "topic_id": "be-api-design",
+   "title": "Проектирование API",
+   "grade": "middle",
+   "requires": [
+    "be-api-errors"
+   ],
+   "description": "Пагинация (offset и cursor), версионирование, идемпотентность POST, фильтрация, коды ответов."
+  },
+  {
+   "topic_id": "be-indexes",
+   "title": "Индексы и EXPLAIN",
+   "grade": "middle",
+   "requires": [
+    "be-sql-joins"
+   ],
+   "description": "B-tree индексы, составные индексы и порядок колонок, EXPLAIN ANALYZE, когда индекс мешает."
+  },
+  {
+   "topic_id": "be-transactions",
+   "title": "Транзакции и уровни изоляции",
+   "grade": "middle",
+   "requires": [
+    "be-sql-joins",
+    "be-orm"
+   ],
+   "description": "ACID, уровни изоляции, аномалии, блокировки, SELECT FOR UPDATE, оптимистичные блокировки."
+  },
+  {
+   "topic_id": "be-n-plus-one",
+   "title": "Проблема N+1",
+   "grade": "middle",
+   "requires": [
+    "be-orm",
+    "be-sql-joins"
+   ],
+   "description": "Как появляется N+1, joinedload/selectinload, select_related/prefetch_related, как заметить в логах."
+  },
+  {
+   "topic_id": "be-caching",
+   "title": "Кэширование и Redis",
+   "grade": "middle",
+   "requires": [
+    "be-indexes",
+    "be-api-design"
+   ],
+   "description": "Cache-aside, TTL, инвалидация, прогрев, cache stampede, что кэшировать нельзя."
+  },
+  {
+   "topic_id": "be-queues",
+   "title": "Очереди: Celery, RabbitMQ, Kafka",
+   "grade": "middle",
+   "requires": [
+    "be-api-design"
+   ],
+   "description": "Фоновые задачи, ретраи, идемпотентные обработчики, at-least-once, партиции Kafka."
+  },
+  {
+   "topic_id": "be-async",
+   "title": "Асинхронность в Python",
+   "grade": "middle",
+   "requires": [
+    "be-fastapi"
+   ],
+   "description": "asyncio, async/await, блокирующие вызовы в async-коде, gather, таймауты."
+  },
+  {
+   "topic_id": "be-security",
+   "title": "Безопасность бэкенда",
+   "grade": "middle",
+   "requires": [
+    "be-auth",
+    "be-sql-joins"
+   ],
+   "description": "SQL-инъекции, секреты в коде, OWASP Top 10, rate limiting, IDOR."
+  },
+  {
+   "topic_id": "be-observability",
+   "title": "Логи и метрики",
+   "grade": "middle",
+   "requires": [
+    "be-api-errors"
+   ],
+   "description": "Структурные логи, уровни логирования, correlation id, метрики RED, алерты."
+  },
+  {
+   "topic_id": "be-integration-tests",
+   "title": "Интеграционные тесты",
+   "grade": "middle",
+   "requires": [
+    "be-unit-tests",
+    "be-docker-local"
+   ],
+   "description": "Тесты с настоящей базой, тестовый клиент API, фикстуры данных, изоляция тестов."
+  }
+ ],
+ "frontend": [
+  {
+   "topic_id": "fe-html",
+   "title": "HTML: семантика и формы",
+   "grade": "junior",
+   "requires": [
+    "c-http"
+   ],
+   "description": "Семантические теги, формы и поля, атрибуты, валидация форм браузером."
+  },
+  {
+   "topic_id": "fe-css-basics",
+   "title": "CSS: селекторы, каскад, блочная модель",
+   "grade": "junior",
+   "requires": [
+    "fe-html"
+   ],
+   "description": "Селекторы и специфичность, каскад, box model, box-sizing, единицы измерения."
+  },
+  {
+   "topic_id": "fe-css-layout",
+   "title": "Flexbox, Grid и адаптивность",
+   "grade": "junior",
+   "requires": [
+    "fe-css-basics"
+   ],
+   "description": "Flexbox, Grid, медиазапросы, mobile-first, адаптивные картинки."
+  },
+  {
+   "topic_id": "fe-js-basics",
+   "title": "JavaScript: основы",
+   "grade": "junior",
+   "requires": [
+    "c-debugging"
+   ],
+   "description": "Типы, let/const, сравнение, функции, массивы и их методы, объекты, деструктуризация."
+  },
+  {
+   "topic_id": "fe-js-closures-this",
+   "title": "Замыкания и this",
+   "grade": "junior",
+   "requires": [
+    "fe-js-basics"
+   ],
+   "description": "Области видимости, замыкания, this в разных вызовах, стрелочные функции, bind."
+  },
+  {
+   "topic_id": "fe-js-async",
+   "title": "Промисы и async/await",
+   "grade": "junior",
+   "requires": [
+    "fe-js-closures-this"
+   ],
+   "description": "Promise, then/catch, async/await, Promise.all, обработка ошибок в асинхронном коде."
+  },
+  {
+   "topic_id": "fe-dom",
+   "title": "DOM и события",
+   "grade": "junior",
+   "requires": [
+    "fe-html",
+    "fe-js-basics"
+   ],
+   "description": "querySelector, изменение DOM, события, всплытие, делегирование, preventDefault."
+  },
+  {
+   "topic_id": "fe-react-basics",
+   "title": "Основы React",
+   "grade": "junior",
+   "requires": [
+    "fe-dom",
+    "fe-js-closures-this"
+   ],
+   "description": "JSX, компоненты, рендер списков и key, условный рендер, useState."
+  },
+  {
+   "topic_id": "fe-react-components",
+   "title": "Компоненты, пропсы и состояние",
+   "grade": "junior_plus",
+   "requires": [
+    "fe-react-basics"
+   ],
+   "description": "Пропсы, подъём состояния, контролируемые формы, useEffect и его зависимости, композиция."
+  },
+  {
+   "topic_id": "fe-api-loading",
+   "title": "Работа с API: загрузка и ошибки",
+   "grade": "junior_plus",
+   "requires": [
+    "fe-js-async",
+    "fe-react-components"
+   ],
+   "description": "fetch, состояния загрузки/ошибки/пусто, отмена запросов, гонки ответов."
+  },
+  {
+   "topic_id": "fe-typescript",
+   "title": "TypeScript: основы",
+   "grade": "junior_plus",
+   "requires": [
+    "fe-js-basics"
+   ],
+   "description": "Типы, интерфейсы, union, типизация функций и пропсов, strict-режим."
+  },
+  {
+   "topic_id": "fe-vite",
+   "title": "Сборка через Vite",
+   "grade": "junior_plus",
+   "requires": [
+    "fe-typescript",
+    "fe-react-basics"
+   ],
+   "description": "Dev-сервер, переменные окружения, сборка, алиасы, прокси к API."
+  },
+  {
+   "topic_id": "fe-ts-advanced",
+   "title": "Продвинутый TypeScript",
+   "grade": "middle",
+   "requires": [
+    "fe-typescript"
+   ],
+   "description": "Дженерики, утилитарные типы, сужение типов, discriminated unions, типизация API-ответов."
+  },
+  {
+   "topic_id": "fe-state",
+   "title": "Управление состоянием",
+   "grade": "middle",
+   "requires": [
+    "fe-api-loading"
+   ],
+   "description": "Локальное и глобальное состояние, контекст, стор (Zustand/Redux), серверное состояние (TanStack Query)."
+  },
+  {
+   "topic_id": "fe-performance",
+   "title": "Производительность фронтенда",
+   "grade": "middle",
+   "requires": [
+    "fe-state",
+    "fe-vite"
+   ],
+   "description": "Лишние ререндеры, memo/useMemo/useCallback, lazy loading, размер бандла, Web Vitals."
+  },
+  {
+   "topic_id": "fe-event-loop",
+   "title": "Event loop и рендеринг",
+   "grade": "middle",
+   "requires": [
+    "fe-js-async"
+   ],
+   "description": "Стек вызовов, макро- и микрозадачи, requestAnimationFrame, долгие задачи и лаги интерфейса."
+  },
+  {
+   "topic_id": "fe-cors",
+   "title": "CORS",
+   "grade": "middle",
+   "requires": [
+    "fe-api-loading",
+    "c-http"
+   ],
+   "description": "Same-origin policy, preflight, заголовки CORS, куки и credentials, прокси в разработке."
+  },
+  {
+   "topic_id": "fe-ssr",
+   "title": "SSR и SSG",
+   "grade": "middle",
+   "requires": [
+    "fe-performance"
+   ],
+   "description": "CSR, SSR, SSG, гидратация, ошибки гидратации, когда что выбирать."
+  },
+  {
+   "topic_id": "fe-testing",
+   "title": "Тесты на фронтенде",
+   "grade": "middle",
+   "requires": [
+    "fe-react-components"
+   ],
+   "description": "Vitest, Testing Library, моки fetch, e2e на Playwright, что тестировать."
+  },
+  {
+   "topic_id": "fe-a11y",
+   "title": "Доступность (a11y)",
+   "grade": "middle",
+   "requires": [
+    "fe-html",
+    "fe-react-components"
+   ],
+   "description": "Семантика, alt, label, фокус и клавиатура, ARIA, контраст."
+  },
+  {
+   "topic_id": "fe-security",
+   "title": "XSS и хранение токенов",
+   "grade": "middle",
+   "requires": [
+    "fe-cors"
+   ],
+   "description": "XSS и dangerouslySetInnerHTML, CSP, где хранить токены, httpOnly-куки, CSRF."
+  }
+ ],
+ "devops": [
+  {
+   "topic_id": "do-linux-processes",
+   "title": "Linux: процессы и сигналы",
+   "grade": "junior",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "ps, top, kill и сигналы, фоновые процессы, память и CPU, OOM killer."
+  },
+  {
+   "topic_id": "do-linux-perms",
+   "title": "Linux: пользователи и права",
+   "grade": "junior",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "Пользователи и группы, chmod/chown, sudo, права на ключи и сокеты."
+  },
+  {
+   "topic_id": "do-systemd-logs",
+   "title": "systemd и журналы",
+   "grade": "junior",
+   "requires": [
+    "do-linux-processes"
+   ],
+   "description": "Юниты systemd, systemctl, перезапуск, journalctl, logrotate."
+  },
+  {
+   "topic_id": "do-networks",
+   "title": "Сети для DevOps",
+   "grade": "junior",
+   "requires": [
+    "c-networks"
+   ],
+   "description": "TCP/IP, порты, ss/netstat, DNS и dig, файрвол, диагностика «не открывается»."
+  },
+  {
+   "topic_id": "do-bash",
+   "title": "Bash-скрипты",
+   "grade": "junior",
+   "requires": [
+    "do-linux-perms"
+   ],
+   "description": "Переменные, условия, циклы, set -euo pipefail, коды выхода, кавычки."
+  },
+  {
+   "topic_id": "do-dockerfile",
+   "title": "Dockerfile",
+   "grade": "junior",
+   "requires": [
+    "do-bash"
+   ],
+   "description": "Инструкции, слои и кэш, multi-stage сборка, непривилегированный пользователь, .dockerignore."
+  },
+  {
+   "topic_id": "do-compose",
+   "title": "docker-compose",
+   "grade": "junior_plus",
+   "requires": [
+    "do-dockerfile",
+    "do-networks"
+   ],
+   "description": "Сервисы, сети, тома, depends_on и healthcheck, переменные окружения."
+  },
+  {
+   "topic_id": "do-ci",
+   "title": "CI/CD: GitHub Actions и GitLab CI",
+   "grade": "junior_plus",
+   "requires": [
+    "do-compose",
+    "c-git-branches"
+   ],
+   "description": "Пайплайны, стадии, кэш, артефакты, секреты CI, деплой по тегу."
+  },
+  {
+   "topic_id": "do-nginx",
+   "title": "Nginx как reverse proxy",
+   "grade": "junior_plus",
+   "requires": [
+    "do-networks",
+    "do-systemd-logs"
+   ],
+   "description": "server и location, proxy_pass, заголовки, TLS, статика, 502/504."
+  },
+  {
+   "topic_id": "do-cloud",
+   "title": "Базовое облако",
+   "grade": "junior_plus",
+   "requires": [
+    "do-networks"
+   ],
+   "description": "Виртуальные машины, сети и security groups, объектное хранилище, IAM, стоимость."
+  },
+  {
+   "topic_id": "do-k8s-basics",
+   "title": "Kubernetes: Deployment и Service",
+   "grade": "middle",
+   "requires": [
+    "do-compose",
+    "do-cloud"
+   ],
+   "description": "Pod, Deployment, ReplicaSet, Service, probes, requests/limits, ConfigMap."
+  },
+  {
+   "topic_id": "do-k8s-ingress-helm",
+   "title": "Kubernetes: Ingress и Helm",
+   "grade": "middle",
+   "requires": [
+    "do-k8s-basics",
+    "do-nginx"
+   ],
+   "description": "Ingress, TLS, Helm-чарты, values, релизы и откаты."
+  },
+  {
+   "topic_id": "do-k8s-debug",
+   "title": "Kubernetes: дебаг подов",
+   "grade": "middle",
+   "requires": [
+    "do-k8s-basics"
+   ],
+   "description": "CrashLoopBackOff, ImagePullBackOff, OOMKilled, Pending, kubectl describe/logs/exec, events."
+  },
+  {
+   "topic_id": "do-terraform",
+   "title": "Terraform",
+   "grade": "middle",
+   "requires": [
+    "do-cloud"
+   ],
+   "description": "Провайдеры, ресурсы, state и его блокировка, plan/apply, модули, переменные."
+  },
+  {
+   "topic_id": "do-ansible",
+   "title": "Ansible",
+   "grade": "middle",
+   "requires": [
+    "do-bash",
+    "do-systemd-logs"
+   ],
+   "description": "Инвентори, плейбуки, модули, идемпотентность, handlers, роли."
+  },
+  {
+   "topic_id": "do-monitoring",
+   "title": "Мониторинг: Prometheus и Grafana",
+   "grade": "middle",
+   "requires": [
+    "do-k8s-basics"
+   ],
+   "description": "Метрики, PromQL, RED/USE, SLO, алерты без шума."
+  },
+  {
+   "topic_id": "do-logging",
+   "title": "Логи: Loki и ELK",
+   "grade": "middle",
+   "requires": [
+    "do-monitoring"
+   ],
+   "description": "Сбор логов, структурные логи, LogQL, ретеншн, поиск по trace id."
+  },
+  {
+   "topic_id": "do-deploy-strategies",
+   "title": "Стратегии деплоя",
+   "grade": "middle",
+   "requires": [
+    "do-k8s-ingress-helm",
+    "do-ci"
+   ],
+   "description": "Rolling, blue-green, canary, фиче-флаги, откат, миграции БД при деплое."
+  },
+  {
+   "topic_id": "do-secrets",
+   "title": "Секреты и Vault",
+   "grade": "middle",
+   "requires": [
+    "do-k8s-basics",
+    "do-ci"
+   ],
+   "description": "Где хранить секреты, Kubernetes Secrets, Vault, ротация, утечки в git."
+  },
+  {
+   "topic_id": "do-backups",
+   "title": "Бэкапы и восстановление",
+   "grade": "middle",
+   "requires": [
+    "do-cloud"
+   ],
+   "description": "Стратегии бэкапов, RPO/RTO, pg_dump и PITR, проверка восстановления."
+  },
+  {
+   "topic_id": "do-incidents",
+   "title": "Инциденты и постмортемы",
+   "grade": "middle",
+   "requires": [
+    "do-monitoring",
+    "do-logging"
+   ],
+   "description": "Роли на инциденте, смягчение vs исправление, коммуникация, blameless-постмортем."
+  }
+ ],
+ "fullstack": [
+  {
+   "topic_id": "fs-contract",
+   "title": "Контракт API между фронтом и бэком",
+   "grade": "middle",
+   "requires": [
+    "be-api-design",
+    "fe-ts-advanced"
+   ],
+   "description": "OpenAPI, генерация типов, обратная совместимость, версии контракта."
+  },
+  {
+   "topic_id": "fs-auth-e2e",
+   "title": "Авторизация через весь стек",
+   "grade": "middle",
+   "requires": [
+    "be-auth",
+    "fe-security",
+    "do-secrets"
+   ],
+   "description": "Логин от формы до базы: куки vs токены, refresh, CSRF, выход со всех устройств."
+  },
+  {
+   "topic_id": "fs-feature-e2e",
+   "title": "Фича целиком: от тикета до прода",
+   "grade": "middle",
+   "requires": [
+    "be-orm",
+    "fe-api-loading",
+    "do-ci"
+   ],
+   "description": "Декомпозиция фичи на бэк, фронт и инфраструктуру, миграции, фиче-флаг, выкладка."
+  },
+  {
+   "topic_id": "fs-realtime",
+   "title": "Реалтайм: WebSocket и SSE",
+   "grade": "middle",
+   "requires": [
+    "be-async",
+    "fe-event-loop",
+    "do-nginx"
+   ],
+   "description": "Polling, SSE, WebSocket, проксирование через Nginx, масштабирование соединений."
+  },
+  {
+   "topic_id": "fs-performance-e2e",
+   "title": "Производительность всего стека",
+   "grade": "middle",
+   "requires": [
+    "be-caching",
+    "fe-performance",
+    "do-monitoring"
+   ],
+   "description": "Где тормозит: фронт, сеть, API или база — и как это доказать метриками."
+  },
+  {
+   "topic_id": "fs-release",
+   "title": "Релиз без простоя",
+   "grade": "middle",
+   "requires": [
+    "do-deploy-strategies",
+    "be-transactions"
+   ],
+   "description": "Обратно совместимые миграции (expand/contract), порядок выкладки фронта и бэка, откат."
+  },
+  {
+   "topic_id": "fs-incident-e2e",
+   "title": "Инцидент через весь стек",
+   "grade": "middle",
+   "requires": [
+    "do-incidents",
+    "fe-cors",
+    "be-observability"
+   ],
+   "description": "Разбор инцидентов, где причина прячется на стыке фронта, бэка и инфраструктуры."
+  },
+  {
+   "topic_id": "fs-system-design",
+   "title": "Системный дизайн: итоговое ревью",
+   "grade": "middle",
+   "requires": [
+    "fs-contract",
+    "fs-auth-e2e",
+    "fs-feature-e2e",
+    "fs-realtime",
+    "fs-performance-e2e",
+    "fs-release",
+    "fs-incident-e2e"
+   ],
+   "description": "Проектирование сервиса целиком: требования, нагрузка, хранилища, кэш, очереди, отказоустойчивость."
+  }
+ ]
+}

@@ -27,7 +27,7 @@ namespace Intern.Game
         }
 
         bool Owned(string key, int price) { return price == 0 || g.Save.owned.Contains(key); }
-        bool RankOk { get { return g.Save.done.Count >= 10; } }
+        bool RankOk { get { return g.GradeIdx >= 2; } }   // корона — с грейда Junior+
 
         int Cost
         {

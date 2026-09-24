@@ -140,10 +140,25 @@ namespace Intern.Game
         public Color Normal = Color.clear, Hovered = K.Hover;
         public string Tip;
         bool enabled = true, hover;
-        public bool Enabled { get { return enabled; } set { enabled = value; style.opacity = value ? 1f : 0.45f; } }
+        // Панель IDE рисуется в текстуру, где прозрачность элемента не видна, — выключенную кнопку приглушаем цветом
+        public bool Enabled
+        {
+            get { return enabled; }
+            set
+            {
+                if (enabled == value) return;
+                enabled = value; SetHover(hover);
+                foreach (var l in this.Query<Label>().ToList()) l.style.opacity = value ? 1f : 0.5f;
+                foreach (var ic in this.Query<Icon>().ToList()) ic.style.opacity = value ? 1f : 0.5f;
+            }
+        }
         public Btn(Action click, bool row = true) { Click = click; style.flexDirection = row ? FlexDirection.Row : FlexDirection.Column; style.alignItems = Align.Center; pickingMode = PickingMode.Position; }
         public void SetColors(Color normal, Color hovered) { Normal = normal; Hovered = hovered; SetHover(hover); }
-        public void SetHover(bool h) { hover = h; style.backgroundColor = h && enabled ? Hovered : Normal; }
+        public void SetHover(bool h)
+        {
+            hover = h;
+            style.backgroundColor = !enabled ? (Normal.a > 0.01f ? Color.Lerp(Normal, K.EditorBg, 0.6f) : Normal) : h ? Hovered : Normal;
+        }
 
         public static Btn Text(string text, Action click, Color bg, Color bgHover, float size = 14, Color? fg = null, string icon = null, Color? iconColor = null)
         {
@@ -298,6 +313,41 @@ namespace Intern.Game
                     Poly(p, true, P(.06f, .26f), P(.94f, .26f), P(.94f, .78f), P(.06f, .78f)); p.Stroke(); Seg(p, P(.26f, .64f), P(.74f, .64f));
                     for (int i = 0; i < 5; i++) { p.BeginPath(); p.Arc(P(.18f + i * .16f, .44f), s * .035f, 0, 360); p.Fill(); } break;
                 case "max": Poly(p, true, P(.22f, .22f), P(.78f, .22f), P(.78f, .78f), P(.22f, .78f)); p.Stroke(); break;
+                // --- направления и файлы ---
+                case "server":   // две стойки с огоньками
+                    Poly(p, true, P(.12f, .14f), P(.88f, .14f), P(.88f, .44f), P(.12f, .44f)); p.Stroke();
+                    Poly(p, true, P(.12f, .56f), P(.88f, .56f), P(.88f, .86f), P(.12f, .86f)); p.Stroke();
+                    p.BeginPath(); p.Arc(P(.26f, .29f), s * .05f, 0, 360); p.Fill(); p.BeginPath(); p.Arc(P(.26f, .71f), s * .05f, 0, 360); p.Fill();
+                    Seg(p, P(.5f, .29f), P(.76f, .29f)); Seg(p, P(.5f, .71f), P(.76f, .71f)); break;
+                case "browser":  // окно браузера с </>
+                    Poly(p, true, P(.08f, .14f), P(.92f, .14f), P(.92f, .86f), P(.08f, .86f)); p.Stroke(); Seg(p, P(.08f, .32f), P(.92f, .32f));
+                    Poly(p, false, P(.36f, .48f), P(.24f, .6f), P(.36f, .72f)); p.Stroke(); Poly(p, false, P(.64f, .48f), P(.76f, .6f), P(.64f, .72f)); p.Stroke();
+                    Seg(p, P(.55f, .46f), P(.45f, .74f)); break;
+                case "cloud":
+                    p.BeginPath(); p.MoveTo(P(.26f, .76f)); p.BezierCurveTo(P(.04f, .76f), P(.04f, .46f), P(.26f, .48f));
+                    p.BezierCurveTo(P(.28f, .22f), P(.62f, .18f), P(.68f, .4f)); p.BezierCurveTo(P(.96f, .38f), P(.98f, .76f), P(.74f, .76f)); p.ClosePath(); p.Stroke(); break;
+                case "stack":    // три слоя
+                    Poly(p, true, P(.5f, .12f), P(.9f, .32f), P(.5f, .52f), P(.1f, .32f)); p.Stroke();
+                    Poly(p, false, P(.1f, .5f), P(.5f, .7f), P(.9f, .5f)); p.Stroke();
+                    Poly(p, false, P(.1f, .68f), P(.5f, .88f), P(.9f, .68f)); p.Stroke(); break;
+                case "file":     // лист с загнутым углом
+                    Poly(p, true, P(.2f, .08f), P(.6f, .08f), P(.82f, .3f), P(.82f, .92f), P(.2f, .92f)); p.Stroke(); Poly(p, false, P(.6f, .08f), P(.6f, .3f), P(.82f, .3f)); p.Stroke(); break;
+                case "radioOn":
+                    p.BeginPath(); p.Arc(P(.5f, .5f), s * .38f, 0, 360); p.Stroke(); p.BeginPath(); p.Arc(P(.5f, .5f), s * .2f, 0, 360); p.Fill(); break;
+                case "boxOn":    // отмеченный флажок
+                    Poly(p, true, P(.12f, .12f), P(.88f, .12f), P(.88f, .88f), P(.12f, .88f)); p.Fill();
+                    p.strokeColor = K.EditorBg; p.BeginPath(); p.MoveTo(P(.26f, .52f)); p.LineTo(P(.43f, .69f)); p.LineTo(P(.76f, .32f)); p.Stroke(); break;
+                case "box":
+                    Poly(p, true, P(.12f, .12f), P(.88f, .12f), P(.88f, .88f), P(.12f, .88f)); p.Stroke(); break;
+                case "star":
+                    {
+                        p.BeginPath();
+                        for (int i = 0; i < 10; i++) { float a = -Mathf.PI / 2 + i * Mathf.PI / 5, r = i % 2 == 0 ? .44f : .19f; var q = P(.5f + Mathf.Cos(a) * r, .54f + Mathf.Sin(a) * r); if (i == 0) p.MoveTo(q); else p.LineTo(q); }
+                        p.ClosePath(); p.Fill(); break;
+                    }
+                case "fire":     // инцидент
+                    p.BeginPath(); p.MoveTo(P(.5f, .08f)); p.BezierCurveTo(P(.62f, .3f), P(.84f, .42f), P(.8f, .66f)); p.BezierCurveTo(P(.76f, .9f), P(.24f, .92f), P(.2f, .66f));
+                    p.BezierCurveTo(P(.18f, .48f), P(.34f, .4f), P(.34f, .26f)); p.BezierCurveTo(P(.44f, .34f), P(.46f, .2f), P(.5f, .08f)); p.ClosePath(); p.Fill(); break;
             }
         }
         static void Poly(Painter2D p, bool close, params Vector2[] pts)

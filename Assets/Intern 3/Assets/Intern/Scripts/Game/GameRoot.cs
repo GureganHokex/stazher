@@ -43,7 +43,48 @@ namespace Intern.Game
         readonly Queue<string> toasts = new Queue<string>();
         string toast; float toastUntil;
 
-        public string RankName { get { return Progress.Rank(Save.done.Count, Tasks.tasks.Length); } }
+        // ---------- направление, грейд, прогресс ----------
+        public TrackPath Path { get; private set; }
+        HashSet<string> doneSet; SaveData doneOwner; int doneCount = -1;
+        public HashSet<string> Done
+        {
+            get
+            {
+                if (doneSet == null || doneOwner != Save || doneCount != Save.done.Count) { doneSet = new HashSet<string>(Save.done); doneOwner = Save; doneCount = Save.done.Count; }
+                return doneSet;
+            }
+        }
+        public string Profession { get { return string.IsNullOrEmpty(Save.profession) ? "backend" : Save.profession; } }
+        public string ProfessionName { get { return Professions.Name(Profession); } }
+        public int GradeIdx { get { return Path.GradeIndex(Done); } }          // 0..3, 4 — направление пройдено
+        public bool PathComplete { get { return GradeIdx >= 4; } }
+        public string RankName { get { return Grades.Name(Mathf.Min(GradeIdx, 3)); } }
+        public string RankFull { get { return RankName + " · " + ProfessionName; } }
+
+        void LoadPath()
+        {
+            Path = Tracks.BuildPath(Profession);
+            Tasks = new TaskFile { language = Profession, tasks = Path.Tasks };
+            Debug.Log("[Стажёр] Направление " + Profession + ": тем " + Path.Topics.Count + ", задач " + Path.Tasks.Length + ", грейд " + RankName);
+        }
+
+        // Старые сохранения (15 задач Python, id py01…) → задачи направления Backend
+        void MigrateSave()
+        {
+            if (Save.version >= 2) return;
+            bool had = Save.done.Count > 0 || Save.codeIds.Count > 0 || Save.hasCharacter;
+            if (had)
+            {
+                var map = Tracks.LegacyMap();
+                string n;
+                Save.done = Save.done.Select(id => map.TryGetValue(id, out n) ? n : id).Distinct().ToList();
+                for (int i = 0; i < Save.codeIds.Count; i++) if (map.TryGetValue(Save.codeIds[i], out n)) Save.codeIds[i] = n;
+                if (string.IsNullOrEmpty(Save.profession)) Save.profession = "backend";
+                Save.xp = Save.done.Count * 30;
+            }
+            Save.version = 2;
+            if (had) { Progress.Save(Save); Debug.Log("[Стажёр] Сохранение перенесено на направления: сдано " + Save.done.Count); }
+        }
 
 #if UNITY_EDITOR
         // Отладка в редакторе: весь лог игры ещё и в файл Temp/intern_log.txt (удобно смотреть снаружи)
@@ -68,7 +109,8 @@ namespace Intern.Game
             Save = Progress.Load();
             if (Save.look == null) Save.look = new Appearance();
             if (Save.owned == null) Save.owned = new List<string>();
-            Tasks = Progress.LoadTasks("python");
+            MigrateSave();
+            LoadPath();
             ide = new IdeWindow(this);
             wardrobe = new WardrobeScreen(this);
 
@@ -110,10 +152,9 @@ namespace Intern.Game
 
         public void Persist() { Progress.Save(Save); }
 
-        public bool IsUnlocked(int i)
-        {
-            return i == 0 || Save.done.Contains(Tasks.tasks[i - 1].id) || Save.done.Contains(Tasks.tasks[i].id);
-        }
+        public bool IsUnlocked(int i) { return i >= 0 && i < Tasks.tasks.Length && Path.TaskOpen(Tasks.tasks[i], Done); }
+        public bool IsOpen(TaskData t) { return Path.TaskOpen(t, Done); }
+        public bool IsDone(TaskData t) { return t != null && Done.Contains(t.id); }
 
         public TaskData CurrentTaskPublic { get { return CurrentTask; } }
 
@@ -121,18 +162,19 @@ namespace Intern.Game
         {
             get
             {
-                for (int i = 0; i < Tasks.tasks.Length; i++)
-                    if (!Save.done.Contains(Tasks.tasks[i].id)) return Tasks.tasks[i];
+                var t = Path.Current(Done);
+                if (t != null) return t;
                 return Tasks.tasks.Length > 0 ? Tasks.tasks[Tasks.tasks.Length - 1] : null;
             }
         }
 
         void UpdateBoard()
         {
-            int done = Save.done.Count, total = Tasks.tasks.Length;
+            int done = DoneCount, total = TotalCount;
             var cur = CurrentTask;
-            refs.board.text = "СПРИНТ 1: Python\n\nСделано: " + done + " / " + total +
-                         (cur != null && done < total ? "\nСейчас: " + cur.title : "\nГлава пройдена!") +
+            var tp = cur != null ? Path.TopicOf(cur) : null;
+            refs.board.text = ProfessionName.ToUpperInvariant() + " · " + RankName + "\n\nСделано: " + done + " / " + total +
+                         (cur != null && !PathComplete ? "\nТема: " + (tp != null ? tp.title : "") + "\nСейчас: " + cur.key + " " + cur.title : "\nНаправление пройдено!") +
                          "\n\nБагов поймано: " + Save.bugsCaught;
         }
 
@@ -145,6 +187,16 @@ namespace Intern.Game
                     player.Tick(false);
                     player.MenuOrbit(Time.time);
                     if (InputX.Esc() && ui != null) ui.Back();
+#if UNITY_EDITOR
+                    // только в редакторе: F9 в меню — отметить/снять пройденными Backend, Frontend и DevOps (проверка Fullstack)
+                    if (InputX.DebugCareer())
+                    {
+                        bool open = Career.FullstackOpen;
+                        foreach (var p in new[] { "backend", "frontend", "devops" }) { if (open) Career.Unmark(p); else Career.MarkDone(p); }
+                        Debug.Log("[Стажёр] F9: Fullstack " + (Career.FullstackOpen ? "открыт" : "закрыт"));
+                        if (ui != null) ui.RefreshMenuPublic();
+                    }
+#endif
                     break;
                 case Mode.Walk:
                     player.Tick(true);
@@ -488,20 +540,37 @@ namespace Intern.Game
         public void CompleteTask(TaskData t, bool usedSolution, bool late)
         {
             if (Save.done.Contains(t.id)) { Toast("Эта задача уже сдана. Повторить — всегда полезно!"); return; }
-            string oldRank = RankName;
+            int oldGrade = GradeIdx;
+            bool fsWasOpen = Career.FullstackOpen;
             float mult = 1f;
             var diff = (Difficulty)Save.difficulty;
             if (diff == Difficulty.Medium) mult *= 1.2f;
             if (diff == Difficulty.Hard) mult *= late ? 0.5f : 1.6f;
+            else if (late) mult *= 0.75f;   // задача с таймером (инцидент) сдана после срока
             if (usedSolution) mult *= 0.5f;
-            int reward = Mathf.RoundToInt(t.reward * mult);
-            Save.money += reward; Save.done.Add(t.id);
+            int reward = Mathf.Max(1, Mathf.RoundToInt(t.reward * mult));
+            int xp = usedSolution ? t.xp / 2 : t.xp;
+            Save.money += reward; Save.xp += xp; Save.done.Add(t.id);
             Persist(); UpdateBoard();
-            Toast("Задача сдана! +" + reward + " монет" + (late ? " (дедлайн сорван)" : ""));
+            Toast("Задача сдана! +" + xp + " XP, +" + reward + " монет" + (late ? " (срок сорван)" : ""));
             if (player.avatar != null) player.avatar.React(2, 3f); // восторг
-            if (RankName != oldRank) Toast("ПОВЫШЕНИЕ! Теперь ты " + RankName + ". Загляни в гардероб — там кое-что новое.");
+            var tp = Path.TopicOf(t);
+            if (tp != null && TrackPath.TopicDone(tp, Done)) Toast("Тема закрыта: " + tp.title);
+            int g = GradeIdx;
+            if (g >= 4 && oldGrade < 4)
+            {
+                Career.MarkDone(Profession);
+                Toast("НАПРАВЛЕНИЕ ПРОЙДЕНО! Ты — Middle " + ProfessionName + "-разработчик.");
+                if (!fsWasOpen && Career.FullstackOpen) Toast("ОТКРЫТ FULLSTACK! Сменить направление можно в паузе (Esc).");
+                else if (Profession != "fullstack") Toast("Попробуй другое направление: смена — в паузе (Esc), прогресс сохранится.");
+            }
+            else if (g > oldGrade)
+            {
+                Toast("ПОВЫШЕНИЕ! Теперь ты " + RankName + " " + ProfessionName + ". Открыты новые темы.");
+                if (g == 2) Toast("В гардеробе открылась корона для Junior+.");
+            }
             var next = CurrentTask;
-            if (next != null && next != t && !Save.done.Contains(next.id)) Toast("Новая задача: " + next.title);
+            if (next != null && next != t && !Save.done.Contains(next.id)) Toast("Новая задача: " + next.key + " " + next.title);
         }
 
         public void SpawnBug()
@@ -586,16 +655,20 @@ namespace Intern.Game
         public void TalkToLead()
         {
             if (refs.lead != null) refs.lead.React(1, 2.5f);
-            int done = Save.done.Count, total = Tasks.tasks.Length;
+            int done = DoneCount, total = TotalCount;
             string text;
+            var cur = CurrentTask;
             if (done == 0)
-                text = "О, новенький! Я Гена. Твой стол — тот, где уточка на мониторе. Садись, открывай первый тикет.\n\n" +
-                       "Главное правило: если непонятно, что делает код, жми «Отладка» и проходи его по шагам. Так учатся все, даже сеньоры.";
-            else if (done >= total)
-                text = "Ты закрыл весь спринт по Python. Теперь ты " + RankName + " — и это заслуженно.\n\n" +
-                       "Дальше будут главы про классы, файлы, тесты, Git и SQL. А пока — перерешай задачи на тяжёлой сложности, это отличная тренировка.";
+                text = "О, новенький! Я Гена. Твой стол — тот, где уточка на мониторе. Ты у нас на направлении " + ProfessionName + ".\n\n" +
+                       "Сначала общая база: терминал, Git, HTTP, дебаг — без этого никуда. Потом — задачи твоего направления, от Junior до Middle. " +
+                       "Все тикеты — в IDE за компьютером, слева «Проводник» со всеми темами.";
+            else if (PathComplete)
+                text = "Ты прошёл всё направление " + ProfessionName + ". Для меня ты теперь Middle — и это заслуженно: " +
+                       "ревью, инциденты, архитектура, оценки — ты всё это уже делал руками.\n\n" +
+                       (Career.FullstackOpen ? "Fullstack открыт — переключайся в паузе (Esc), там сквозные задачи через весь стек." :
+                        "Хочешь вырасти шире — возьми другое направление в паузе (Esc). Общая база уже закрыта, начнёшь сразу с Junior-тем.");
             else
-                text = "Ты сейчас " + RankName + ", сделано " + done + " из " + total + ". Следующая задача: «" + CurrentTask.title + "».\n\n" + Tip(done);
+                text = "Ты сейчас " + RankName + " " + ProfessionName + ", сделано " + done + " из " + total + ". Следующая задача: " + cur.key + " «" + cur.title + "».\n\n" + Tip(done);
             OpenDialog("Тимлид Гена", text, Btn("Понял, иду работать", CloseDialog));
         }
 
@@ -609,6 +682,10 @@ namespace Intern.Game
                 "Совет: если цикл не заканчивается — проверь, меняется ли переменная из условия.",
                 "Совет: range(1, n) не включает n. Это частый источник багов «на единицу».",
                 "Совет: сначала напиши план в комментариях, потом код.",
+                "Совет: в инцидентах сначала останавливай кровотечение — откат, фичефлаг, — а разбор причин потом.",
+                "Совет: на ревью отделяй блокеры от вкусовщины. Автору важно понимать, что обязательно, а что — пожелание.",
+                "Совет: оценка — это не «сколько я буду печатать код», а ещё тесты, ревью, выкладка и неизвестные.",
+                "Совет: прежде чем гуглить ошибку, прочитай её целиком. Половина ответа обычно уже там.",
             };
             return tips[done % tips.Length];
         }
@@ -635,15 +712,18 @@ namespace Intern.Game
             OpenDialog("Кофемашина", "У тебя " + Save.money + " монет. Что берём?", list.ToArray());
         }
 
-        void StartGame(Difficulty d, bool fresh)
+        void StartGame(Difficulty d, bool fresh, string profession = null)
         {
             if (fresh)
             {
-                Progress.Wipe(); Save = new SaveData(); ide = new IdeWindow(this); if (ideUi != null) ideUi.ResetProgress(CurrentTask);
+                Progress.Wipe(); Save = new SaveData { version = 2, profession = Career.CanPick(profession) && !string.IsNullOrEmpty(profession) ? profession : "backend" };
+                LoadPath();
+                ide = new IdeWindow(this); if (ideUi != null) ideUi.ResetProgress(CurrentTask);
                 foreach (var b in bugs) if (b != null) Destroy(b.gameObject);
                 player.SetAvatar(Save.look);
             }
             Save.difficulty = (int)d; Persist(); UpdateBoard();
+            if (fresh) Toast("Направление: " + ProfessionName + ". Начинаем с общей базы — грейд «Стажёр».");
             if (fresh || !Save.hasCharacter) { OpenWardrobe(true); return; }
             player.Teleport(refs.spawn.position, refs.spawn.eulerAngles.y);
             player.FaceCameraYaw(refs.spawn.eulerAngles.y);
@@ -714,7 +794,7 @@ namespace Intern.Game
             var cur = CurrentTask;
             GUI.Box(new Rect(16, 16, 420, 78), GUIContent.none, Ui.panel);
             GUI.Label(new Rect(30, 22, 400, 26), "<b>" + RankName + "</b>   Монеты: " + Save.money, Ui.body);
-            GUI.Label(new Rect(30, 48, 400, 40), cur != null && Save.done.Count < Tasks.tasks.Length ? "Задача: " + cur.title : "Спринт закрыт!", Ui.small);
+            GUI.Label(new Rect(30, 48, 400, 40), cur != null && !PathComplete ? "Задача: " + cur.key + " " + cur.title : "Направление пройдено!", Ui.small);
             if (bugs.Count > 0) GUI.Label(new Rect(30, 100, 400, 24), "<color=#FF4F9A>Багов в офисе: " + bugs.Count + "</color>", Ui.body);
 
             if (player.firstPerson)
@@ -754,7 +834,7 @@ namespace Intern.Game
             GUILayout.Space(24);
             if (Progress.HasSave() && Save.hasCharacter)
             {
-                if (GUILayout.Button("Продолжить  (" + RankName + ", " + Save.done.Count + "/" + Tasks.tasks.Length + ", " + Progress.DifficultyName((Difficulty)Save.difficulty) + ")", Ui.btn, GUILayout.Height(50)))
+                if (GUILayout.Button("Продолжить  (" + RankFull + ", " + DoneCount + "/" + TotalCount + ", " + Progress.DifficultyName((Difficulty)Save.difficulty) + ")", Ui.btn, GUILayout.Height(50)))
                     StartGame((Difficulty)Save.difficulty, false);
                 GUILayout.Space(16);
                 GUILayout.Label("Новая игра (прогресс сбросится):", Ui.small);
@@ -811,7 +891,7 @@ namespace Intern.Game
         // ================== Для интерфейса (GameUi) ==================
         public Mode CurMode { get { return mode; } }
         public bool HasProgress { get { return Progress.HasSave() && Save.hasCharacter; } }
-        public int DoneCount { get { return Save.done.Count; } }
+        public int DoneCount { get { return Path.DoneCount(Done); } }
         public int TotalCount { get { return Tasks.tasks.Length; } }
         public int BugCount { get { return bugs.Count; } }
         public bool FirstPerson { get { return player != null && player.firstPerson; } }
@@ -819,9 +899,23 @@ namespace Intern.Game
         public string ToastText { get { return toast; } }
         public float ToastAge { get { return Time.unscaledTime - (toastUntil - 3.2f); } }
         public float ToastLeft { get { return toastUntil - Time.unscaledTime; } }
-        public string TaskCodeOf(TaskData t) { int i = Array.IndexOf(Tasks.tasks, t); return "KOD-" + (101 + Mathf.Max(0, i)); }
+        public string TaskCodeOf(TaskData t) { return t == null ? "" : !string.IsNullOrEmpty(t.key) ? t.key : "KOD-" + (101 + Mathf.Max(0, Array.IndexOf(Tasks.tasks, t))); }
         public void UiContinue() { StartGame((Difficulty)Save.difficulty, false); }
-        public void UiNewGame(Difficulty d) { StartGame(d, true); }
+        public void UiNewGame(Difficulty d) { StartGame(d, true, "backend"); }
+        public void UiNewGame(Difficulty d, string profession) { StartGame(d, true, profession); }
+
+        // Смена направления посреди игры: сданные задачи (и общая база) остаются засчитанными
+        public bool UiSetProfession(string p)
+        {
+            if (p == Profession || !Career.CanPick(p)) return false;
+            if (ideUi != null && ideUi.Task != null) ideUi.Close();
+            Save.profession = p; Persist();
+            LoadPath(); UpdateBoard();
+            ide = new IdeWindow(this);
+            if (ideUi != null && CurrentTask != null) ideUi.Open(CurrentTask);
+            Toast("Направление: " + ProfessionName + " · " + RankName + ". Сдано " + DoneCount + " из " + TotalCount + ".");
+            return true;
+        }
         public void UiResume() { if (mode == Mode.Pause) Resume(); }
         public void UiWardrobe() { OpenWardrobe(false); }
         public void UiToggleView() { player.ToggleView(); Save.firstPerson = player.firstPerson; Persist(); }
