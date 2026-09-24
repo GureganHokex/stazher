@@ -195,6 +195,7 @@ namespace Intern.Game
     // Прокрутка кода на экранах коллег — «работают»
     public class ScreenScroller : MonoBehaviour
     {
+        public static bool Animate = true;   // настройки: «прокрутка кода на мониторах»
         Material m; float off, speed;
         void Start()
         {
@@ -204,6 +205,7 @@ namespace Intern.Game
         }
         void Update()
         {
+            if (!Animate) return;
             off = Mathf.Repeat(off + speed * Time.deltaTime, 1f);
             m.mainTextureOffset = new Vector2(0, -off);
         }

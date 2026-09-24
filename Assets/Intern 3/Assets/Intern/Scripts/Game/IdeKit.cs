@@ -28,6 +28,11 @@ namespace Intern.Game
         public static FontAsset Mono { get { if (mono == null) mono = Load(new[] { "Consolas", "Cascadia Mono", "Cascadia Code", "JetBrains Mono", "Menlo", "SF Mono", "DejaVu Sans Mono", "Liberation Mono", "Courier New" }); return mono; } }
         public static FontAsset Sans { get { if (sans == null) sans = Load(new[] { "Segoe UI", "SF Pro Text", "Helvetica Neue", "Arial", "DejaVu Sans", "Liberation Sans" }); return sans; } }
 
+        static FontAsset bold, black; static bool boldTried, blackTried;
+        // Жирные начертания для меню и заголовков (если в системе нет — будет обычный шрифт с программным «жирным»)
+        public static FontAsset SansBold { get { if (!boldTried) { boldTried = true; bold = LoadStyle(new[] { "Segoe UI", "SF Pro Text", "Helvetica Neue", "Arial", "DejaVu Sans" }, new[] { "Bold", "Semibold" }); } return bold; } }
+        public static FontAsset SansBlack { get { if (!blackTried) { blackTried = true; black = LoadStyle(new[] { "Segoe UI", "Arial", "Helvetica Neue", "DejaVu Sans" }, new[] { "Black", "Heavy", "Bold" }); } return black; } }
+
         static FontAsset Load(string[] families)
         {
             foreach (var f in families)
@@ -37,6 +42,28 @@ namespace Intern.Game
                 if (fa != null) { fa.name = f; return fa; }
             }
             try { return FontAsset.CreateFontAsset(Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")); } catch { return null; }
+        }
+
+        static FontAsset LoadStyle(string[] families, string[] styles)
+        {
+            foreach (var st in styles)
+                foreach (var f in families)
+                {
+                    FontAsset fa = null;
+                    try { fa = FontAsset.CreateFontAsset(f, st); } catch { }
+                    if (fa != null) { fa.name = f + " " + st; return fa; }
+                }
+            return null;
+        }
+
+        // Метка жирным начертанием (настоящим, если найдено, иначе программным)
+        public static Label B(string text, float size, Color color, bool black = false)
+        {
+            var l = T(text, size, color);
+            var fa = black ? (SansBlack ?? SansBold) : SansBold;
+            if (fa != null) l.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromSDFFont(fa));
+            else l.style.unityFontStyleAndWeight = FontStyle.Bold;
+            return l;
         }
 
         public static void Font(VisualElement v, bool isMono)
@@ -205,6 +232,8 @@ namespace Intern.Game
                     Poly(p, true, P(.08f, .22f), P(.4f, .22f), P(.5f, .32f), P(.92f, .32f), P(.92f, .82f), P(.08f, .82f)); p.Stroke(); break;
                 case "chevR":
                     p.BeginPath(); p.MoveTo(P(.38f, .22f)); p.LineTo(P(.66f, .5f)); p.LineTo(P(.38f, .78f)); p.Stroke(); break;
+                case "chevL":
+                    p.BeginPath(); p.MoveTo(P(.62f, .22f)); p.LineTo(P(.34f, .5f)); p.LineTo(P(.62f, .78f)); p.Stroke(); break;
                 case "chevD":
                     p.BeginPath(); p.MoveTo(P(.22f, .38f)); p.LineTo(P(.5f, .66f)); p.LineTo(P(.78f, .38f)); p.Stroke(); break;
                 case "lock":
@@ -233,6 +262,41 @@ namespace Intern.Game
                 case "more":
                     for (int i = 0; i < 3; i++) { p.BeginPath(); p.Arc(P(.22f + i * .28f, .5f), s * .07f, 0, 360); p.Fill(); } break;
                 case "min": Seg(p, P(.2f, .5f), P(.8f, .5f)); break;
+                // --- для меню игры ---
+                case "door":    // дверь и стрелка наружу
+                    Poly(p, false, P(.56f, .2f), P(.56f, .1f), P(.14f, .1f), P(.14f, .9f), P(.56f, .9f), P(.56f, .8f)); p.Stroke();
+                    Seg(p, P(.4f, .5f), P(.9f, .5f)); Poly(p, false, P(.76f, .34f), P(.92f, .5f), P(.76f, .66f)); p.Stroke(); break;
+                case "shirt":
+                    Poly(p, true, P(.36f, .12f), P(.1f, .26f), P(.18f, .46f), P(.28f, .42f), P(.28f, .9f), P(.72f, .9f), P(.72f, .42f), P(.82f, .46f), P(.9f, .26f), P(.64f, .12f), P(.5f, .24f)); p.Stroke(); break;
+                case "camera":
+                    Poly(p, true, P(.08f, .3f), P(.34f, .3f), P(.42f, .18f), P(.62f, .18f), P(.7f, .3f), P(.92f, .3f), P(.92f, .82f), P(.08f, .82f)); p.Stroke();
+                    p.BeginPath(); p.Arc(P(.5f, .56f), s * .16f, 0, 360); p.Stroke(); break;
+                case "home":
+                    Poly(p, false, P(.1f, .5f), P(.5f, .12f), P(.9f, .5f)); p.Stroke();
+                    Poly(p, false, P(.22f, .4f), P(.22f, .88f), P(.78f, .88f), P(.78f, .4f)); p.Stroke(); Poly(p, false, P(.42f, .88f), P(.42f, .64f), P(.58f, .64f), P(.58f, .88f)); p.Stroke(); break;
+                case "plus":
+                    Seg(p, P(.5f, .16f), P(.5f, .84f)); Seg(p, P(.16f, .5f), P(.84f, .5f)); break;
+                case "monitor":
+                    Poly(p, true, P(.08f, .14f), P(.92f, .14f), P(.92f, .7f), P(.08f, .7f)); p.Stroke(); Seg(p, P(.5f, .7f), P(.5f, .86f)); Seg(p, P(.3f, .88f), P(.7f, .88f)); break;
+                case "image":   // горы и солнце — «графика»
+                    Poly(p, true, P(.08f, .14f), P(.92f, .14f), P(.92f, .86f), P(.08f, .86f)); p.Stroke();
+                    Poly(p, false, P(.14f, .8f), P(.4f, .48f), P(.58f, .68f), P(.7f, .56f), P(.88f, .8f)); p.Stroke();
+                    p.BeginPath(); p.Arc(P(.68f, .32f), s * .08f, 0, 360); p.Fill(); break;
+                case "sound":
+                    Poly(p, true, P(.1f, .38f), P(.28f, .38f), P(.5f, .16f), P(.5f, .84f), P(.28f, .62f), P(.1f, .62f)); p.Fill();
+                    p.BeginPath(); p.Arc(P(.5f, .5f), s * .2f, -50, 50); p.Stroke(); p.BeginPath(); p.Arc(P(.5f, .5f), s * .36f, -50, 50); p.Stroke(); break;
+                case "mouse":
+                    p.BeginPath(); p.MoveTo(P(.26f, .4f)); p.BezierCurveTo(P(.26f, .06f), P(.74f, .06f), P(.74f, .4f)); p.LineTo(P(.74f, .64f));
+                    p.BezierCurveTo(P(.74f, .98f), P(.26f, .98f), P(.26f, .64f)); p.ClosePath(); p.Stroke(); Seg(p, P(.5f, .16f), P(.5f, .36f)); break;
+                case "layout":
+                    Poly(p, true, P(.1f, .14f), P(.9f, .14f), P(.9f, .86f), P(.1f, .86f)); p.Stroke(); Seg(p, P(.1f, .34f), P(.9f, .34f)); Seg(p, P(.38f, .34f), P(.38f, .86f)); break;
+                case "bug":
+                    p.BeginPath(); p.Arc(P(.5f, .58f), s * .24f, 0, 360); p.Fill(); p.BeginPath(); p.Arc(P(.5f, .28f), s * .12f, 0, 360); p.Fill();
+                    Seg(p, P(.16f, .44f), P(.3f, .5f)); Seg(p, P(.84f, .44f), P(.7f, .5f)); Seg(p, P(.12f, .66f), P(.28f, .64f)); Seg(p, P(.88f, .66f), P(.72f, .64f));
+                    Seg(p, P(.18f, .88f), P(.32f, .76f)); Seg(p, P(.82f, .88f), P(.68f, .76f)); break;
+                case "keyboard":
+                    Poly(p, true, P(.06f, .26f), P(.94f, .26f), P(.94f, .78f), P(.06f, .78f)); p.Stroke(); Seg(p, P(.26f, .64f), P(.74f, .64f));
+                    for (int i = 0; i < 5; i++) { p.BeginPath(); p.Arc(P(.18f + i * .16f, .44f), s * .035f, 0, 360); p.Fill(); } break;
                 case "max": Poly(p, true, P(.22f, .22f), P(.78f, .22f), P(.78f, .78f), P(.22f, .78f)); p.Stroke(); break;
             }
         }

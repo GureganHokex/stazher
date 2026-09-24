@@ -12,6 +12,8 @@ namespace Intern.Game
     // Работает и со старым Input Manager, и с новым Input System (по умолчанию в Unity 6).
     public static class InputX
     {
+        public static float LookScale = 1f;   // чувствительность мыши (настройки)
+        public static bool InvertY;
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
         static bool K(Key k) { return Keyboard.current != null && Keyboard.current[k].isPressed; }
         static bool KD(Key k) { return Keyboard.current != null && Keyboard.current[k].wasPressedThisFrame; }
@@ -21,11 +23,21 @@ namespace Intern.Game
             float y = (K(Key.W) ? 1 : 0) - (K(Key.S) ? 1 : 0);
             return new Vector2(x, y);
         }
-        public static Vector2 Look() { return Mouse.current == null ? Vector2.zero : Mouse.current.delta.ReadValue() * 0.08f; }
+        public static Vector2 Look()
+        {
+            if (Mouse.current == null) return Vector2.zero;
+            var d = Mouse.current.delta.ReadValue() * 0.08f * LookScale;
+            if (InvertY) d.y = -d.y;
+            return d;
+        }
         public static bool Sprint() { return K(Key.LeftShift); }
         public static bool Jump() { return KD(Key.Space); }
         public static bool Interact() { return KD(Key.E); }
+#if UNITY_EDITOR
+        public static bool Esc() { return KD(Key.Escape) || KD(Key.F4); }   // в редакторе F4 дублирует Esc (удалённое управление Esc не передаёт)
+#else
         public static bool Esc() { return KD(Key.Escape); }
+#endif
         public static bool Click() { return Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame; }
         public static bool ToggleView() { return KD(Key.V); }
         public static Vector2 MousePosition() { return Mouse.current == null ? Vector2.zero : Mouse.current.position.ReadValue(); }
@@ -39,7 +51,12 @@ namespace Intern.Game
             float y = (Input.GetKey(KeyCode.W) ? 1 : 0) - (Input.GetKey(KeyCode.S) ? 1 : 0);
             return new Vector2(x, y);
         }
-        public static Vector2 Look() { return new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * 2f; }
+        public static Vector2 Look()
+        {
+            var d = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * 2f * LookScale;
+            if (InvertY) d.y = -d.y;
+            return d;
+        }
         public static bool Sprint() { return Input.GetKey(KeyCode.LeftShift); }
         public static bool Jump() { return Input.GetKeyDown(KeyCode.Space); }
         public static bool Interact() { return Input.GetKeyDown(KeyCode.E); }

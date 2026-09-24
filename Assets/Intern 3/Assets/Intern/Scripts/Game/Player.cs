@@ -5,6 +5,7 @@ namespace Intern.Game
 {
     public class PlayerController : MonoBehaviour
     {
+        public static float FovThird = 60f, FovFirst = 72f;   // поле зрения (настройки)
         public Camera cam;
         public CharacterAnim avatar;
         public bool firstPerson;
@@ -160,7 +161,7 @@ namespace Intern.Game
             {
                 cam.transform.position = transform.position + Vector3.up * (Tall ? 1.8f : 1.58f) + transform.forward * 0.12f;
                 cam.transform.rotation = Quaternion.Euler(camPitch, camYaw, 0);
-                cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, 72f, dt * 6f);
+                cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, FovFirst, dt * 6f);
                 return;
             }
             var pivot = transform.position + Vector3.up * (Tall ? 1.65f : 1.45f);
@@ -175,7 +176,7 @@ namespace Intern.Game
             float k = curDist / camDist;
             cam.transform.position = pivot + back * curDist + shoulder * k;
             cam.transform.rotation = rot;
-            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, 60f, dt * 6f);
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, FovThird, dt * 6f);
             // если камера подъехала вплотную — прячем голову, чтобы не смотреть изнутри
             avatar.SetHeadVisible(curDist > 0.9f);
         }

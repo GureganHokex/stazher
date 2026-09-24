@@ -9,7 +9,7 @@ namespace Intern.Game
 {
     public class GameRoot : MonoBehaviour
     {
-        enum Mode { Menu, Walk, Transition, Ide, Dialog, Pause, Wardrobe }
+        public enum Mode { Menu, Walk, Transition, Ide, Dialog, Pause, Wardrobe }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
@@ -23,6 +23,7 @@ namespace Intern.Game
         public UiKit Ui;
         IdeWindow ide;          // старая IDE на IMGUI — запасной вариант
         IdeScreen ideUi;        // новая IDE на UI Toolkit, рисуется на экране монитора
+        GameUi ui;              // меню, пауза, настройки, HUD на UI Toolkit (если не создался — старый IMGUI)
         Transform ideQuad;      // своя плоскость экрана перед монитором (у экрана из модели нет развёртки и он утоплен в корпус)
         float ideQuadW, ideQuadH;
         WardrobeScreen wardrobe;
@@ -96,6 +97,9 @@ namespace Intern.Game
                     if (CurrentTask != null) ideUi.Open(CurrentTask);
                 }
             }
+            // Настройки (экран, графика, звук, управление) и новый интерфейс
+            GameConfig.Load(); GameConfig.ApplyAll();
+            ui = GameUi.TryCreate(this);
         }
 
         void SetCursor(bool locked)
@@ -140,6 +144,7 @@ namespace Intern.Game
                 case Mode.Menu:
                     player.Tick(false);
                     player.MenuOrbit(Time.time);
+                    if (InputX.Esc() && ui != null) ui.Back();
                     break;
                 case Mode.Walk:
                     player.Tick(true);
@@ -168,7 +173,7 @@ namespace Intern.Game
                     break;
                 case Mode.Pause:
                     player.Tick(false);
-                    if (InputX.Esc()) Resume();
+                    if (InputX.Esc() && (ui == null || !ui.Back())) Resume();
                     break;
             }
             if (toast == null || Time.unscaledTime > toastUntil)
@@ -178,6 +183,7 @@ namespace Intern.Game
             }
             bugs.RemoveAll(b => b == null);
             if (ideUi != null) ideUi.Update(Time.deltaTime);
+            if (ui != null) ui.Tick(Time.unscaledDeltaTime);
 #if UNITY_EDITOR
             if (ideUi != null && InputX.DebugDump()) { Debug.Log("[Стажёр] F7: mode=" + mode + ", ideActive=" + ideUi.Active + ", task=" + (ideUi.Task != null ? ideUi.Task.id : "-")); ideUi.DebugDump(System.IO.Path.GetFullPath(Application.dataPath + "/../Temp")); Toast("Снимок IDE сохранён"); }
 #endif
@@ -658,8 +664,8 @@ namespace Intern.Game
 
             switch (mode)
             {
-                case Mode.Menu: DrawMenu(W, H); break;
-                case Mode.Walk: DrawHud(W, H); break;
+                case Mode.Menu: if (ui == null) DrawMenu(W, H); break;
+                case Mode.Walk: if (ui == null) DrawHud(W, H); break;
                 case Mode.Ide:
                     if (ideUi != null)
                     {
@@ -669,11 +675,11 @@ namespace Intern.Game
                     }
                     else DrawIdeOnMonitor();
                     GUI.matrix = baseMatrix; break;
-                case Mode.Dialog: DrawHud(W, H); DrawDialog(W, H); break;
-                case Mode.Pause: DrawPause(W, H); break;
+                case Mode.Dialog: if (ui == null) DrawHud(W, H); DrawDialog(W, H); break;
+                case Mode.Pause: if (ui == null) DrawPause(W, H); break;
                 case Mode.Wardrobe: wardrobe.Draw(W, H); break;
             }
-            if (toast != null)
+            if (toast != null && ui == null)
             {
                 var sz = Ui.toast.CalcSize(new GUIContent(toast));
                 GUI.Label(new Rect((W - sz.x) / 2, H - 120, sz.x, sz.y), toast, Ui.toast);
@@ -800,7 +806,36 @@ namespace Intern.Game
         }
 
         void OnApplicationQuit() { if (ideUi != null) ideUi.Close(); else ide.Close(); Persist(); }
-        void OnDestroy() { if (ideUi != null) ideUi.Dispose(); }
+        void OnDestroy() { if (ideUi != null) ideUi.Dispose(); if (ui != null) ui.Dispose(); }
+
+        // ================== Для интерфейса (GameUi) ==================
+        public Mode CurMode { get { return mode; } }
+        public bool HasProgress { get { return Progress.HasSave() && Save.hasCharacter; } }
+        public int DoneCount { get { return Save.done.Count; } }
+        public int TotalCount { get { return Tasks.tasks.Length; } }
+        public int BugCount { get { return bugs.Count; } }
+        public bool FirstPerson { get { return player != null && player.firstPerson; } }
+        public string FocusPrompt { get { return focus != null && mode == Mode.Walk ? focus.Prompt : null; } }
+        public string ToastText { get { return toast; } }
+        public float ToastAge { get { return Time.unscaledTime - (toastUntil - 3.2f); } }
+        public float ToastLeft { get { return toastUntil - Time.unscaledTime; } }
+        public string TaskCodeOf(TaskData t) { int i = Array.IndexOf(Tasks.tasks, t); return "KOD-" + (101 + Mathf.Max(0, i)); }
+        public void UiContinue() { StartGame((Difficulty)Save.difficulty, false); }
+        public void UiNewGame(Difficulty d) { StartGame(d, true); }
+        public void UiResume() { if (mode == Mode.Pause) Resume(); }
+        public void UiWardrobe() { OpenWardrobe(false); }
+        public void UiToggleView() { player.ToggleView(); Save.firstPerson = player.firstPerson; Persist(); }
+        public void UiSetDifficulty(Difficulty d) { Save.difficulty = (int)d; Persist(); }
+        public void UiToMenu() { mode = Mode.Menu; player.cinematic = true; SetCursor(false); }
+        public void UiQuit()
+        {
+            Persist(); GameConfig.Save();
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
+        }
 
         // Точка на экране (координаты OnGUI) → точка на панели IDE: луч из камеры в плоскость экрана монитора
         // Экран IDE: прямоугольник перед корпусом монитора (из офиса Blender — готовый, иначе строим сами)
