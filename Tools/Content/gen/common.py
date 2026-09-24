@@ -1887,7 +1887,7 @@ task("c-code-review-03", "code_review", 3, "teamlead",
      code="""
 import requests
 
-BOT_TOKEN = "7312894410:AAHk3v9QeX2mZrT8wLp0dYs1uN4bGcJfE7o"
+BOT_TOKEN = "7312894410:AAHk3v9QeX2mZrT8wLp0dYs1uN4bG"
 
 
 def send_daily_report(orders, chat_id):
