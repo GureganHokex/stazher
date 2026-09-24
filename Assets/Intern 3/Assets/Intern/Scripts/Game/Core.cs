@@ -28,6 +28,10 @@ namespace Intern.Game
         public static bool Esc() { return KD(Key.Escape); }
         public static bool Click() { return Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame; }
         public static bool ToggleView() { return KD(Key.V); }
+        public static Vector2 MousePosition() { return Mouse.current == null ? Vector2.zero : Mouse.current.position.ReadValue(); }
+        public static bool DebugSit() { return KD(Key.F8); }
+        public static bool DebugDump() { return KD(Key.F7); }
+        public static bool DebugClose() { return KD(Key.F6); }
 #else
         public static Vector2 Move()
         {
@@ -42,6 +46,10 @@ namespace Intern.Game
         public static bool Esc() { return Input.GetKeyDown(KeyCode.Escape); }
         public static bool Click() { return Input.GetMouseButtonDown(0); }
         public static bool ToggleView() { return Input.GetKeyDown(KeyCode.V); }
+        public static Vector2 MousePosition() { return Input.mousePosition; }
+        public static bool DebugSit() { return Input.GetKeyDown(KeyCode.F8); }
+        public static bool DebugDump() { return Input.GetKeyDown(KeyCode.F7); }
+        public static bool DebugClose() { return Input.GetKeyDown(KeyCode.F6); }
 #endif
     }
 

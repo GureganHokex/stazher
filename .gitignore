@@ -115,3 +115,6 @@ InitTestScene*.unity*
 
 # macOS
 .DS_Store
+
+# Превью-картинки из сессий Claude
+/Claude outputs/

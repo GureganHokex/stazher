@@ -97,7 +97,7 @@ namespace Intern.Game
         public UiKit()
         {
             white = Tex(Color.white);
-            mono = Font.CreateDynamicFontFromOSFont(new[] { "Menlo", "SF Mono", "Monaco", "Consolas", "Courier New" }, 16);
+            mono = Font.CreateDynamicFontFromOSFont(PickMono(), 16);
 
             panel = Rounded(Pal.Panel, 14, 14);
             panelLight = Rounded(Pal.PanelLight, 14, 14);
@@ -132,8 +132,17 @@ namespace Intern.Game
             swatch.active.background = swatch.normal.background;
             glare = GlareTex();
 
-            toast = Label(17, Pal.Ink, FontStyle.Bold); toast.alignment = TextAnchor.MiddleCenter;
+            toast = Label(17, Pal.Ink, FontStyle.Bold); toast.alignment = TextAnchor.MiddleCenter; toast.wordWrap = false;   // однострочные: иначе при масштабе GUI текст переносится и обрезается
             toast.normal.background = RoundTex(Pal.Sun, 14, Pal.Hex("E0A800"), 5); toast.border = new RectOffset(16, 16, 16, 21); toast.padding = new RectOffset(20, 20, 10, 15);
+        }
+
+        // Первый моноширинный шрифт, который реально есть в системе (Mac — Menlo, Windows — Consolas)
+        static string PickMono()
+        {
+            var installed = new System.Collections.Generic.HashSet<string>(Font.GetOSInstalledFontNames());
+            foreach (var n in new[] { "Menlo", "SF Mono", "Monaco", "Consolas", "Cascadia Mono", "Courier New", "DejaVu Sans Mono" })
+                if (installed.Contains(n)) return n;
+            return "Courier New";
         }
 
         // Безопасно показать произвольный текст в rich text

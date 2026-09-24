@@ -21,7 +21,10 @@ namespace Intern.Game
         public SaveData Save;
         public TaskFile Tasks;
         public UiKit Ui;
-        IdeWindow ide;
+        IdeWindow ide;          // старая IDE на IMGUI — запасной вариант
+        IdeScreen ideUi;        // новая IDE на UI Toolkit, рисуется на экране монитора
+        Transform ideQuad;      // своя плоскость экрана перед монитором (у экрана из модели нет развёртки и он утоплен в корпус)
+        float ideQuadW, ideQuadH;
         WardrobeScreen wardrobe;
         PlayerController player;
         OfficeRefs refs;
@@ -41,8 +44,26 @@ namespace Intern.Game
 
         public string RankName { get { return Progress.Rank(Save.done.Count, Tasks.tasks.Length); } }
 
+#if UNITY_EDITOR
+        // Отладка в редакторе: весь лог игры ещё и в файл Temp/intern_log.txt (удобно смотреть снаружи)
+        static System.IO.StreamWriter logFile;
+        static void LogToFile(string msg, string stack, LogType type)
+        {
+            try
+            {
+                if (logFile == null) { logFile = new System.IO.StreamWriter(System.IO.Path.GetFullPath(Application.dataPath + "/../Temp/intern_log.txt"), false, new System.Text.UTF8Encoding(false)); logFile.AutoFlush = true; }
+                logFile.WriteLine("[" + Time.frameCount + " " + type + "] " + msg);
+                if (type == LogType.Exception || type == LogType.Error) logFile.WriteLine(stack);
+            }
+            catch { }
+        }
+#endif
+
         void Awake()
         {
+#if UNITY_EDITOR
+            Application.logMessageReceived -= LogToFile; Application.logMessageReceived += LogToFile;
+#endif
             Save = Progress.Load();
             if (Save.look == null) Save.look = new Appearance();
             if (Save.owned == null) Save.owned = new List<string>();
@@ -64,6 +85,17 @@ namespace Intern.Game
             player.cinematic = true;
             UpdateBoard();
             SetCursor(false);
+            // Новая IDE: панель UI Toolkit рисуется в текстуру, текстура — на экран монитора
+            if (refs.screen != null)
+            {
+                float aspect = refs.screenSize.y > 0.01f ? refs.screenSize.x / refs.screenSize.y : 16f / 9f;
+                ideUi = IdeScreen.TryCreate(this, aspect, ScreenToMonitor);
+                if (ideUi != null)
+                {
+                    BuildIdeQuad(ModelLib.ScreenMaterial(ideUi.Texture, 0.9f, Color.white));
+                    if (CurrentTask != null) ideUi.Open(CurrentTask);
+                }
+            }
         }
 
         void SetCursor(bool locked)
@@ -78,6 +110,8 @@ namespace Intern.Game
         {
             return i == 0 || Save.done.Contains(Tasks.tasks[i - 1].id) || Save.done.Contains(Tasks.tasks[i].id);
         }
+
+        public TaskData CurrentTaskPublic { get { return CurrentTask; } }
 
         TaskData CurrentTask
         {
@@ -113,11 +147,17 @@ namespace Intern.Game
                     if (focus != null && (InputX.Interact() || (focus is BugCritter && InputX.Click()))) focus.Interact(this);
                     else if (InputX.Click() && Cursor.lockState != CursorLockMode.Locked) SetCursor(true);
                     if (InputX.ToggleView()) { player.ToggleView(); Save.firstPerson = player.firstPerson; Persist(); }
+#if UNITY_EDITOR
+                    if (InputX.DebugSit()) OpenIde();   // только в редакторе: сразу за компьютер (для тестов)
+#endif
                     if (InputX.Esc()) { mode = Mode.Pause; SetCursor(false); }
                     break;
                 case Mode.Ide:
-                    ide.Tick(Time.deltaTime);
-                    if (InputX.Esc()) CloseIde();
+                    if (ideUi != null) ideUi.Tick(Time.deltaTime); else ide.Tick(Time.deltaTime);
+                    if (InputX.Esc() && !(ideUi != null && ideUi.WantsEsc)) CloseIde();
+#if UNITY_EDITOR
+                    if (InputX.DebugClose()) CloseIde();   // только в редакторе: F6 = «Выйти» (для тестов)
+#endif
                     break;
                 case Mode.Dialog:
                     player.Tick(false);
@@ -137,6 +177,29 @@ namespace Intern.Game
                 if (toast != null) toastUntil = Time.unscaledTime + 3.2f;
             }
             bugs.RemoveAll(b => b == null);
+            if (ideUi != null) ideUi.Update(Time.deltaTime);
+#if UNITY_EDITOR
+            if (ideUi != null && InputX.DebugDump()) { Debug.Log("[Стажёр] F7: mode=" + mode + ", ideActive=" + ideUi.Active + ", task=" + (ideUi.Task != null ? ideUi.Task.id : "-")); ideUi.DebugDump(System.IO.Path.GetFullPath(Application.dataPath + "/../Temp")); Toast("Снимок IDE сохранён"); }
+#endif
+        }
+
+        public string ScreenRendererInfo()
+        {
+            if (refs == null || refs.screen == null) return "screen: null";
+            var r = refs.screen.GetComponent<Renderer>();
+            var mf = refs.screen.GetComponent<MeshFilter>();
+            string s = "mats: " + (r != null ? r.sharedMaterials.Length : 0) + ", props: " + (r != null && r.sharedMaterial != null ? string.Join(",", r.sharedMaterial.GetTexturePropertyNames()) : "") + "\n";
+            if (r != null && r.sharedMaterial != null) foreach (var pn in r.sharedMaterial.GetTexturePropertyNames()) { var tx = r.sharedMaterial.GetTexture(pn); s += "  " + pn + " = " + (tx != null ? tx.name + " " + tx.GetType().Name : "null") + "\n"; }
+            if (r != null && r.sharedMaterial != null) s += "  keywords: " + string.Join(" ", r.sharedMaterial.shaderKeywords) + "\n";
+            s += "screen: " + refs.screen.name + ", renderer: " + (r != null) + ", mat: " + (r != null && r.sharedMaterial != null ? r.sharedMaterial.name + " / " + r.sharedMaterial.shader.name + " / tex " + (r.sharedMaterial.mainTexture != null ? r.sharedMaterial.mainTexture.name : "null") : "null");
+            if (mf != null && mf.sharedMesh != null)
+            {
+                var m = mf.sharedMesh; var uv = m.isReadable ? m.uv : new Vector2[0];
+                Vector2 mn = new Vector2(9, 9), mx = new Vector2(-9, -9);
+                foreach (var u in uv) { mn = Vector2.Min(mn, u); mx = Vector2.Max(mx, u); }
+                s += "\nmesh: " + m.name + " verts " + m.vertexCount + " bounds " + m.bounds + " uv " + mn + " .. " + mx;
+            }
+            return s;
         }
 
         void FindFocus()
@@ -166,22 +229,27 @@ namespace Intern.Game
 
         void Resume() { mode = Mode.Walk; SetCursor(true); }
 
-        public void Toast(string s) { toasts.Enqueue(s); }
+        public void Toast(string s)
+        {
+            if (mode == Mode.Ide && ideUi != null) { ideUi.GameNotice(s); return; }   // за компьютером — уведомлением в IDE
+            toasts.Enqueue(s);
+        }
 
         // ================== Компьютер: посадка и работа ==================
         public void OpenIde()
         {
             if (mode != Mode.Walk) return;
-            var t = ide.Task ?? CurrentTask;
+            var open = ideUi != null ? ideUi.Task : ide.Task;
+            var t = open ?? CurrentTask;
             if (t == null) return;
-            if (ide.Task == null) ide.Open(t);
+            if (open == null) { if (ideUi != null) ideUi.Open(t); else ide.Open(t); }
             StartCoroutine(SitDown());
         }
 
         public void CloseIde()
         {
             if (mode != Mode.Ide) return;
-            ide.Close();
+            if (ideUi != null) ideUi.Close(); else ide.Close();
             StartCoroutine(StandUp());
         }
 
@@ -228,6 +296,25 @@ namespace Intern.Game
             player.SetCamera(p1, r1, f1);
         }
 
+        Vector3 DeskRight { get { return Quaternion.Euler(0, DeskYaw, 0) * Vector3.right; } }
+        Vector3 chairRestPos; Quaternion chairRestRot; bool chairRestSaved;
+
+        void SaveChairRest()
+        {
+            if (refs.chairObj == null || chairRestSaved) return;
+            chairRestPos = refs.chairObj.position; chairRestRot = refs.chairObj.rotation; chairRestSaved = true;
+        }
+
+        void SetChair(Vector3 pos, float swivel)
+        {
+            if (refs.chairObj == null) return;
+            refs.chairObj.position = pos;
+            refs.chairObj.rotation = Quaternion.Euler(0, swivel, 0) * chairRestRot;
+        }
+
+        Vector3 ChairBase { get { SaveChairRest(); return refs.chairObj != null ? new Vector3(chairRestPos.x, 0, chairRestPos.z) : SeatPos; } }
+
+        // Кат-сцена: подойти, отодвинуть кресло, сесть с «плюх», подкатиться к столу
         IEnumerator SitDown()
         {
             mode = Mode.Transition;
@@ -236,56 +323,93 @@ namespace Intern.Game
             player.EnablePhysics(false);
             var av = player.avatar;
             av.SetHeadVisible(true);
+            SaveChairRest();
 
+            Vector3 c0 = ChairBase, c1 = c0 - DeskFwd * 0.38f;
+            Vector3 side = c0 - DeskFwd * 0.55f + DeskRight * 0.6f;
             Vector3 start = player.Position; start.y = 0;
             float startYaw = player.transform.eulerAngles.y;
-            Vector3 approach = SeatPos - DeskFwd * 0.6f;
             Vector3 camA; Quaternion rotA;
             ShoulderPose(out camA, out rotA);
 
-            // 1. Подходим к креслу
+            // 1. подходим к креслу сбоку
             Vector3 p0; Quaternion r0; float f0;
             player.GetCamera(out p0, out r0, out f0);
-            float dist = Vector3.Distance(start, approach);
+            float dist = Vector3.Distance(start, side);
             float T1 = Mathf.Clamp(dist / 3f, 0.35f, 0.9f);
+            float yawToChair = Quaternion.LookRotation(c0 - side).eulerAngles.y;
             for (float t = 0; t < T1; t += Time.deltaTime)
             {
                 float k = Smooth(t / T1);
-                player.Place(Vector3.Lerp(start, approach, k), Mathf.LerpAngle(startYaw, DeskYaw, Smooth(t / (T1 * 0.7f))));
+                player.Place(Vector3.Lerp(start, side, k), Mathf.LerpAngle(startYaw, yawToChair, Smooth(t / (T1 * 0.7f))));
                 av.moveSpeed = dist / T1 * (1 - k * 0.6f);
                 player.SetCamera(Vector3.Lerp(p0, camA, k), Quaternion.Slerp(r0, rotA, k), Mathf.Lerp(f0, 55f, k));
                 yield return null;
             }
             av.moveSpeed = 0;
 
-            // 2. Садимся
-            av.sitTarget = 1;
+            // 2. отодвигаем кресло на себя, оно поворачивается к нам
             for (float t = 0; t < 0.45f; t += Time.deltaTime)
             {
-                player.Place(Vector3.Lerp(approach, SeatPos, Smooth(t / 0.45f)), DeskYaw);
+                float k = Smooth(t / 0.45f);
+                SetChair(Vector3.Lerp(c0, c1, k), 25f * k);
                 yield return null;
             }
-            player.Place(SeatPos, DeskYaw);
+
+            // 3. шаг к креслу и разворот к столу
+            Vector3 front = c1 + DeskFwd * 0.06f;
+            for (float t = 0; t < 0.45f; t += Time.deltaTime)
+            {
+                float k = Smooth(t / 0.45f);
+                player.Place(Vector3.Lerp(side, front, k), Mathf.LerpAngle(yawToChair, DeskYaw, k));
+                av.moveSpeed = 1.2f * (1 - k);
+                SetChair(c1, 25f * (1 - k));
+                yield return null;
+            }
+            av.moveSpeed = 0;
+
+            // 4. садимся: небольшой наклон вперёд и «плюх»
+            av.sitTarget = 1;
+            bool plopped = false;
+            for (float t = 0; t < 0.5f; t += Time.deltaTime)
+            {
+                player.Place(Vector3.Lerp(front, c1, Smooth(t / 0.5f)), DeskYaw);
+                if (!plopped && t > 0.36f) { av.Plop(); plopped = true; }
+                yield return null;
+            }
+
+            // 5. подкатываемся к столу вместе с креслом
+            for (float t = 0; t < 0.55f; t += Time.deltaTime)
+            {
+                float k = Smooth(t / 0.55f);
+                var pos = Vector3.Lerp(c1, c0, k);
+                SetChair(pos, Mathf.Sin(k * Mathf.PI) * 6f);
+                player.Place(pos, DeskYaw);
+                yield return null;
+            }
+            SetChair(c0, 0); player.Place(c0, DeskYaw);
             av.handsOnDesk = true;
 
-            // 3. Камера наезжает на монитор
+            // 6. камера наезжает на монитор
             Vector3 camB; Quaternion rotB; float fovB;
             MonitorPose(out camB, out rotB, out fovB);
-            Vector3 c0; Quaternion q0; float fv0;
-            player.GetCamera(out c0, out q0, out fv0);
+            Vector3 cc0; Quaternion q0; float fv0;
+            player.GetCamera(out cc0, out q0, out fv0);
             for (float t = 0; t < 0.8f; t += Time.deltaTime)
             {
                 float k = Smooth(t / 0.8f);
                 if (k > 0.5f) av.SetHeadVisible(false);
-                player.SetCamera(Vector3.Lerp(c0, camB, k), Quaternion.Slerp(q0, rotB, k), Mathf.Lerp(fv0, fovB, k));
+                player.SetCamera(Vector3.Lerp(cc0, camB, k), Quaternion.Slerp(q0, rotB, k), Mathf.Lerp(fv0, fovB, k));
                 yield return null;
             }
             player.SetCamera(camB, rotB, fovB);
             mode = Mode.Ide;
             ideShownAt = Time.unscaledTime;
+            if (ideUi != null) ideUi.SetActive(true);
             SetCursor(false);
         }
 
+        // Кат-сцена: откатиться, встать, отойти; кресло откатывается на место
         IEnumerator StandUp()
         {
             mode = Mode.Transition;
@@ -294,16 +418,30 @@ namespace Intern.Game
             ShoulderPose(out camA, out rotA);
             yield return StartCoroutine(CameraMoveWithHead(camA, rotA, 55f, 0.6f));
 
+            Vector3 c0 = ChairBase, c1 = c0 - DeskFwd * 0.38f;
+            Vector3 side = c0 - DeskFwd * 0.6f + DeskRight * 0.6f;
             av.handsOnDesk = false;
-            av.sitTarget = 0;
-            Vector3 standPos = SeatPos - DeskFwd * 0.75f;
-            for (float t = 0; t < 0.5f; t += Time.deltaTime)
+            for (float t = 0; t < 0.45f; t += Time.deltaTime)
             {
-                player.Place(Vector3.Lerp(SeatPos, standPos, Smooth(t / 0.5f)), DeskYaw);
+                var pos = Vector3.Lerp(c0, c1, Smooth(t / 0.45f));
+                SetChair(pos, 0); player.Place(pos, DeskYaw);
                 yield return null;
             }
-            player.Teleport(standPos + Vector3.up * 0.05f, DeskYaw);
-            player.FaceCameraYaw(DeskYaw);
+            av.sitTarget = 0;
+            for (float t = 0; t < 0.45f; t += Time.deltaTime) yield return null;
+            float yawOut = Quaternion.LookRotation(side - c1).eulerAngles.y;
+            for (float t = 0; t < 0.5f; t += Time.deltaTime)
+            {
+                float k = Smooth(t / 0.5f);
+                player.Place(Vector3.Lerp(c1, side, k), Mathf.LerpAngle(DeskYaw, yawOut, k));
+                av.moveSpeed = 1.3f * Mathf.Sin(k * Mathf.PI);
+                SetChair(Vector3.Lerp(c1, c0, Smooth(Mathf.Clamp01(t / 0.5f - 0.2f))), 0);
+                yield return null;
+            }
+            av.moveSpeed = 0;
+            SetChair(c0, 0);
+            player.Teleport(side + Vector3.up * 0.05f, yawOut);
+            player.FaceCameraYaw(yawOut);
             player.cinematic = false;
             player.BlendFromCurrent(0.5f);
             player.avatar.SetHeadVisible(!player.firstPerson);
@@ -354,6 +492,7 @@ namespace Intern.Game
             Save.money += reward; Save.done.Add(t.id);
             Persist(); UpdateBoard();
             Toast("Задача сдана! +" + reward + " монет" + (late ? " (дедлайн сорван)" : ""));
+            if (player.avatar != null) player.avatar.React(2, 3f); // восторг
             if (RankName != oldRank) Toast("ПОВЫШЕНИЕ! Теперь ты " + RankName + ". Загляни в гардероб — там кое-что новое.");
             var next = CurrentTask;
             if (next != null && next != t && !Save.done.Contains(next.id)) Toast("Новая задача: " + next.title);
@@ -361,6 +500,7 @@ namespace Intern.Game
 
         public void SpawnBug()
         {
+            if (player.avatar != null) player.avatar.React(4, 2.5f); // грусть
             if (bugs.Count >= 12) return;
             var p = refs.spawn.position + UnityEngine.Random.insideUnitSphere * 3f; p.y = 0;
             p.x = Mathf.Clamp(p.x, -10.5f, 10.5f); p.z = Mathf.Clamp(p.z, -6.5f, 6.5f);
@@ -411,6 +551,7 @@ namespace Intern.Game
                 Save.money -= cost;
                 if (!Save.owned.Contains("top" + result.top)) Save.owned.Add("top" + result.top);
                 if (!Save.owned.Contains("acc" + result.accessory)) Save.owned.Add("acc" + result.accessory);
+                if (!Save.owned.Contains("outfit" + result.outfit)) Save.owned.Add("outfit" + result.outfit);
                 Toast("Обновка! −" + cost + " монет");
             }
             Save.look = result.Clone();
@@ -438,6 +579,7 @@ namespace Intern.Game
 
         public void TalkToLead()
         {
+            if (refs.lead != null) refs.lead.React(1, 2.5f);
             int done = Save.done.Count, total = Tasks.tasks.Length;
             string text;
             if (done == 0)
@@ -491,7 +633,7 @@ namespace Intern.Game
         {
             if (fresh)
             {
-                Progress.Wipe(); Save = new SaveData(); ide = new IdeWindow(this);
+                Progress.Wipe(); Save = new SaveData(); ide = new IdeWindow(this); if (ideUi != null) ideUi.ResetProgress(CurrentTask);
                 foreach (var b in bugs) if (b != null) Destroy(b.gameObject);
                 player.SetAvatar(Save.look);
             }
@@ -518,7 +660,15 @@ namespace Intern.Game
             {
                 case Mode.Menu: DrawMenu(W, H); break;
                 case Mode.Walk: DrawHud(W, H); break;
-                case Mode.Ide: DrawIdeOnMonitor(); GUI.matrix = baseMatrix; break;
+                case Mode.Ide:
+                    if (ideUi != null)
+                    {
+                        GUI.matrix = Matrix4x4.identity;
+                        if (Event.current.type == EventType.KeyDown) player.avatar.typingUntil = Time.time + 0.4f;
+                        ideUi.HandleEvent(Event.current);
+                    }
+                    else DrawIdeOnMonitor();
+                    GUI.matrix = baseMatrix; break;
                 case Mode.Dialog: DrawHud(W, H); DrawDialog(W, H); break;
                 case Mode.Pause: DrawPause(W, H); break;
                 case Mode.Wardrobe: wardrobe.Draw(W, H); break;
@@ -649,6 +799,60 @@ namespace Intern.Game
             GUILayout.EndArea();
         }
 
-        void OnApplicationQuit() { ide.Close(); Persist(); }
+        void OnApplicationQuit() { if (ideUi != null) ideUi.Close(); else ide.Close(); Persist(); }
+        void OnDestroy() { if (ideUi != null) ideUi.Dispose(); }
+
+        // Точка на экране (координаты OnGUI) → точка на панели IDE: луч из камеры в плоскость экрана монитора
+        // Экран IDE: прямоугольник перед корпусом монитора (из офиса Blender — готовый, иначе строим сами)
+        void BuildIdeQuad(Material mat)
+        {
+            if (refs.screenQuad != null)
+            {
+                ideQuad = refs.screenQuad;
+                ideQuad.GetComponent<Renderer>().sharedMaterial = mat;
+            }
+            else
+            {
+                var src = refs.screen.GetComponent<Renderer>();
+                if (src == null) return;
+                ideQuad = ModelLib.FrontQuad(src, SeatPos + Vector3.up * refs.screen.position.y, null, mat, refs.screen.root.GetComponentsInChildren<Renderer>());
+            }
+            ideQuadW = ideQuad.lossyScale.x; ideQuadH = ideQuad.lossyScale.y;
+            Debug.Log("[Стажёр] Экран IDE: " + ideQuadW.ToString("0.000") + "×" + ideQuadH.ToString("0.000") + " м");
+        }
+
+        Vector2? ScreenToMonitor(Vector2 gui)
+        {
+            if (ideQuad != null && player != null && player.cam != null && ideUi != null)
+            {
+                var qray = player.cam.ScreenPointToRay(new Vector3(gui.x, Screen.height - gui.y, 0));
+                var qplane = new Plane(-ideQuad.forward, ideQuad.position);
+                float qd;
+                if (!qplane.Raycast(qray, out qd)) return null;
+                var ql = qray.GetPoint(qd) - ideQuad.position;
+                float qu = Vector3.Dot(ql, ideQuad.right) / ideQuadW + 0.5f, qv = Vector3.Dot(ql, ideQuad.up) / ideQuadH + 0.5f;
+                if (qu < -0.05f || qu > 1.05f || qv < -0.05f || qv > 1.05f) return null;
+                return new Vector2(qu * ideUi.PanelWidth, (1 - qv) * ideUi.PanelHeight);
+            }
+            if (refs == null || refs.screen == null || player == null || player.cam == null || ideUi == null) return null;
+            var scr = refs.screen;
+            var mf = scr.GetComponent<MeshFilter>();
+            Bounds b = mf != null && mf.sharedMesh != null ? mf.sharedMesh.bounds : new Bounds(Vector3.zero, new Vector3(refs.screenSize.x, refs.screenSize.y, 0.001f));
+            bool wideX = b.size.x >= b.size.z;
+            Vector3 c = scr.TransformPoint(b.center);
+            Vector3 axW = scr.TransformVector(wideX ? new Vector3(b.size.x, 0, 0) : new Vector3(0, 0, b.size.z));
+            Vector3 axH = scr.TransformVector(new Vector3(0, b.size.y, 0));
+            var cam = player.cam;
+            if (Vector3.Dot(axW, cam.transform.right) < 0) axW = -axW;
+            if (Vector3.Dot(axH, Vector3.up) < 0) axH = -axH;
+            var ray = cam.ScreenPointToRay(new Vector3(gui.x, Screen.height - gui.y, 0));
+            var plane = new Plane(Vector3.Cross(axW, axH).normalized, c);
+            float d;
+            if (!plane.Raycast(ray, out d)) return null;
+            var local = ray.GetPoint(d) - c;
+            float u = Vector3.Dot(local, axW) / axW.sqrMagnitude + 0.5f, v = Vector3.Dot(local, axH) / axH.sqrMagnitude + 0.5f;
+            if (u < -0.05f || u > 1.05f || v < -0.05f || v > 1.05f) return null;
+            return new Vector2(u * ideUi.PanelWidth, (1 - v) * ideUi.PanelHeight);
+        }
     }
 }

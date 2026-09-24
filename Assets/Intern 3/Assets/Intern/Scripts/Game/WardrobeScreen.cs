@@ -14,7 +14,7 @@ namespace Intern.Game
         Vector2 scroll;
         public float Spin;
         static readonly string[] TabsBean = { "Лицо", "Волосы", "Одежда", "Аксессуары" };
-        static readonly string[] TabsModel = { "Лицо", "Одежда", "Аксессуары" };
+        static readonly string[] TabsModel = { "Костюм", "Цвета", "Эмоция", "Аксессуары" };
         bool Model { get { return ModelLib.HasCharacter("Intern"); } }
         string[] Tabs { get { return Model ? TabsModel : TabsBean; } }
 
@@ -35,6 +35,7 @@ namespace Intern.Game
             {
                 int c = 0;
                 if (!Model && !Owned("top" + draft.top, Catalog.TopPrice(draft.top))) c += Catalog.TopPrice(draft.top);
+                if (Model && !Owned("outfit" + draft.outfit, Catalog.OutfitPrice(draft.outfit))) c += Catalog.OutfitPrice(draft.outfit);
                 if (!Owned("acc" + draft.accessory, Catalog.AccPrice(draft.accessory))) c += Catalog.AccPrice(draft.accessory);
                 return c;
             }
@@ -119,24 +120,35 @@ namespace Intern.Game
             GUILayout.EndArea();
         }
 
-        // Вкладки для модели из Blender: цвета одежды и аксессуары
+        // Вкладки для модели из Blender: костюмы, цвета, эмоции, аксессуары
         void DrawModelTab()
         {
             switch (tab)
             {
                 case 0:
-                    Header("Цвет кожи");
-                    Swatches(Catalog.Skins, draft.skin, v => draft.skin = v);
+                    Header("Костюм");
+                    for (int i = 0; i < Catalog.OutfitNames.Length; i++)
+                    {
+                        string label = Catalog.OutfitNames[i] + PriceTag("outfit" + i, Catalog.OutfitPrice(i), false);
+                        if (GUILayout.Button(label, i == draft.outfit ? S.btn : S.btnAlt, GUILayout.Height(36)) && i != draft.outfit)
+                        { draft.outfit = i; draft.topColor = draft.pants = draft.shoes = draft.tie = -1; Changed(); }
+                    }
+                    GUILayout.Label("При смене костюма цвета возвращаются к «родным». Перекрасить можно во вкладке «Цвета».", S.small);
                     break;
                 case 1:
-                    Header("Рубашка");
-                    Swatches(Catalog.Cloth, draft.topColor, v => draft.topColor = v);
-                    Header("Галстук");
-                    Swatches(Catalog.Cloth, draft.tie, v => draft.tie = v);
-                    Header("Брюки");
-                    Swatches(Catalog.Cloth, draft.pants, v => draft.pants = v);
-                    Header("Ботинки");
-                    Swatches(Catalog.Cloth, draft.shoes, v => draft.shoes = v);
+                    Header("Цвет кожи");
+                    Swatches(Catalog.Skins, draft.skin, v => draft.skin = v);
+                    ColorRow("Верх", draft.topColor, v => draft.topColor = v);
+                    ColorRow("Низ", draft.pants, v => draft.pants = v);
+                    ColorRow("Обувь", draft.shoes, v => draft.shoes = v);
+                    if (Catalog.OutfitIds[Mathf.Clamp(draft.outfit, 0, Catalog.OutfitIds.Length - 1)] == "classic")
+                        ColorRow("Галстук", draft.tie, v => draft.tie = v);
+                    break;
+                case 2:
+                    Header("Эмоция");
+                    Options(Catalog.EmotionNames, draft.emotion, v => draft.emotion = v, null);
+                    GUILayout.Space(6);
+                    GUILayout.Label("С этим лицом стажёр ходит по офису. После сданной задачи он на пару секунд придёт в восторг, после упавшего теста — расстроится.", S.small);
                     break;
                 default:
                     Header("Аксессуар");
@@ -145,6 +157,17 @@ namespace Intern.Game
                     GUILayout.Label("Корону выдают за звание Junior+. Остальное можно купить за монеты — примерять бесплатно.", S.small);
                     break;
             }
+        }
+
+        void ColorRow(string title, int current, Action<int> set)
+        {
+            GUILayout.Space(8);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(title, S.h3, GUILayout.Width(120));
+            if (GUILayout.Button(current < 0 ? "Как у костюма (выбрано)" : "Как у костюма", current < 0 ? S.btn : S.btnGhost, GUILayout.Height(28), GUILayout.ExpandWidth(false)) && current >= 0)
+            { set(-1); Changed(); }
+            GUILayout.EndHorizontal();
+            Swatches(Catalog.Cloth, current, set);
         }
 
         string PriceTag(string key, int price, bool needsRank)
@@ -201,6 +224,13 @@ namespace Intern.Game
             draft.shoes = r.Next(Catalog.Cloth.Length);
             draft.blush = r.Next(2) == 0;
             draft.tie = r.Next(Catalog.Cloth.Length);
+            if (Model)
+            {
+                int o = r.Next(Catalog.OutfitIds.Length);
+                draft.outfit = Owned("outfit" + o, Catalog.OutfitPrice(o)) ? o : r.Next(2);
+                draft.emotion = r.Next(Catalog.EmotionNames.Length);
+                draft.topColor = draft.pants = draft.shoes = draft.tie = r.Next(3) == 0 ? r.Next(Catalog.Cloth.Length) : -1;
+            }
             // случайно выбираем только из уже доступных вещей
             int top = r.Next(Catalog.TopNames.Length);
             draft.top = Owned("top" + top, Catalog.TopPrice(top)) ? top : 0;

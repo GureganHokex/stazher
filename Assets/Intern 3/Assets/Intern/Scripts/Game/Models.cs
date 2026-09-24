@@ -107,7 +107,76 @@ namespace Intern.Game
         public static Texture2D IdeTexture { get { if (ideTex == null) ideTex = Resources.Load<Texture2D>("Textures/IDE_Screen"); return ideTex; } }
         public static Texture2D CodeTexture { get { if (codeTex == null) codeTex = Resources.Load<Texture2D>("Textures/CodeScroll"); return codeTex; } }
 
-        public static Material ScreenMaterial(Texture2D tex, float emission, Color tint)
+        // Экран монитора как отдельный прямоугольник: смотрит на зрителя, чуть впереди корпуса, с правильной развёрткой.
+        // У экранов из Blender нормаль смотрит внутрь монитора (их не видно) и нет нормальной развёртки — поэтому свой.
+        // viewer — точка, откуда смотрят (кресло); иначе направление берём «от задней крышки к экрану».
+        public static Transform FrontQuad(Renderer src, Vector3? viewer, Vector3? backCenter, Material mat, IList<Renderer> scan)
+        {
+            var scr = src.transform;
+            var mf = scr.GetComponent<MeshFilter>();
+            Bounds b = mf != null && mf.sharedMesh != null ? mf.sharedMesh.bounds : new Bounds(Vector3.zero, new Vector3(0.97f, 0.55f, 0.001f));
+            bool wideX = b.size.x >= b.size.z;
+            Vector3 c = scr.TransformPoint(b.center);
+            float w = scr.TransformVector(wideX ? new Vector3(b.size.x, 0, 0) : new Vector3(0, 0, b.size.z)).magnitude;
+            float h = scr.TransformVector(new Vector3(0, b.size.y, 0)).magnitude;
+            Vector3 n = viewer.HasValue ? viewer.Value - c : backCenter.HasValue ? c - backCenter.Value : -scr.forward;
+            n.y = 0; n = n.sqrMagnitude > 1e-6f ? n.normalized : -scr.forward;
+            var rot = Quaternion.LookRotation(-n, Vector3.up);
+            Vector3 right = rot * Vector3.right, up = Vector3.up;
+            // передняя плоскость корпуса — встаём на 3 мм перед ней
+            float front = 0f;
+            if (scan != null)
+                foreach (var r in scan)
+                {
+                    if (r == null || r == src) continue;
+                    string rn = Clean(r.name);
+                    if (!(rn.Contains("Mon") || rn.Contains("Screen") || rn.Contains("Bezel"))) continue;
+                    if ((r.bounds.center - c).sqrMagnitude > 0.8f * 0.8f) continue;
+                    float d0, d1, x0, x1, y0, y1; Project(r.bounds, c, n, right, up, out d0, out d1, out x0, out x1, out y0, out y1);
+                    if (x1 < -w * 0.5f || x0 > w * 0.5f || y1 < -h * 0.5f || y0 > h * 0.5f) continue;
+                    front = Mathf.Max(front, Mathf.Min(d1, 0.12f));
+                }
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = Clean(src.name) + "_Front";
+            var col = go.GetComponent<Collider>(); if (col != null) Object.Destroy(col);
+            go.transform.SetPositionAndRotation(c + n * (front + 0.003f), rot);
+            go.transform.localScale = new Vector3(w, h, 1f);
+            if (scr.parent != null) go.transform.SetParent(scr.parent, true);
+            var qr = go.GetComponent<MeshRenderer>();
+            qr.sharedMaterial = mat;
+            qr.shadowCastingMode = ShadowCastingMode.Off;
+            src.enabled = false;
+            // стикеры, наклеенные поверх экрана, сдвигаем на рамку — вверх или вниз
+            if (scan != null)
+                foreach (var r in scan)
+                {
+                    if (r == null) continue;
+                    string rn = Clean(r.name);
+                    if (!(rn.Contains("Sticky") || rn.Contains("Note"))) continue;
+                    var rb = r.bounds;
+                    if ((rb.center - c).sqrMagnitude > 0.8f * 0.8f || rb.size.x > 0.3f || rb.size.y > 0.3f || rb.size.z > 0.3f) continue;
+                    float d0, d1, x0, x1, y0, y1; Project(rb, c, n, right, up, out d0, out d1, out x0, out x1, out y0, out y1);
+                    if (d1 < -0.01f || d0 > 0.15f) continue;
+                    float ox = Mathf.Min(x1, w * 0.5f) - Mathf.Max(x0, -w * 0.5f), oy = Mathf.Min(y1, h * 0.5f) - Mathf.Max(y0, -h * 0.5f);
+                    if (ox <= 0 || oy <= 0) continue;
+                    float dy = (y0 + y1) > 0 ? (h * 0.5f - y0) + 0.004f : -(y1 + h * 0.5f) - 0.004f;
+                    r.transform.position += up * dy + n * Mathf.Max(0f, front + 0.004f - d0);
+                }
+            return go.transform;
+        }
+
+        static void Project(Bounds rb, Vector3 c, Vector3 n, Vector3 right, Vector3 up, out float d0, out float d1, out float x0, out float x1, out float y0, out float y1)
+        {
+            d0 = x0 = y0 = float.MaxValue; d1 = x1 = y1 = float.MinValue;
+            for (int i = 0; i < 8; i++)
+            {
+                var v = new Vector3((i & 1) == 0 ? rb.min.x : rb.max.x, (i & 2) == 0 ? rb.min.y : rb.max.y, (i & 4) == 0 ? rb.min.z : rb.max.z) - c;
+                float d = Vector3.Dot(v, n), x = Vector3.Dot(v, right), y = Vector3.Dot(v, up);
+                d0 = Mathf.Min(d0, d); d1 = Mathf.Max(d1, d); x0 = Mathf.Min(x0, x); x1 = Mathf.Max(x1, x); y0 = Mathf.Min(y0, y); y1 = Mathf.Max(y1, y);
+            }
+        }
+
+        public static Material ScreenMaterial(Texture tex, float emission, Color tint)
         {
             var m = new Material(Lit) { name = "lp_screen" };
             SetColor(m, tint);
@@ -151,6 +220,8 @@ namespace Intern.Game
             "Ceiling", "Window", "Win", "Sill", "Rail", "Skirt", "Low", "Band", "Donut", "Icing", "Plate", "Cup", "Hopper", "Gauge", "Needle"
         };
 
+        static readonly string[] ChairNames = { "Seat", "Back", "BackArm", "Pole", "Hub", "StarLeg", "Wheel" };
+
         static bool Skip(string n)
         {
             foreach (var s in NoCollide) if (n.Contains(s)) return true;
@@ -167,7 +238,12 @@ namespace Intern.Game
             ModelLib.ConvertAll(office);
 
             var playerScreen = (Transform)null; Vector3 seat = new Vector3(-5, 0, 1.55f);
-            foreach (var r in office.GetComponentsInChildren<MeshRenderer>(true))
+            var chairParts = new List<Transform>();
+            var screens = new List<Renderer>();
+            var all = office.GetComponentsInChildren<MeshRenderer>(true);
+            var byName = new Dictionary<string, Renderer>();
+            foreach (var r in all) byName[ModelLib.Clean(r.name)] = r;
+            foreach (var r in all)
             {
                 string n = ModelLib.Clean(r.name);
                 var go = r.gameObject;
@@ -180,10 +256,13 @@ namespace Intern.Game
                 if (isScreen)
                 {
                     if (n.StartsWith("Desk_Player")) { playerScreen = r.transform; r.sharedMaterial = ModelLib.ScreenMaterial(ModelLib.IdeTexture, 0.9f, Color.white); }
-                    else { r.sharedMaterial = ModelLib.ScreenMaterial(ModelLib.CodeTexture, 1.3f, new Color(0.85f, 0.9f, 1f)); go.AddComponent<ScreenScroller>(); }
+                    else r.sharedMaterial = ModelLib.ScreenMaterial(ModelLib.CodeTexture, 1.3f, new Color(0.85f, 0.9f, 1f));
+                    if (n.EndsWith("MonScreen")) screens.Add(r);
+                    else if (!n.StartsWith("Desk_Player")) go.AddComponent<ScreenScroller>();
                     continue;
                 }
                 if (n == "Desk_Player__Seat") seat = r.bounds.center;
+                if (n.StartsWith("Desk_Player__") && System.Array.IndexOf(ChairNames, n.Substring(13)) >= 0) { chairParts.Add(r.transform); continue; }
                 if (n == "Desk_Player__MonPanel") { go.AddComponent<BoxCollider>(); go.AddComponent<ComputerDesk>(); continue; }
                 if (n == "EspBody") { go.AddComponent<BoxCollider>(); go.AddComponent<CoffeeMachine>(); continue; }
                 if (n == "LockerBody") { go.AddComponent<BoxCollider>(); go.AddComponent<Wardrobe>(); continue; }
@@ -192,6 +271,17 @@ namespace Intern.Game
                 bool floor = n == "Floor";
                 if (floor || (!Skip(n) && size.y > 0.2f && (size.x > 0.15f || size.z > 0.15f)))
                     go.AddComponent<BoxCollider>();
+            }
+
+            // Экраны мониторов: свои прямоугольники перед корпусом (у экранов из модели нормаль смотрит внутрь)
+            foreach (var r in screens)
+            {
+                string n = ModelLib.Clean(r.name);
+                string prefix = n.Substring(0, n.Length - "MonScreen".Length);
+                Renderer back; byName.TryGetValue(prefix + "MonBack", out back);
+                var q = ModelLib.FrontQuad(r, null, back != null ? back.bounds.center : (Vector3?)null, r.sharedMaterial, all);
+                if (r.transform == playerScreen) refs.screenQuad = q;
+                else q.gameObject.AddComponent<ScreenScroller>();
             }
 
             // Метки и опорные точки
@@ -211,6 +301,13 @@ namespace Intern.Game
             var chair = new GameObject("PlayerChairAnchor").transform;
             chair.position = new Vector3(seat.x, 0.5f, seat.z);
             refs.playerChair = chair;
+            // кресло целиком: точка опоры — центр основания, под сиденьем
+            var chairObj = new GameObject("PlayerChair").transform;
+            chairObj.position = new Vector3(seat.x, 0, seat.z);
+            foreach (var t in chairParts) t.SetParent(chairObj, true);
+            var col = chairObj.gameObject.AddComponent<BoxCollider>();
+            col.center = new Vector3(0, 0.5f, -0.1f); col.size = new Vector3(0.6f, 1.0f, 0.6f);
+            refs.chairObj = chairObj;
 
             refs.spawn = new GameObject("Spawn").transform; refs.spawn.position = new Vector3(-5, 0.1f, -4.8f);
             refs.lockerSpot = new GameObject("LockerSpot").transform; refs.lockerSpot.position = new Vector3(-8f, 0.1f, -6.1f);

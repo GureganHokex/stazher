@@ -9,6 +9,8 @@ namespace Intern.Game
     public class OfficeRefs
     {
         public Transform spawn, playerDesk, playerChair, screen, lockerSpot;
+        public Transform chairObj; // кресло целиком — его можно отодвигать при посадке
+        public Transform screenQuad; // экран монитора игрока (свой прямоугольник перед корпусом), если есть
         public Vector2 screenSize;
         public TextMesh board;
         public CharacterAnim lead;
@@ -154,6 +156,7 @@ namespace Intern.Game
                         mon.AddComponent<ComputerDesk>();
                         scr.AddComponent<ComputerDesk>();
                         refs.playerChair = ch;
+                        refs.chairObj = ch;
                         B("Sticky", new Vector3(0.72f, 1.55f, 0.205f), new Vector3(0.13f, 0.13f, 0.01f), Pal.Hex("FFE066"), 0.01f, false, 0.5f, 0, false, d).transform.localRotation = Quaternion.Euler(0, 0, 8);
                         B("Sticky2", new Vector3(-0.72f, 1.1f, 0.205f), new Vector3(0.13f, 0.13f, 0.01f), Pal.Hex("FF9FC6"), 0.01f, false, 0.5f, 0, false, d).transform.localRotation = Quaternion.Euler(0, 0, -6);
                         // уточка сидит на мониторе

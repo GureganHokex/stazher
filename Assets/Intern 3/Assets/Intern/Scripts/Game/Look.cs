@@ -12,7 +12,8 @@ namespace Intern.Game
     [Serializable]
     public class Appearance
     {
-        public int skin = 1, hair = 0, hairColor = 0, eyes = 0, mouth = 0, top = 0, topColor = 0, pants = 1, shoes = 8, accessory = 0, tie = 2;
+        public int skin = 1, hair = 0, hairColor = 0, eyes = 0, mouth = 0, top = 0, topColor = -1, pants = -1, shoes = -1, accessory = 0, tie = -1;
+        public int outfit = 0, emotion = 0;
         public bool blush = true;
         public Appearance Clone() { return (Appearance)MemberwiseClone(); }
     }
@@ -34,6 +35,21 @@ namespace Intern.Game
         public static int TopPrice(int i) { return topPrice[Mathf.Clamp(i, 0, topPrice.Length - 1)]; }
         public static int AccPrice(int i) { return accPrice[Mathf.Clamp(i, 0, accPrice.Length - 1)]; }
         public static bool AccNeedsJuniorPlus(int i) { return i == 5; }
+
+        // Костюмы (модель из Blender): id совпадают с группами Top_/Bottom_/Shoes_ в FBX
+        public static readonly string[] OutfitIds = { "classic", "junior", "backend", "frontend", "teamlead", "devops", "designer", "qa", "hackathon" };
+        public static readonly string[] OutfitNames = { "Классика: рубашка и галстук", "Джун: худи и джинсы", "Бэкендер: фланель и карго", "Фронтендер: футболка с принтом",
+                                                        "Тимлид: жилет и галстук", "DevOps: флиска и карго", "Дизайнер: водолазка", "Тестировщик: белая футболка", "Хакатон: капюшон на голове" };
+        static readonly int[] outfitPrice = { 0, 0, 120, 120, 250, 180, 150, 100, 200 };
+        public static int OutfitPrice(int i) { return outfitPrice[Mathf.Clamp(i, 0, outfitPrice.Length - 1)]; }
+
+        // Эмоции: рот, наклон бровей (+ — «грустные», − — «злые»), подъём бровей, прикрытие век 0..1, размер зрачков
+        public static readonly string[] EmotionNames = { "Спокойный", "Радость", "Восторг", "Удивление", "Грусть", "Злость", "Хитрый", "Сонный" };
+        public static readonly string[] EmoMouth = { "smile", "grin", "grin", "o", "frown", "flat", "smirk", "flat" };
+        public static readonly float[] EmoTilt = { 0f, 0f, -6f, 0f, 16f, -20f, 0f, 0f };
+        public static readonly float[] EmoRaise = { 0f, 0.008f, 0.018f, 0.028f, 0.004f, -0.008f, 0f, -0.006f };
+        public static readonly float[] EmoLid = { 0.12f, 0.05f, 0f, 0f, 0.35f, 0.3f, 0.45f, 0.68f };
+        public static readonly float[] EmoPupil = { 1f, 1.1f, 1.35f, 0.7f, 1f, 0.8f, 0.9f, 1f };
 
         static Color[] Hexes(params string[] h) { var c = new Color[h.Length]; for (int i = 0; i < h.Length; i++) c[i] = Pal.Hex(h[i]); return c; }
         public static Color Pick(Color[] arr, int i) { return arr[((i % arr.Length) + arr.Length) % arr.Length]; }
@@ -311,6 +327,12 @@ namespace Intern.Game
         Vector2 lean, leanVel, headLag, headLagVel;
         float armFlopL, armFlopR, armFlopVelL, armFlopVelR;
         int[] eyeAxis = new int[0];
+        Transform lidL, lidR, browL, browR, pupilL, pupilR;
+        Vector3 browPosL, browPosR, pupilScaleL, pupilScaleR; Quaternion browRotL, browRotR;
+        readonly Dictionary<string, GameObject> mouths = new Dictionary<string, GameObject>();
+        readonly List<Transform> outfitParts = new List<Transform>();
+        readonly List<KeyValuePair<Renderer, Material[]>> originals = new List<KeyValuePair<Renderer, Material[]>>();
+        int emotion, reactEmotion = -1; float reactUntil, lidAmount, browTilt, browRaise, pupilK = 1f;
         readonly Dictionary<string, Material> tinted = new Dictionary<string, Material>();
         public Transform[] eyes = new Transform[0];
         public Renderer[] headRenderers = new Renderer[0];
@@ -617,6 +639,8 @@ namespace Intern.Game
             var srcRoot = rootT;
             rig = NormalizeRig(srcRoot, transform);
             rig.name = "Rig";
+            int skins = BindSkins(inst.transform);
+            if (skins > 0) Debug.Log("[Стажёр] " + modelName + ": модель со скелетом, сеток с костями: " + skins);
             inst.SetActive(false); Destroy(inst);
             hips = F("Hips"); torso = F("Torso"); neck = F("Neck"); head = F("Head");
             legL = F("HipL"); legR = F("HipR"); kneeL = F("KneeL"); kneeR = F("KneeR");
@@ -640,8 +664,21 @@ namespace Intern.Game
             }
             hipsBase = hips.localPosition;
             headRenderers = head.GetComponentsInChildren<Renderer>(true);
+            lidL = F("LidL"); lidR = F("LidR"); browL = F("BrowL"); browR = F("BrowR"); pupilL = F("PupilL"); pupilR = F("PupilR");
+            if (browL != null) { browPosL = browL.localPosition; browRotL = browL.localRotation; }
+            if (browR != null) { browPosR = browR.localPosition; browRotR = browR.localRotation; }
+            if (pupilL != null) pupilScaleL = pupilL.localScale;
+            if (pupilR != null) pupilScaleR = pupilR.localScale;
+            mouths.Clear(); outfitParts.Clear(); originals.Clear();
+            foreach (var t in rig.GetComponentsInChildren<Transform>(true))
+            {
+                string n = ModelLib.Clean(t.name);
+                if (n.StartsWith("Mouth_") && !n.Contains("__")) mouths[n.Substring(6)] = t.gameObject;
+                if (n.StartsWith("Top_") || n.StartsWith("Bottom_") || n.StartsWith("Shoes_")) outfitParts.Add(t);
+            }
+            foreach (var r in rig.GetComponentsInChildren<Renderer>(true)) originals.Add(new KeyValuePair<Renderer, Material[]>(r, r.sharedMaterials));
             lastPos = transform.position;
-            if (ap != null) ApplyLook(ap); else ShowAccessory(-1);
+            if (ap != null) ApplyLook(ap); else { ShowAccessory(-1); SetEmotion(0); }
             if (transform.Find("BlobShadow") == null) Look.Blob(transform, 0.42f);
         }
 
@@ -664,14 +701,15 @@ namespace Intern.Game
             appearance = ap.Clone();
             if (!imported) { Build(ap); return; }
             Color skin = Catalog.Pick(Catalog.Skins, ap.skin);
-            var colors = new Dictionary<string, Color> {
-                { "lp_skin_", skin }, { "lp_sock_", Color.Lerp(skin, Color.black, 0.18f) },
-                { "lp_shirt_", Catalog.Pick(Catalog.Cloth, ap.topColor) }, { "lp_pants_", Catalog.Pick(Catalog.Cloth, ap.pants) },
-                { "lp_boots_", Catalog.Pick(Catalog.Cloth, ap.shoes) }, { "lp_tie_", Catalog.Pick(Catalog.Cloth, ap.tie) },
-            };
-            foreach (var r in rig.GetComponentsInChildren<Renderer>(true))
+            var colors = new Dictionary<string, Color> { { "lp_skin_", skin }, { "lp_sock_", Color.Lerp(skin, Color.black, 0.18f) } };
+            if (ap.topColor >= 0) colors["lp_shirt_"] = Catalog.Pick(Catalog.Cloth, ap.topColor);
+            if (ap.pants >= 0) colors["lp_pants_"] = Catalog.Pick(Catalog.Cloth, ap.pants);
+            if (ap.shoes >= 0) colors["lp_boots_"] = Catalog.Pick(Catalog.Cloth, ap.shoes);
+            if (ap.tie >= 0) colors["lp_tie_"] = Catalog.Pick(Catalog.Cloth, ap.tie);
+            foreach (var kv0 in originals)
             {
-                var mats = r.sharedMaterials; bool changed = false;
+                var r = kv0.Key; if (r == null) continue;
+                var mats = (Material[])kv0.Value.Clone(); bool changed = true;
                 for (int i = 0; i < mats.Length; i++)
                 {
                     if (mats[i] == null) continue;
@@ -687,6 +725,55 @@ namespace Intern.Game
                 if (changed) r.sharedMaterials = mats;
             }
             ShowAccessory(ap.accessory);
+            ApplyOutfit(ap.outfit);
+            SetEmotion(ap.emotion);
+        }
+
+        // Показываем только выбранный костюм (у коллег в модели один костюм — он всегда виден)
+        public void ApplyOutfit(int index)
+        {
+            if (outfitParts.Count == 0) return;
+            string id = Catalog.OutfitIds[Mathf.Clamp(index, 0, Catalog.OutfitIds.Length - 1)];
+            foreach (var t in outfitParts)
+            {
+                if (t == null) continue;
+                string n = ModelLib.Clean(t.name);
+                int sep = n.IndexOf('_');
+                bool on = n.Substring(sep + 1).StartsWith(id + "__");
+                t.gameObject.SetActive(on);
+            }
+        }
+
+        public void SetEmotion(int e) { emotion = Mathf.Clamp(e, 0, Catalog.EmotionNames.Length - 1); }
+
+        // Короткая реакция: например, восторг после сданной задачи
+        public void React(int e, float seconds) { reactEmotion = e; reactUntil = Time.time + seconds; }
+
+        // «Плюх» при посадке — бёдра проседают и пружинят
+        public void Plop() { land = 0.8f; }
+
+        void UpdateFace(float dt)
+        {
+            int e = Time.time < reactUntil && reactEmotion >= 0 ? reactEmotion : emotion;
+            string mouth = Catalog.EmoMouth[e];
+            foreach (var kv in mouths) if (kv.Value != null && kv.Value.activeSelf != (kv.Key == mouth)) kv.Value.SetActive(kv.Key == mouth);
+            float k = 1 - Mathf.Exp(-10f * dt);
+            browTilt = Mathf.Lerp(browTilt, Catalog.EmoTilt[e], k);
+            browRaise = Mathf.Lerp(browRaise, Catalog.EmoRaise[e], k);
+            pupilK = Mathf.Lerp(pupilK, Catalog.EmoPupil[e], k);
+            float lidTarget = Catalog.EmoLid[e];
+            // моргание — веки закрываются полностью
+            if (blinkT >= 0) lidTarget = 1f;
+            lidAmount = Mathf.Lerp(lidAmount, lidTarget, blinkT >= 0 ? 1 - Mathf.Exp(-40f * dt) : k);
+            // хитрый: одна бровь выше
+            float extraL = e == 6 ? 0.02f : 0f;
+            if (browL != null) { browL.localPosition = browPosL + Vector3.up * (browRaise + extraL); browL.localRotation = Quaternion.AngleAxis(browTilt, Vector3.forward) * browRotL; }
+            if (browR != null) { browR.localPosition = browPosR + Vector3.up * browRaise; browR.localRotation = Quaternion.AngleAxis(-browTilt, Vector3.forward) * browRotR; }
+            if (pupilL != null) pupilL.localScale = pupilScaleL * pupilK;
+            if (pupilR != null) pupilR.localScale = pupilScaleR * pupilK;
+            // веко: купол над глазом поворачивается вперёд вокруг центра глаза
+            if (lidL != null) lidL.localRotation = Quaternion.Euler(165f * lidAmount, 0, 0);
+            if (lidR != null) lidR.localRotation = Quaternion.Euler(165f * lidAmount, 0, 0);
         }
 
         static float Spring(ref float x, ref float v, float target, float k, float damp, float dt)
@@ -782,9 +869,15 @@ namespace Intern.Game
             }
             head.localRotation = Quaternion.Slerp(head.localRotation, Quaternion.Euler(pitchHead + headLag.x, yawHead, headLag.y + Mathf.Sin(t * 0.7f) * 3f), dt * 8f);
 
-            // моргание
+            // моргание: веками (новые модели) или сплющиванием глаза (старые)
             if (blinkT < 0 && Time.time > nextBlink) blinkT = 0;
-            if (blinkT >= 0)
+            UpdateFace(dt);
+            if (blinkT >= 0 && lidL != null)
+            {
+                blinkT += dt;
+                if (blinkT > 0.16f) { blinkT = -1; nextBlink = Time.time + Random.Range(2f, 5f); }
+            }
+            else if (blinkT >= 0)
             {
                 blinkT += dt;
                 float kb = blinkT < 0.07f ? 1 - blinkT / 0.07f : Mathf.Min(1, (blinkT - 0.07f) / 0.07f);
@@ -815,6 +908,49 @@ namespace Intern.Game
                 else c.SetParent(n, true);
             }
             return n;
+        }
+
+        // Модели v3: тело и одежда — SkinnedMeshRenderer с костями из FBX (в осях Blender).
+        // Меши не трогаем: каждую исходную кость вешаем дочерней на новую кость с тем же именем из NormalizeRig.
+        // В покое её положение в мире не меняется, поэтому bindposes остаются верными, а дальше она просто
+        // едет за новой костью, которую крутит анимация. Пустышки-дубли (рты, аксессуары) у старых костей убираем,
+        // чтобы Find находил только новые узлы.
+        int BindSkins(Transform src)
+        {
+            // сетки с костями в FBX лежат рядом со скелетом, а не внутри него — NormalizeRig их не видит, забираем сами
+            foreach (var s in src.GetComponentsInChildren<SkinnedMeshRenderer>(true)) s.transform.SetParent(rig, true);
+            var smrs = rig.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            if (smrs.Length == 0) return 0;
+            var bones = new HashSet<Transform>();
+            foreach (var s in smrs) foreach (var b in s.bones) if (b != null) bones.Add(b);
+            var map = new Dictionary<string, Transform>();
+            foreach (var t in rig.GetComponentsInChildren<Transform>(true))
+            {
+                if (bones.Contains(t)) continue;
+                string n = ModelLib.Clean(t.name);
+                if (!map.ContainsKey(n)) map[n] = t;
+            }
+            int missing = 0;
+            foreach (var b in bones)
+            {
+                Transform nb;
+                if (!map.TryGetValue(ModelLib.Clean(b.name), out nb)) { nb = rig; missing++; }
+                b.SetParent(nb, true);
+            }
+            var leftovers = new List<GameObject>();
+            foreach (var b in bones)
+                foreach (Transform c in b)
+                    if (!bones.Contains(c)) leftovers.Add(c.gameObject);
+            foreach (var go in leftovers) if (go != null) DestroyImmediate(go);
+            foreach (var b in bones) b.name = ModelLib.Clean(b.name) + "_bind";
+            foreach (var s in smrs)
+            {
+                // границы с запасом: в позе «сидит» ноги уходят далеко от покоя, а пересчитывать каждый кадр дорого
+                s.localBounds = new Bounds(Vector3.zero, Vector3.one * 3.2f);
+                s.updateWhenOffscreen = false;
+            }
+            if (missing > 0) Debug.LogWarning("[Стажёр] " + model + ": не нашлось новых узлов для " + missing + " костей");
+            return smrs.Length;
         }
 
         // ---------- Анимация ----------
