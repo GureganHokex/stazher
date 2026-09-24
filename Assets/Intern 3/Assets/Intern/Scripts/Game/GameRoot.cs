@@ -14,7 +14,7 @@ namespace Intern.Game
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
         {
-            if (FindFirstObjectByType<GameRoot>() != null) return;
+            if (FindFirstObjectByType<GameRoot>() != null || SelfTest.Requested) return;
             new GameObject("InternGame").AddComponent<GameRoot>();
         }
 
@@ -228,6 +228,7 @@ namespace Intern.Game
                     if (InputX.Esc() && (ui == null || !ui.Back())) Resume();
                     break;
             }
+            if (InputX.Screenshot()) TakeScreenshot();
             if (toast == null || Time.unscaledTime > toastUntil)
             {
                 toast = toasts.Count > 0 ? toasts.Dequeue() : null;
@@ -239,6 +240,27 @@ namespace Intern.Game
 #if UNITY_EDITOR
             if (ideUi != null && InputX.DebugDump()) { Debug.Log("[Стажёр] F7: mode=" + mode + ", ideActive=" + ideUi.Active + ", task=" + (ideUi.Task != null ? ideUi.Task.id : "-")); ideUi.DebugDump(System.IO.Path.GetFullPath(Application.dataPath + "/../Temp")); Toast("Снимок IDE сохранён"); }
 #endif
+        }
+
+        // F12 — скриншот: в игре — в папку Screenshots рядом с сохранениями, в редакторе — в Temp/Screenshots проекта
+        void TakeScreenshot()
+        {
+            try
+            {
+#if UNITY_EDITOR
+                string dir = System.IO.Path.GetFullPath(Application.dataPath + "/../Temp/Screenshots");
+#else
+                string dir = System.IO.Path.Combine(Application.persistentDataPath, "Screenshots");
+#endif
+                System.IO.Directory.CreateDirectory(dir);
+                string file = System.IO.Path.Combine(dir, "stazher_" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + ".png");
+                ScreenCapture.CaptureScreenshot(file);
+                Debug.Log("[Стажёр] Скриншот: " + file);
+#if !UNITY_EDITOR
+                Toast("Скриншот сохранён: " + file);
+#endif
+            }
+            catch (Exception e) { Debug.LogWarning("[Стажёр] Скриншот не сохранился: " + e.Message); }
         }
 
         public string ScreenRendererInfo()

@@ -45,6 +45,7 @@ namespace Intern.Game
         public static bool DebugDump() { return KD(Key.F7); }
         public static bool DebugClose() { return KD(Key.F6); }
         public static bool DebugCareer() { return KD(Key.F9); }
+        public static bool Screenshot() { return KD(Key.F12); }
 #else
         public static Vector2 Move()
         {
@@ -69,6 +70,7 @@ namespace Intern.Game
         public static bool DebugDump() { return Input.GetKeyDown(KeyCode.F7); }
         public static bool DebugClose() { return Input.GetKeyDown(KeyCode.F6); }
         public static bool DebugCareer() { return Input.GetKeyDown(KeyCode.F9); }
+        public static bool Screenshot() { return Input.GetKeyDown(KeyCode.F12); }
 #endif
     }
 

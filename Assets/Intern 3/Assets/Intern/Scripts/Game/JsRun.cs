@@ -52,7 +52,7 @@ namespace Intern.Game
         public int MaxOutputChars = 20000;           // сколько символов console.* сохраняем, дальше обрезаем
         public double MaxTimerMs = 60000;            // горизонт виртуального времени таймеров (бесконечный setInterval)
         public int StackBudgetBytes = 12 * 1024 * 1024;  // сколько стека может занять JS (≈3000 уровней рекурсии)
-        public int ThreadStackBytes = 64 * 1024 * 1024;  // стек рабочего потока (резерв; запас сверх бюджета — для рекурсии
+        public int ThreadStackBytes = 16 * 1024 * 1024;  // стек рабочего потока (резерв; запас сверх бюджета — для рекурсии
                                                          // внутри встроенных функций Jint); 0 — выполнять в вызывающем потоке
         public int InlineStackBudgetBytes = 256 * 1024;  // бюджет стека JS, если потока нет (главный поток Unity)
     }
@@ -1833,7 +1833,7 @@ namespace Intern.Game
             var job = new JsJob<TResult>();
             try
             {
-                int size = lim.ThreadStackBytes > 0 ? lim.ThreadStackBytes : 64 * 1024 * 1024;
+                int size = lim.ThreadStackBytes > 0 ? lim.ThreadStackBytes : 16 * 1024 * 1024;   // больше не надо: сборщик мусора сканирует весь стек потока
                 var th = new Thread(() => { workerStackBytes = size; job.Finish(Safe(work, onError)); }, size);
                 th.IsBackground = true;
                 th.Name = "Intern.JsRun";
