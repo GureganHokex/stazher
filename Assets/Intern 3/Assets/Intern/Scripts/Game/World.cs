@@ -204,7 +204,7 @@ namespace Intern.Game
             var cap = lead.gameObject.AddComponent<CapsuleCollider>(); cap.center = new Vector3(0, 0.9f, 0); cap.height = 1.9f; cap.radius = 0.4f;
             lead.gameObject.AddComponent<TeamLeadNpc>();
             P("LeadMug", PrimitiveType.Cylinder, new Vector3(0, -0.38f, 0.12f), new Vector3(0.13f, 0.08f, 0.13f), Pal.Pink, false, 1, 0, lead.armL);
-            var tag = Label("Тимлид Гена", new Vector3(8.2f, 2.55f, 5.6f), 0.017f, Pal.Ink);
+            var tag = Label("Тимлид Гена", new Vector3(0, 2.55f / 1.12f, 0), 0.017f / 1.12f, Pal.Ink, lead.transform);
             tag.gameObject.AddComponent<Billboard>();
 
             // ---------- Кофейный уголок (магазин) ----------

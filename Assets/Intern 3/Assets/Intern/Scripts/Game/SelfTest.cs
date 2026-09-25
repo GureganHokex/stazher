@@ -89,17 +89,35 @@ namespace Intern.Game
                 expect(r.idleHours == 9 && r.workHours == 0, "первый день: часы учёта " + r.workHours + "/" + r.idleHours);
                 expect(w.Clock == "Пн 18:00", "первый день: часы показывают " + w.Clock);
             }
-            // 2. Второй день, средняя сложность: простой до обеда, штрафы, неоплаченный штраф и самоволка → увольнение
+            // 2. Второй день, средняя сложность: первый час простоя — предупреждение, потом штрафы, долг, замечания
             {
                 var s = new SaveData { version = 3, difficulty = 1, money = 100 }; WorkDay.Reset(s); s.day = 2;
                 var w = new WorkDay(s, () => 0); bool fired = false; w.Fired = () => fired = true;
+                var moods = new List<LeadMood>(); w.Visit = (m, t) => moods.Add(m);
                 w.Advance(180f, true);
-                expect(s.money == 10 && s.dayFines == 90, "простой 3 часа: деньги " + s.money + ", штрафы " + s.dayFines);
-                w.Advance(60f, true);
-                expect(s.strikes == 1 && !fired, "неоплаченный штраф: выговоров " + s.strikes);
-                string why; expect(w.CanLunch(out why), "обед в 13:00 недоступен: " + why);
-                w.StartLunch();
-                expect(fired && w.IsFired, "самоволка при 1 из 2 выговоров не уволила");
+                expect(s.money == 40 && s.dayFines == 60 && s.strikes == 0, "простой 3 часа: деньги " + s.money + ", штрафы " + s.dayFines + ", выговоры " + s.strikes);
+                expect(moods.Count == 3 && moods[0] == LeadMood.Warn && moods[1] == LeadMood.Fine, "Гена подходил не так: " + string.Join(",", moods.Select(m => m.ToString()).ToArray()));
+                w.Advance(120f, true);                                   // 14:00: 10 монет взял, 20 в долг
+                expect(s.money == 0 && s.debt == 20 && s.strikes == 0 && !fired, "штраф без денег: деньги " + s.money + ", долг " + s.debt + ", выговоры " + s.strikes);
+                int got = w.Earn(50); s.money += got;
+                expect(got == 30 && s.debt == 0 && s.dayDebtPaid == 20, "доход не погасил долг: дошло " + got + ", долг " + s.debt);
+                string why; expect(w.CanLunch(out why), "обед в 14:00 недоступен: " + why);
+                w.StartLunch();                                          // самоволка в первый раз — замечание
+                expect(!fired && s.strikes == 0 && s.warnedAwol, "первая самоволка дала выговор");
+                w.Advance(60f, false);
+                w.Advance(180f, true);                                   // 16:00 штраф 30, 17:00 долг 30, 18:00 долг 60
+                expect(s.money == 0 && s.debt == 60 && s.strikes == 0, "после обеда: деньги " + s.money + ", долг " + s.debt + ", выговоры " + s.strikes);
+                var r = w.Finish();                                      // первый прогул — замечание
+                expect(!r.truancy && r.remark != null && s.strikes == 0 && s.cleanDays == 0, "первый прогул: выговоры " + s.strikes + ", замечание " + r.remark);
+                expect(r.debt == 60, "долг в итогах дня " + r.debt);
+                w.NextDay();
+                w.Advance(60f, true);                                    // 10:00 предупреждение
+                expect(s.debt == 60 && s.strikes == 0, "новый день: предупреждение стоило денег или выговор");
+                w.Advance(60f, true);                                    // 11:00 долг 90 → выговор, долг списан
+                expect(s.strikes == 1 && s.debt == 0 && !fired, "долг 90: выговоры " + s.strikes + ", долг " + s.debt);
+                w.Advance(60f, true);                                    // 12:00 долг 30
+                w.StartLunch();                                          // вторая самоволка — выговор, 2 из 2 → уволен
+                expect(fired && w.IsFired, "вторая самоволка при 1 из 2 выговоров не уволила");
             }
             // 3. Честный день: работа каждый час, обед, задачи → без штрафов, чистый день
             {
@@ -122,28 +140,45 @@ namespace Intern.Game
                 var s = new SaveData { version = 3, difficulty = 0, money = 500 }; WorkDay.Reset(s); s.day = 2;
                 var w = new WorkDay(s, () => 3);
                 w.Activity(WorkKind.Edit, 119f); w.Advance(60f, true);
-                expect(s.dayIdleHours == 1 && s.money == 400, "119 с правок засчитаны как работа (штраф Middle 100)");
+                expect(s.dayIdleHours == 1 && s.money == 500, "119 с правок засчитаны как работа или предупреждение стоило денег");
                 w.Activity(WorkKind.Edit, 60f); w.Activity(WorkKind.Edit, 61f); w.Advance(60f, true);
                 expect(s.dayWorkHours == 1, "121 с правок не засчитаны");
+                w.Advance(60f, true);
+                expect(s.money == 400, "второй простой не оштрафован на 100 (Middle): " + s.money);
             }
             // 5. Прогул и снятие выговора за 5 чистых дней
             {
                 var s = new SaveData { version = 3, difficulty = 0, money = 1000 }; WorkDay.Reset(s); s.day = 5;
                 var w = new WorkDay(s, () => 0);
+                s.warnedTruancy = true;                                  // замечание уже было
                 w.Activity(WorkKind.Run); w.Advance(540f, true);
                 var r = w.Finish();
-                expect(r.truancy && s.strikes == 1, "день без задач не посчитан прогулом");
+                expect(r.truancy && s.strikes == 1, "повторный прогул не дал выговор");
                 s.cleanDays = 4; w.NextDay(); s.strikeToday = false;
                 for (int h = 0; h < 9; h++) { w.Activity(WorkKind.Run); if (h < 3) s.dayTasks++; w.Advance(60f, true); }
                 r = w.Finish();
-                expect(r.strikeRemoved && s.strikes == 0, "пятый чистый день не снял выговор");
+                expect(r.strikeRemoved && s.strikes == 0 && !s.warnedTruancy, "пятый чистый день не снял выговор или замечание");
             }
-            // 6. Час, почти целиком прошедший на обеде, не считается
+            // 6. Тяжёлая: час на обеде не считается, выговор только когда долг дорос до трёх штрафов
             {
                 var s = new SaveData { version = 3, difficulty = 2, money = 0 }; WorkDay.Reset(s); s.day = 2;
                 var w = new WorkDay(s, () => 0); bool fired = false; w.Fired = () => fired = true;
-                w.Activity(WorkKind.Run); w.Advance(170f, true);           // 9:00–11:50, работа только в первый час
-                expect(fired, "тяжёлая: неоплаченный штраф за простой не уволил сразу");
+                w.Activity(WorkKind.Run); w.Advance(170f, true);           // 9:00–11:50: работа, предупреждение
+                expect(!fired && s.debt == 0, "тяжёлая: предупреждение уволило или стоило денег");
+                w.Advance(10f, true);                                     // 12:00: долг 30
+                w.StartLunch(); w.Advance(60f, false);                    // час на обеде не считается
+                expect(s.dayIdleHours == 2 && s.debt == 30 && !fired, "тяжёлая: простои " + s.dayIdleHours + ", долг " + s.debt);
+                w.Advance(60f, true);
+                expect(!fired && s.debt == 60, "тяжёлая: долг 60 уже уволил");
+                w.Advance(60f, true);
+                expect(fired, "тяжёлая: долг 90 не дал выговор");
+            }
+            // 7. Похвала за три рабочих часа подряд
+            {
+                var s = new SaveData { version = 3, difficulty = 0, money = 0 }; WorkDay.Reset(s); s.day = 2;
+                var w = new WorkDay(s, () => 0); var moods = new List<LeadMood>(); w.Visit = (m, t) => moods.Add(m);
+                for (int h = 0; h < 3; h++) { w.Activity(WorkKind.Solved); w.Advance(60f, true); }
+                expect(moods.Count == 1 && moods[0] == LeadMood.Praise, "нет похвалы за три часа работы");
             }
             return bad;
         }

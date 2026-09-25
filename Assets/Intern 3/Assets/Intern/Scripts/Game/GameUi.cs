@@ -909,13 +909,15 @@ def deploy(env=""staging""):
             summaryCard.Add(StatRow("coin", "Монеты за работу", "+" + r.money, Sun));
             summaryCard.Add(StatRow("coin", "Монеты за обед", (r.lunchMoney >= 0 ? "+" : "") + r.lunchMoney + (r.kills > 0 ? "  (выбито " + r.kills + ")" : ""), Sun));
             if (r.fines > 0) summaryCard.Add(StatRow("warning", "Штрафы за простой", "−" + r.fines, Pink));
+            if (r.debt > 0 || r.debtPaid > 0) summaryCard.Add(StatRow("coin", "Долг Гене", r.debt + (r.debtPaid > 0 ? "  (погашено сегодня " + r.debtPaid + ")" : ""), r.debt > 0 ? Pink : Mint));
             summaryCard.Add(StatRow("monitor", "Рабочих часов", r.workHours + " из 8" + (r.idleHours > 0 ? "  (простой " + r.idleHours + ")" : ""), Text));
             summaryCard.Add(StatRow("warning", "Выговоры", r.strikes + " из " + r.limit, r.strikes > 0 ? Pink : Text));
             string note = r.truancy ? "Гена: «Сегодня ты почти ничего не сделал. Это прогул, выговор.»"
+                        : r.remark != null ? "Гена: «" + r.remark + "»"
                         : r.strikeRemoved ? "Гена: «Пять дней без замечаний, снимаю один выговор.»"
                         : r.tasks >= 5 ? "Гена: «Отличный день. Так держать.»"
                         : "Гена: «Нормально. Завтра можно бодрее.»";
-            var nl = K.T(note, 16f, r.truancy ? Pink : Muted, false, false, true); nl.style.marginTop = 14f; summaryCard.Add(nl);
+            var nl = K.T(note, 16f, r.truancy ? Pink : r.remark != null ? Sun : Muted, false, false, true); nl.style.marginTop = 14f; summaryCard.Add(nl);
             var row = K.Box(true); row.pickingMode = PickingMode.Ignore; row.style.marginTop = 10f;
             var next = new UiBtn("Следующий день", () => g.UiNextDay(), Sun, SunHover, SunLip, Ink, "play", g.Work.WeekdayFull + ", 9:00", 60f, false); K.Grow(next); next.style.marginRight = 10f;
             var home = new UiBtn("В меню", () => g.UiSummaryToMenu(), Ghost, GhostHover, GhostLip, Text, "home", null, 60f, false); home.style.width = 180f;
@@ -1058,8 +1060,8 @@ def deploy(env=""staging""):
             var w = g.Work;
             string clock = w != null ? w.Clock : "";
             bool sated = w != null && w.Sated;
-            int strikes = w != null ? w.Strikes : 0;
-            string key = g.RankFull + "|" + g.Save.money + "|" + (t != null ? t.id : "") + "|" + g.DoneCount + "|" + g.BugCount + "|" + sprintDone + "|" + clock + "|" + sated + "|" + strikes;
+            int strikes = w != null ? w.Strikes : 0, debt = w != null ? w.Debt : 0;
+            string key = g.RankFull + "|" + g.Save.money + "|" + (t != null ? t.id : "") + "|" + g.DoneCount + "|" + g.BugCount + "|" + sprintDone + "|" + clock + "|" + sated + "|" + strikes + "|" + debt;
             if (key != lastHud)
             {
                 lastHud = key;
@@ -1073,8 +1075,13 @@ def deploy(env=""staging""):
                 bugRow.style.display = g.BugCount > 0 ? DisplayStyle.Flex : DisplayStyle.None;
                 bugLabel.text = "Багов в офисе: " + g.BugCount + " — поймай их!";
                 clockLabel.text = clock;
-                strikeRow.style.display = strikes > 0 ? DisplayStyle.Flex : DisplayStyle.None;
-                if (w != null) strikeLabel.text = "Выговоры: " + strikes + " из " + w.StrikeLimit + (strikes == w.StrikeLimit - 1 ? " — ещё один, и увольнение" : "");
+                strikeRow.style.display = strikes > 0 || debt > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+                if (w != null)
+                {
+                    string st = strikes > 0 ? "Выговоры: " + strikes + " из " + w.StrikeLimit + (strikes == w.StrikeLimit - 1 ? " — ещё один, и увольнение" : "") : "";
+                    string dt = debt > 0 ? "Долг Гене: " + debt + " из " + w.DebtLimit + (strikes > 0 ? "" : " — гасится с премии") : "";
+                    strikeLabel.text = st + (st.Length > 0 && dt.Length > 0 ? "\n" : "") + dt;
+                }
                 satedChip.style.display = sated ? DisplayStyle.Flex : DisplayStyle.None;
             }
             // подсказка действия: «[E] Сесть за компьютер» → клавиша + текст

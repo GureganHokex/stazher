@@ -53,6 +53,8 @@ namespace Intern.Game
         public DayReport LastReport { get; private set; }
         public DayReport FiredReport { get; private set; }
         public LunchRun Lunch { get { return lunch; } }
+        LeadWalker leadWalker;            // Гена ходит к столу стажёра
+        bool summaryNow;                  // идёт подсчёт итогов дня: реплики Гены покажет карточка итогов
 
         // тосты
         readonly Queue<string> toasts = new Queue<string>();
@@ -114,6 +116,7 @@ namespace Intern.Game
         {
             Work = new WorkDay(Save, () => GradeIdx);
             Work.Lead = t => { Toast("Гена: " + t); if (refs != null && refs.lead != null) refs.lead.React(5, 2.5f); };
+            Work.Visit = LeadVisit;
             Work.Notice = t => Toast(t);
             Work.DayOver = () => { dayOverPending = true; dayOverNoticed = false; };
             Work.Fired = OnFired;
@@ -163,6 +166,11 @@ namespace Intern.Game
             player.cinematic = true;
             UpdateBoard();
             PlaceExitDoor();
+            if (refs.lead != null)
+            {
+                leadWalker = refs.lead.gameObject.AddComponent<LeadWalker>();
+                leadWalker.Init(refs.lead, () => player.Position, () => mode == Mode.Walk ? player.cam.transform.forward : Vector3.zero, LeadCanMove, t => Toast("Гена: " + t), t => Toast("Гена (через весь офис): " + t));
+            }
             SetCursor(false);
             // Новая IDE: панель UI Toolkit рисуется в текстуру, текстура — на экран монитора
             if (refs.screen != null)
@@ -296,7 +304,8 @@ namespace Intern.Game
             if (ideUi != null) ideUi.Update(Time.deltaTime);
             if (ui != null) ui.Tick(Time.unscaledDeltaTime);
 #if UNITY_EDITOR
-            if (ideUi != null && InputX.DebugDump()) { Debug.Log("[Стажёр] F7: mode=" + mode + ", ideActive=" + ideUi.Active + ", task=" + (ideUi.Task != null ? ideUi.Task.id : "-")); ideUi.DebugDump(System.IO.Path.GetFullPath(Application.dataPath + "/../Temp")); Toast("Снимок IDE сохранён"); }
+            if (ideUi != null && InputX.DebugDump()) { Debug.Log("[Стажёр] F7: mode=" + mode + ", ideActive=" + ideUi.Active + ", task=" + (ideUi.Task != null ? ideUi.Task.id : "-") +
+                                                            ", день " + Work.Clock + ", уволен " + Work.IsFired + "/" + (FiredReport != null) + ", выговоры " + Save.strikes + ", долг " + Save.debt + ", Гена " + (leadWalker != null ? leadWalker.State : "-")); ideUi.DebugDump(System.IO.Path.GetFullPath(Application.dataPath + "/../Temp")); Toast("Снимок IDE сохранён"); }
 #endif
         }
 
@@ -645,11 +654,13 @@ namespace Intern.Game
             int xp = usedSolution ? t.xp / 2 : t.xp;
             bool sated = Work != null && Work.Sated;
             if (sated) xp = Mathf.RoundToInt(xp * 1.1f);
-            Save.money += reward; Save.xp += xp; Save.done.Add(t.id);
+            int got = Work != null ? Work.Earn(reward) : reward;
+            Save.money += got; Save.xp += xp; Save.done.Add(t.id);
             Save.dayTasks++; Save.dayXp += xp; Save.dayMoney += reward;
             if (Work != null) Work.Activity(WorkKind.Solved);
             Persist(); UpdateBoard();
-            Toast("Задача сдана! +" + xp + " XP" + (sated ? " (сытый +10%)" : "") + ", +" + reward + " монет" + (late ? " (срок сорван)" : ""));
+            Toast("Задача сдана! +" + xp + " XP" + (sated ? " (сытый +10%)" : "") + ", +" + reward + " монет" + (late ? " (срок сорван)" : "") +
+                  (got < reward ? ", из них " + (reward - got) + " в счёт долга Гене" : ""));
             if (player.avatar != null) player.avatar.React(2, 3f); // восторг
             var tp = Path.TopicOf(t);
             if (tp != null && TrackPath.TopicDone(tp, Done)) Toast("Тема закрыта: " + tp.title);
@@ -681,7 +692,7 @@ namespace Intern.Game
 
         public void OnBugCaught()
         {
-            Save.bugsCaught++; Save.money += 5; Persist(); UpdateBoard();
+            Save.bugsCaught++; Save.money += Work != null ? Work.Earn(5) : 5; Persist(); UpdateBoard();
             Toast("Баг пойман! +5 монет");
         }
 
@@ -746,19 +757,38 @@ namespace Intern.Game
             dlgTitle = title; dlgText = text; dlgButtons = buttons.ToList();
             mode = Mode.Dialog; SetCursor(false);
         }
-        void CloseDialog() { mode = Mode.Walk; SetCursor(true); }
+        void CloseDialog()
+        {
+            mode = Mode.Walk; SetCursor(true);
+            if (leadWalker != null && leadWalker.State == "Listening") leadWalker.GoHome();   // разговор с Геной окончен — он уходит
+        }
         static KeyValuePair<string, Action> Btn(string s, Action a) { return new KeyValuePair<string, Action>(s, a); }
+
+        // Гена может ходить, пока игра идёт в офисе
+        bool LeadCanMove() { return mode == Mode.Walk || mode == Mode.Ide || mode == Mode.Dialog || mode == Mode.Wardrobe; }
+
+        // Гена по делу: подходит к столу и говорит лично. Если стажёр не в офисе — пишет в мессенджер
+        void LeadVisit(LeadMood mood, string text)
+        {
+            if (summaryNow) return;                       // итоги дня расскажет карточка
+            if (refs != null && refs.lead != null) refs.lead.React(mood == LeadMood.Praise ? 1 : 5, 2.5f);
+            if (leadWalker == null || !LeadCanMove()) { Toast("Гена: " + text); return; }
+            if (mode == Mode.Ide && !leadWalker.Busy) Toast("Гена встал из-за доски и идёт к твоему столу…");
+            leadWalker.Visit(mood, text);
+        }
 
         public void TalkToLead()
         {
             if (refs.lead != null) refs.lead.React(1, 2.5f);
+            var pending = leadWalker != null ? leadWalker.Interrupt() : new List<string>();
             int done = DoneCount, total = TotalCount;
             string text;
             var cur = CurrentTask;
             if (done == 0)
                 text = "О, новенький! Я Гена. Твой стол — тот, где уточка на мониторе. Ты у нас на направлении " + ProfessionName + ".\n\n" +
                        "Сначала общая база: терминал, Git, HTTP, дебаг — без этого никуда. Потом — задачи твоего направления, от Junior до Middle. " +
-                       "Все тикеты — в IDE за компьютером, слева «Проводник» со всеми темами.";
+                       "Все тикеты — в IDE за компьютером, слева «Проводник» со всеми темами.\n\n" +
+                       "Рабочий день с 9:00 до 18:00, обед с 12:00 до 16:00 — дверь «Выход» у входа. Час без работы — штраф, но первый раз за день просто предупрежу.";
             else if (PathComplete)
                 text = "Ты прошёл всё направление " + ProfessionName + ". Для меня ты теперь Middle — и это заслуженно: " +
                        "ревью, инциденты, архитектура, оценки — ты всё это уже делал руками.\n\n" +
@@ -766,7 +796,40 @@ namespace Intern.Game
                         "Хочешь вырасти шире — возьми другое направление в паузе (Esc). Общая база уже закрыта, начнёшь сразу с Junior-тем.");
             else
                 text = "Ты сейчас " + RankName + " " + ProfessionName + ", сделано " + done + " из " + total + ". Следующая задача: " + cur.key + " «" + cur.title + "».\n\n" + Tip(done);
-            OpenDialog("Тимлид Гена", text, Btn("Понял, иду работать", CloseDialog));
+            if (Work != null && done > 0) text = TodayLine() + "\n\n" + text;
+            if (pending.Count > 0) text = "«" + string.Join(" ", pending.ToArray()) + "»\n\n" + text;
+            OpenDialog("Тимлид Гена", text,
+                Btn("Понял, иду работать", LeaveLead),
+                Btn("Как у нас с дисциплиной?", DisciplineTalk));
+        }
+
+        void LeaveLead() { CloseDialog(); }
+
+        // Что Гена видит за сегодня
+        string TodayLine()
+        {
+            var w = Work;
+            string s = w.Clock + ". Сегодня: задач " + Save.dayTasks + ", рабочих часов " + Save.dayWorkHours + (Save.dayIdleHours > 0 ? ", простоев " + Save.dayIdleHours : "") + ".";
+            if (Save.strikes > 0 || Save.debt > 0)
+                s += " " + (Save.strikes > 0 ? "Выговоров " + Save.strikes + " из " + w.StrikeLimit : "") +
+                     (Save.strikes > 0 && Save.debt > 0 ? ", " : "") + (Save.debt > 0 ? "долг " + Save.debt + " из " + w.DebtLimit : "") + ".";
+            string why;
+            if (w.CanLunch(out why)) s += Save.workedToday ? " Обед открыт до 16:00 — сходи, поешь." : " Обед открыт, но сначала поработай — иначе самоволка.";
+            return s;
+        }
+
+        void DisciplineTalk()
+        {
+            var w = Work;
+            string text =
+                "Правила простые.\n\n" +
+                "• Час без работы: первый за день — предупреждение, дальше штраф " + w.FineAmount + " монет.\n" +
+                "• Не хватает денег — штраф уходит в долг. Долг гасится с премии за задачи и обед. Дорос до " + w.DebtLimit + " — выговор.\n" +
+                "• Ушёл на обед, ни разу не поработав с утра, — самоволка. Прогул — день без задач или меньше двух рабочих часов. В первый раз — замечание, потом выговор.\n" +
+                "• Выговоров " + w.StrikeLimit + " — увольнение. Пять чистых дней подряд снимают один выговор и возвращают право на замечание.\n\n" +
+                "У тебя сейчас: выговоров " + Save.strikes + " из " + w.StrikeLimit + ", долг " + Save.debt + ", чистых дней подряд " + Save.cleanDays + "." +
+                (Save.warnedTruancy || Save.warnedAwol ? " Замечание уже было — за " + (Save.warnedTruancy && Save.warnedAwol ? "прогул и самоволку" : Save.warnedTruancy ? "прогул" : "самоволку") + "." : "");
+            OpenDialog("Тимлид Гена", text, Btn("Понял", LeaveLead));
         }
 
         static string Tip(int done)
@@ -824,6 +887,7 @@ namespace Intern.Game
             }
             Save.difficulty = (int)d; Persist(); UpdateBoard();
             lastInput = Time.unscaledTime;
+            if (leadWalker != null) leadWalker.ResetHome();
             if (Work.Ended) dayOverPending = true;
             if (fresh) Toast("Направление: " + ProfessionName + ". Начинаем с общей базы — грейд «Стажёр».");
             if (fresh || !Save.hasCharacter) { OpenWardrobe(true); return; }
@@ -921,7 +985,10 @@ namespace Intern.Game
 
         void DrawDialog(float W, float H)
         {
-            float w = Mathf.Min(720, W - 40), h = 200 + dlgButtons.Count * 46;
+            // высота по тексту: длинные реплики (правила Гены) не обрезаются
+            float w = Mathf.Min(720, W - 40);
+            float textH = Ui.body.CalcHeight(new GUIContent(UiKit.Esc(dlgText)), w - 40) + Ui.h3.CalcHeight(new GUIContent(dlgTitle), w - 40);
+            float h = Mathf.Min(H - 80, Mathf.Max(200f, textH + 60f) + dlgButtons.Count * 46);
             var r = new Rect((W - w) / 2, H - h - 40, w, h);
             GUI.Box(r, GUIContent.none, Ui.panelLight);
             GUILayout.BeginArea(new Rect(r.x + 20, r.y + 16, r.width - 40, r.height - 32));
@@ -1007,6 +1074,12 @@ namespace Intern.Game
             // только в редакторе: F3 — плюс игровой час, F2 — обеду осталось 5 секунд
             if (InputX.DebugHour() && mode != Mode.Menu && mode != Mode.Lunch && !Work.Ended) { Work.Advance(60f, true); Debug.Log("[Стажёр] F3: " + Work.Clock + ", штрафы " + Save.dayFines + ", выговоры " + Save.strikes); }
             if (InputX.DebugLunchEnd() && lunch != null) lunch.timeLeft = Mathf.Min(lunch.timeLeft, 5f);
+            if (InputX.DebugLead() && mode == Mode.Walk && refs.lead != null)
+            {
+                // F5 — встать перед Геной лицом к нему
+                var lt = refs.lead.transform; var at = lt.position + lt.forward * 1.6f; at.y = 0.1f;
+                player.Teleport(at, lt.eulerAngles.y + 180f); player.FaceCameraYaw(lt.eulerAngles.y + 180f);
+            }
             if (InputX.DebugDoor() && mode == Mode.Walk && exitSpot != null) { player.Teleport(exitSpot.position + Vector3.forward * 0.4f, 180f); player.FaceCameraYaw(180f); }
             if (InputX.DebugSit() && lunch != null && mode == Mode.Lunch)
             {
@@ -1053,7 +1126,9 @@ namespace Intern.Game
         void ShowDaySummary()
         {
             dayOverPending = false;
+            summaryNow = true;
             LastReport = Work.Finish();
+            summaryNow = false;
             if (FiredReport != null) return;      // уволили по итогам дня
             Work.NextDay();
             Persist(); UpdateBoard();
@@ -1067,7 +1142,8 @@ namespace Intern.Game
             player.FaceCameraYaw(refs.spawn.eulerAngles.y);
             player.cinematic = false; player.BlendFromCurrent(0.8f);
             mode = Mode.Walk; SetCursor(true); lastInput = Time.unscaledTime;
-            Toast(Work.WeekdayFull + ", 9:00. День " + Save.day + ". Гена ждёт тикеты!");
+            if (leadWalker != null) leadWalker.ResetHome();
+            Toast(Work.WeekdayFull + ", 9:00. День " + Save.day + ". Гена ждёт тикеты!" + (Save.debt > 0 ? " Долг Гене: " + Save.debt + "." : ""));
         }
 
         public void UiSummaryToMenu() { if (mode == Mode.DaySummary) { mode = Mode.Menu; player.cinematic = true; SetCursor(false); } }
@@ -1075,8 +1151,11 @@ namespace Intern.Game
         void OnFired()
         {
             FiredReport = new DayReport { day = Save.day, tasks = Save.done.Count, money = Save.money, kills = Save.totalKills, lunchMoney = Save.totalLunches, fines = Save.totalFines, strikes = Save.strikes, limit = Work.StrikeLimit, weekday = RankFull };
-            if (mode == Mode.Ide) { if (ideUi != null) ideUi.Close(); else ide.Close(); }
+            // увольнение может случиться посреди кат-сцены (садится за стол, выходит на обед) — обрываем их
+            StopAllCoroutines();
+            if (mode == Mode.Ide || (ideUi != null && ideUi.Active)) { if (ideUi != null) ideUi.Close(); else ide.Close(); }
             if (lunch != null) { lunch.Cleanup(); lunch = null; if (city != null) city.root.gameObject.SetActive(false); ShowKnife(false); }
+            if (leadWalker != null) leadWalker.ResetHome();
             Progress.Wipe();
             dayOverPending = false;
             StartCoroutine(FiredScene());
@@ -1149,6 +1228,7 @@ namespace Intern.Game
             if (!Work.CanLunch(out why)) { Toast(why); return; }
             Work.StartLunch(); Persist();
             if (FiredReport != null) return;      // самоволка оказалась последней каплей
+            if (leadWalker != null) leadWalker.ResetHome();
             StartCoroutine(ToCity());
         }
 
@@ -1197,7 +1277,7 @@ namespace Intern.Game
         void FinishLunchNow()
         {
             if (lunch == null) return;
-            Save.money = Mathf.Max(0, Save.money + lunch.coins);
+            Save.money = Mathf.Max(0, Save.money + (lunch.coins > 0 ? Work.Earn(lunch.coins) : lunch.coins));
             Work.EndLunch(lunch.coins, lunch.kills);
             lunch.Cleanup(); lunch = null;
             if (city != null) city.root.gameObject.SetActive(false);

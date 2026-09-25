@@ -48,6 +48,7 @@ namespace Intern.Game
         public static bool DebugHour() { return KD(Key.F3); }
         public static bool DebugDoor() { return KD(Key.F1); }
         public static bool DebugLunchEnd() { return KD(Key.F2); }
+        public static bool DebugLead() { return KD(Key.F5); }
         public static bool Screenshot() { return KD(Key.F12); }
         // Был ли хоть какой-то ввод в этом кадре — для автопаузы
         public static bool AnyInput()
@@ -85,6 +86,7 @@ namespace Intern.Game
         public static bool DebugHour() { return Input.GetKeyDown(KeyCode.F3); }
         public static bool DebugDoor() { return Input.GetKeyDown(KeyCode.F1); }
         public static bool DebugLunchEnd() { return Input.GetKeyDown(KeyCode.F2); }
+        public static bool DebugLead() { return Input.GetKeyDown(KeyCode.F5); }
         public static bool Screenshot() { return Input.GetKeyDown(KeyCode.F12); }
         public static bool AnyInput() { return Input.anyKey || Mathf.Abs(Input.GetAxisRaw("Mouse X")) + Mathf.Abs(Input.GetAxisRaw("Mouse Y")) > 0.01f; }
         public static bool Attack() { return Input.GetMouseButtonDown(0); }
@@ -166,6 +168,12 @@ namespace Intern.Game
         public bool hourWorked;
         public int dayTasks, dayXp, dayMoney, dayLunchMoney, dayKills, dayFines, dayWorkHours, dayIdleHours;
         public int totalKills, totalLunches, totalFines;
+        // мягкие правила Гены: долг вместо выговора, первое нарушение — замечание
+        public int debt;                 // неоплаченные штрафы, гасятся из следующих доходов
+        public bool idleWarnedToday;     // первый час простоя за день — только предупреждение
+        public bool warnedTruancy, warnedAwol;  // замечание за прогул и самоволку уже было
+        public int workStreak;           // рабочих часов подряд (для похвалы)
+        public int dayDebtPaid, dayRemarks;
 
         public string GetCode(string id) { int i = codeIds.IndexOf(id); return i >= 0 ? codeTexts[i] : null; }
         public void SetCode(string id, string code)

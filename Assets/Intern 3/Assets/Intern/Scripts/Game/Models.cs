@@ -367,7 +367,8 @@ namespace Intern.Game
                 var cap = lead.gameObject.AddComponent<CapsuleCollider>(); cap.center = new Vector3(0, 0.95f, 0); cap.height = 1.9f; cap.radius = 0.35f;
                 lead.gameObject.AddComponent<TeamLeadNpc>();
                 refs.lead = lead;
-                var tag = OfficeBuilder.Label("Тимлид Гена", new Vector3(8.2f, 2.35f, 5.6f), 0.017f, Pal.Ink);
+                // табличка ходит вместе с Геной
+                var tag = OfficeBuilder.Label("Тимлид Гена", new Vector3(0, 2.35f, 0), 0.017f, Pal.Ink, lead.transform);
                 tag.gameObject.AddComponent<Billboard>();
             }
         }

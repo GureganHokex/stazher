@@ -25,11 +25,14 @@ namespace Intern.Game
 
     public enum WorkKind { Edit, Run, Check, Solved, Theory, Hint, Terminal }
 
+    // С каким настроением Гена подходит к столу
+    public enum LeadMood { Warn, Fine, Strike, Praise }
+
     public class DayReport
     {
-        public int day, tasks, xp, money, lunchMoney, kills, fines, workHours, idleHours, strikes, limit;
+        public int day, tasks, xp, money, lunchMoney, kills, fines, workHours, idleHours, strikes, limit, debt, debtPaid;
         public bool strikeToday, strikeRemoved, truancy;
-        public string weekday;
+        public string weekday, remark;   // remark — замечание вместо выговора (первый прогул)
     }
 
     public class WorkDay
@@ -43,7 +46,8 @@ namespace Intern.Game
         public WorkDay(SaveData save, Func<int> grade) { s = save; gradeIdx = grade; }
 
         // ---- что показать игроку ----
-        public Action<string> Lead;          // реплика Гены
+        public Action<string> Lead;          // реплика Гены издалека (уведомление)
+        public Action<LeadMood, string> Visit; // Гена подходит к столу и говорит лично
         public Action<string> Notice;        // просто сообщение
         public Action Fired;                 // уволен
         public Action DayOver;               // 18:00
@@ -65,6 +69,9 @@ namespace Intern.Game
         public int StrikeLimit { get { return FireLimit((Difficulty)s.difficulty); } }
         public static int FireLimit(Difficulty d) { return d == Difficulty.Easy ? 3 : d == Difficulty.Medium ? 2 : 1; }
         public int FineAmount { get { int g = gradeIdx(); return g <= 0 ? 30 : g == 1 ? 50 : g == 2 ? 75 : 100; } }
+        public int Debt { get { return s.debt; } }
+        // Долг, при котором Гена всё-таки даёт выговор: три неоплаченных штрафа
+        public int DebtLimit { get { return FineAmount * 3; } }
 
         bool fired, dayOverSent;
         public bool IsFired { get { return fired; } }
@@ -103,25 +110,68 @@ namespace Intern.Game
             bool counted = s.hourMinutes >= 30f;   // час, почти целиком прошедший на обеде, не считается
             if (counted)
             {
-                if (s.hourWorked) s.dayWorkHours++;
+                if (s.hourWorked)
+                {
+                    s.dayWorkHours++; s.workStreak++;
+                    if (!FirstDay && s.workStreak == 3) Praise();
+                }
                 else
                 {
-                    s.dayIdleHours++;
+                    s.dayIdleHours++; s.workStreak = 0;
                     if (!FirstDay) IdleFine();
                 }
             }
             s.hourStart += 60; s.hourMinutes = 0f; s.hourEditSec = 0f; s.hourWorked = false;
         }
 
+        static readonly string[] PraiseLines = {
+            "Три часа подряд в работе — вот это я понимаю. Так держать!",
+            "Смотрю, ты в потоке. Не отвлекаю, продолжай.",
+            "Хороший темп. На планёрке скажу, что стажёр тащит.",
+        };
+
+        void Praise()
+        {
+            Tell(LeadMood.Praise, PraiseLines[(s.day + s.hourStart / 60) % PraiseLines.Length]);
+        }
+
+        // Час простоя. Первый за день — предупреждение, дальше штраф.
+        // Не хватает денег — остаток уходит в долг; выговор только когда долг дорос до трёх штрафов.
         void IdleFine()
         {
             int fine = FineAmount;
-            if (s.money >= fine)
+            if (!s.idleWarnedToday)
             {
-                s.money -= fine; s.dayFines += fine; s.totalFines += fine;
-                Say(Lead, "Ты чего сидишь? Час без работы — минус " + fine + " с премии.");
+                s.idleWarnedToday = true;
+                Tell(LeadMood.Warn, "Эй, целый час без работы. Сегодня первый раз — просто предупреждаю. Следующий час простоя — минус " + fine + " с премии.");
+                return;
             }
-            else AddStrike("штраф за простой нечем заплатить");
+            int paid = Mathf.Min(s.money, fine), owe = fine - paid;
+            s.money -= paid; s.dayFines += fine; s.totalFines += fine;
+            if (owe <= 0)
+            {
+                Tell(LeadMood.Fine, "Опять час без работы. Минус " + fine + " с премии.");
+                return;
+            }
+            s.debt += owe;
+            if (s.debt >= DebtLimit)
+            {
+                s.debt -= DebtLimit;
+                AddStrike("долг за простой дорос до " + DebtLimit + " монет. Долг списываю, но выговор пишу");
+                return;
+            }
+            Tell(LeadMood.Fine, "Час без работы — штраф " + fine + ". " + (paid > 0 ? "Взял " + paid + ", остальное " : "Денег нет, ") +
+                                "записал в долг. Вернёшь с премии. Долг " + s.debt + " из " + DebtLimit + ", дальше — выговор.");
+        }
+
+        // Доход (задачи, обед, баги): сначала гасит долг. Возвращает, сколько дошло до кошелька
+        public int Earn(int amount)
+        {
+            if (amount <= 0 || s.debt <= 0) return amount;
+            int pay = Mathf.Min(s.debt, amount);
+            s.debt -= pay; s.dayDebtPaid += pay;
+            if (s.debt == 0) Say(Notice, "Долг Гене погашен.");
+            return amount - pay;
         }
 
         // ================= работа =================
@@ -152,7 +202,13 @@ namespace Intern.Game
         public void StartLunch()
         {
             s.lunchTaken = true; s.totalLunches++;
-            if (!FirstDay && !s.workedToday) AddStrike("самоволка: ушёл на обед, не поработав с утра");
+            if (FirstDay || s.workedToday) return;
+            if (!s.warnedAwol)
+            {
+                s.warnedAwol = true; s.dayRemarks++;
+                Say(Lead, "Ты куда? С утра ни одной строчки — и сразу на обед? Первый раз — замечание. Второй — выговор.");
+            }
+            else AddStrike("самоволка: ушёл на обед, не поработав с утра");
         }
 
         public void EndLunch(int coins, int kills)
@@ -168,8 +224,8 @@ namespace Intern.Game
             s.strikes++; s.strikeToday = true; s.cleanDays = 0;
             int limit = StrikeLimit;
             if (s.strikes >= limit) { fired = true; if (Fired != null) Fired(); return; }
-            Say(Lead, "Выговор: " + reason + ". Это " + s.strikes + " из " + limit + "." +
-                      (s.strikes == limit - 1 ? " Ещё один — и пишешь заявление." : ""));
+            Tell(LeadMood.Strike, "Выговор: " + reason + ". Это " + s.strikes + " из " + limit + "." +
+                      (s.strikes == limit - 1 ? " Ещё один — и пишешь заявление." : " Пять чистых дней — и сниму."));
         }
 
         // ================= конец дня =================
@@ -178,18 +234,30 @@ namespace Intern.Game
         {
             var r = new DayReport { day = s.day, weekday = WeekdayFull };
             bool truancy = !FirstDay && (s.dayTasks == 0 || s.dayWorkHours < 2);
-            if (truancy) { r.truancy = true; AddStrike(s.dayTasks == 0 ? "прогул: за день ни одной решённой задачи" : "прогул: меньше двух рабочих часов за день"); }
+            if (truancy)
+            {
+                string why = s.dayTasks == 0 ? "за день ни одной решённой задачи" : "меньше двух рабочих часов за день";
+                if (!s.warnedTruancy) { s.warnedTruancy = true; s.dayRemarks++; r.remark = "Замечание: " + why + ". Первый раз прощаю, в следующий — выговор."; }
+                else { r.truancy = true; AddStrike("прогул: " + why); }
+            }
             if (!fired)
             {
-                if (!s.strikeToday)
+                if (!s.strikeToday && s.dayRemarks == 0)
                 {
                     s.cleanDays++;
-                    if (s.cleanDays >= 5 && s.strikes > 0) { s.strikes--; s.cleanDays = 0; r.strikeRemoved = true; }
+                    if (s.cleanDays >= 5)
+                    {
+                        // пять чистых дней: минус выговор и снова право на замечание
+                        if (s.strikes > 0) { s.strikes--; r.strikeRemoved = true; }
+                        s.warnedTruancy = s.warnedAwol = false;
+                        s.cleanDays = 0;
+                    }
                 }
+                else if (s.dayRemarks > 0) s.cleanDays = 0;
             }
             r.tasks = s.dayTasks; r.xp = s.dayXp; r.money = s.dayMoney; r.lunchMoney = s.dayLunchMoney; r.kills = s.dayKills;
             r.fines = s.dayFines; r.workHours = s.dayWorkHours; r.idleHours = s.dayIdleHours;
-            r.strikes = s.strikes; r.limit = StrikeLimit; r.strikeToday = s.strikeToday;
+            r.strikes = s.strikes; r.limit = StrikeLimit; r.strikeToday = s.strikeToday; r.debt = s.debt; r.debtPaid = s.dayDebtPaid;
             return r;
         }
 
@@ -197,8 +265,9 @@ namespace Intern.Game
         {
             s.day++; s.minute = Start; s.lunchTaken = false; s.satedUntil = 0f;
             s.hourStart = Start; s.hourMinutes = 0f; s.hourEditSec = 0f; s.hourWorked = false;
-            s.strikeToday = false; s.workedToday = false;
+            s.strikeToday = false; s.workedToday = false; s.idleWarnedToday = false; s.workStreak = 0;
             s.dayTasks = s.dayXp = s.dayMoney = s.dayLunchMoney = s.dayKills = s.dayFines = s.dayWorkHours = s.dayIdleHours = 0;
+            s.dayDebtPaid = s.dayRemarks = 0;
             dayOverSent = false;
         }
 
@@ -208,6 +277,13 @@ namespace Intern.Game
             s.day = 1; s.minute = Start; s.lunchTaken = false; s.satedUntil = 0f; s.strikes = 0; s.cleanDays = 0;
             s.strikeToday = false; s.workedToday = false; s.hourStart = Start; s.hourMinutes = 0f; s.hourEditSec = 0f; s.hourWorked = false;
             s.dayTasks = s.dayXp = s.dayMoney = s.dayLunchMoney = s.dayKills = s.dayFines = s.dayWorkHours = s.dayIdleHours = 0;
+            s.debt = 0; s.idleWarnedToday = false; s.warnedTruancy = s.warnedAwol = false; s.workStreak = 0; s.dayDebtPaid = s.dayRemarks = 0;
+        }
+
+        // Гена говорит лично (подходит к столу), если это можно показать, иначе — уведомлением
+        void Tell(LeadMood mood, string text)
+        {
+            if (Visit != null) Visit(mood, text); else Say(Lead, text);
         }
 
         static void Say(Action<string> a, string text) { if (a != null) a(text); }
