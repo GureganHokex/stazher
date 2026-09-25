@@ -301,6 +301,7 @@ namespace Intern.Game
         {
             viewDir = view;
             anim = a; body = GetComponent<Collider>();
+            if (GetComponent<Rigidbody>() == null) { var rb = gameObject.AddComponent<Rigidbody>(); rb.isKinematic = true; rb.useGravity = false; }
             home = transform.position; homeYaw = transform.eulerAngles.y; yaw = homeYaw;
             playerPos = player; active = isActive; say = onSay; sayFar = onFar;
             bubble = SpeechBubble.Create(transform, 1.75f);

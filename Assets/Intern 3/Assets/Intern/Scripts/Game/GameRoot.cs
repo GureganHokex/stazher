@@ -7,9 +7,9 @@ using UnityEngine;
 
 namespace Intern.Game
 {
-    public class GameRoot : MonoBehaviour
+    public partial class GameRoot : MonoBehaviour
     {
-        public enum Mode { Menu, Walk, Transition, Ide, Dialog, Pause, Wardrobe, Lunch, DaySummary, Fired }
+        public enum Mode { Menu, Walk, Transition, Ide, Dialog, Pause, Wardrobe, Lunch, DaySummary, Fired, Shop, LunchSummary }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
@@ -43,7 +43,8 @@ namespace Intern.Game
         public WorkDay Work { get; private set; }
         CityRefs city;
         LunchRun lunch;
-        Knife knife;
+        PlayerCombat combat;
+        Arsenal arsenal;
         Transform exitSpot;
         Mode pausedFrom = Mode.Walk;
         bool dayOverPending, dayOverNoticed;
@@ -112,6 +113,18 @@ namespace Intern.Game
             if (Progress.HasSave()) Progress.Save(Save);
         }
 
+        // Версия 4: арсенал обеда. Нож есть у всех, остальное докупается (Arsenal сам достроит пустые списки)
+        void MigrateArsenal()
+        {
+            if (Save.version >= 4) return;
+            Save.version = 4;
+            if (Save.arsenal == null) Save.arsenal = new List<WeaponSave>();
+            if (Save.attachments == null) Save.attachments = new List<string>();
+            if (Save.ammoBag == null) Save.ammoBag = new List<AmmoSave>();
+            if (string.IsNullOrEmpty(Save.meleeWeapon)) Save.meleeWeapon = "knife";
+            if (Progress.HasSave()) Progress.Save(Save);
+        }
+
         void SetupWork()
         {
             Work = new WorkDay(Save, () => GradeIdx);
@@ -147,6 +160,11 @@ namespace Intern.Game
             if (Save.owned == null) Save.owned = new List<string>();
             MigrateSave();
             MigrateDay();
+            MigrateArsenal();
+#if UNITY_EDITOR
+            Balance.ExportIfMissing();
+#endif
+            Balance.Load();
             LoadPath();
             SetupWork();
             ide = new IdeWindow(this);
@@ -161,11 +179,13 @@ namespace Intern.Game
             var pgo = new GameObject("Player");
             player = pgo.AddComponent<PlayerController>();
             player.firstPerson = Save.firstPerson;
-            player.SetAvatar(Save.look);
+            SetupArsenal(pgo);
+            player.SetAvatar(LookNow());
             player.Teleport(refs.spawn.position, refs.spawn.eulerAngles.y);
             player.cinematic = true;
             UpdateBoard();
             PlaceExitDoor();
+            PlaceArsenalCase();
             if (refs.lead != null)
             {
                 leadWalker = refs.lead.gameObject.AddComponent<LeadWalker>();
@@ -254,20 +274,9 @@ namespace Intern.Game
                     if (InputX.Esc()) PauseFrom(Mode.Walk);
                     else if (dayOverPending) ShowDaySummary();
                     break;
-                case Mode.Lunch:
-                    player.Tick(true);
-                    FindFocus();
-                    if (focus != null && InputX.Interact()) focus.Interact(this);
-                    else if (InputX.Attack()) { if (Cursor.lockState != CursorLockMode.Locked) SetCursor(true); else Attack(); }
-                    if (InputX.ToggleView()) { player.ToggleView(); Save.firstPerson = player.firstPerson; Persist(); }
-                    if (lunch != null)
-                    {
-                        lunch.Tick(Time.deltaTime);
-                        Work.Advance(Time.deltaTime * 60f / lunch.duration, false);
-                        if (lunch.Over) EndLunch(true);
-                    }
-                    if (mode == Mode.Lunch && InputX.Esc()) PauseFrom(Mode.Lunch);
-                    break;
+                case Mode.Lunch: LunchUpdate(); break;
+                case Mode.Shop: ShopUpdate(); break;
+                case Mode.LunchSummary: player.Tick(false); break;
                 case Mode.Ide:
                     if (ideUi != null) ideUi.Tick(Time.deltaTime); else ide.Tick(Time.deltaTime);
                     TrackTheory(Time.deltaTime);
@@ -304,7 +313,8 @@ namespace Intern.Game
             if (ideUi != null) ideUi.Update(Time.deltaTime);
             if (ui != null) ui.Tick(Time.unscaledDeltaTime);
 #if UNITY_EDITOR
-            if (ideUi != null && InputX.DebugDump()) { Debug.Log("[Стажёр] F7: mode=" + mode + ", ideActive=" + ideUi.Active + ", task=" + (ideUi.Task != null ? ideUi.Task.id : "-") +
+            if (InputX.DebugDump() && lunch != null && combat != null) Debug.Log("[Стажёр] F7 обед: " + combat.DebugInfo() + ", живых гуманитариев " + lunch.AliveHumanitarians + ", технарей " + lunch.AliveTechies);
+            else if (ideUi != null && InputX.DebugDump()) { Debug.Log("[Стажёр] F7: mode=" + mode + ", ideActive=" + ideUi.Active + ", task=" + (ideUi.Task != null ? ideUi.Task.id : "-") +
                                                             ", день " + Work.Clock + ", уволен " + Work.IsFired + "/" + (FiredReport != null) + ", выговоры " + Save.strikes + ", долг " + Save.debt + ", Гена " + (leadWalker != null ? leadWalker.State : "-")); ideUi.DebugDump(System.IO.Path.GetFullPath(Application.dataPath + "/../Temp")); Toast("Снимок IDE сохранён"); }
 #endif
         }
@@ -740,7 +750,7 @@ namespace Intern.Game
             Save.look = result.Clone();
             Save.hasCharacter = true;
             Persist();
-            player.SetAvatar(Save.look);
+            player.SetAvatar(LookNow());
             var spot = refs.lockerSpot.position;
             player.Teleport(spot, 0);
             player.FaceCameraYaw(0);
@@ -876,14 +886,15 @@ namespace Intern.Game
         {
             if (fresh)
             {
-                Progress.Wipe(); Save = new SaveData { version = 3, profession = Career.CanPick(profession) && !string.IsNullOrEmpty(profession) ? profession : "backend" };
+                Progress.Wipe(); Save = new SaveData { version = 4, profession = Career.CanPick(profession) && !string.IsNullOrEmpty(profession) ? profession : "backend" };
                 WorkDay.Reset(Save);
                 LoadPath();
                 SetupWork();
                 LastReport = null; FiredReport = null; dayOverPending = false; theoryCredited.Clear();
                 ide = new IdeWindow(this); if (ideUi != null) ideUi.ResetProgress(CurrentTask);
                 foreach (var b in bugs) if (b != null) Destroy(b.gameObject);
-                player.SetAvatar(Save.look);
+                SetupArsenal(player.gameObject);
+                player.SetAvatar(LookNow());
             }
             Save.difficulty = (int)d; Persist(); UpdateBoard();
             lastInput = Time.unscaledTime;
@@ -1074,6 +1085,13 @@ namespace Intern.Game
             // только в редакторе: F3 — плюс игровой час, F2 — обеду осталось 5 секунд
             if (InputX.DebugHour() && mode != Mode.Menu && mode != Mode.Lunch && !Work.Ended) { Work.Advance(60f, true); Debug.Log("[Стажёр] F3: " + Work.Clock + ", штрафы " + Save.dayFines + ", выговоры " + Save.strikes); }
             if (InputX.DebugLunchEnd() && lunch != null) lunch.timeLeft = Mathf.Min(lunch.timeLeft, 5f);
+            else if (InputX.DebugLunchEnd() && lunch == null && mode == Mode.Walk)
+            {
+                // F2 в офисе — обед снова доступен (и время не раньше 12:00)
+                Save.lunchTaken = false; if (Save.minute < WorkDay.LunchOpen) Work.Advance(WorkDay.LunchOpen - Save.minute, true);
+                Toast("Отладка: обед снова доступен");
+            }
+            if (mode == Mode.Lunch && lunch != null) DebugLunch();
             if (InputX.DebugLead() && mode == Mode.Walk && refs.lead != null)
             {
                 // F5 — встать перед Геной лицом к нему
@@ -1088,7 +1106,7 @@ namespace Intern.Game
             }
 #endif
             // часы идут в офисе, за компьютером, в разговоре и в гардеробе
-            bool office = mode == Mode.Walk || mode == Mode.Ide || mode == Mode.Dialog || mode == Mode.Wardrobe || (mode == Mode.Transition && lunch == null);
+            bool office = mode == Mode.Walk || mode == Mode.Ide || mode == Mode.Dialog || mode == Mode.Wardrobe || ((mode == Mode.Transition || mode == Mode.Shop || mode == Mode.LunchSummary) && lunch == null);
             if (office && !Work.Ended) Work.Advance(Time.deltaTime / DayLength.SecondsPerGameMinute(GameConfig.S.dayLength), true);
             // автопауза: 2 минуты без ввода — часы и обед стоят
             if ((mode == Mode.Walk || mode == Mode.Ide || mode == Mode.Lunch) && Time.unscaledTime - lastInput > 120f)
@@ -1154,7 +1172,7 @@ namespace Intern.Game
             // увольнение может случиться посреди кат-сцены (садится за стол, выходит на обед) — обрываем их
             StopAllCoroutines();
             if (mode == Mode.Ide || (ideUi != null && ideUi.Active)) { if (ideUi != null) ideUi.Close(); else ide.Close(); }
-            if (lunch != null) { lunch.Cleanup(); lunch = null; if (city != null) city.root.gameObject.SetActive(false); ShowKnife(false); }
+            if (lunch != null) { lunch.Cleanup(); lunch = null; if (city != null) city.root.gameObject.SetActive(false); if (combat != null) combat.End(); }
             if (leadWalker != null) leadWalker.ResetHome();
             Progress.Wipe();
             dayOverPending = false;
@@ -1221,99 +1239,6 @@ namespace Intern.Game
             Debug.Log("[Стажёр] Дверь на обед: x " + x.ToString("0.0") + ", стена z " + wallZ.ToString("0.00") + (found ? "" : " (стена не найдена, запасное место)"));
         }
 
-        public void TryStartLunch()
-        {
-            if (mode != Mode.Walk) return;
-            string why;
-            if (!Work.CanLunch(out why)) { Toast(why); return; }
-            Work.StartLunch(); Persist();
-            if (FiredReport != null) return;      // самоволка оказалась последней каплей
-            if (leadWalker != null) leadWalker.ResetHome();
-            StartCoroutine(ToCity());
-        }
-
-        IEnumerator ToCity()
-        {
-            mode = Mode.Transition;
-            yield return Fade(1f, 0.35f);
-            if (city == null) city = CityBuilder.Build();
-            city.root.gameObject.SetActive(true);
-            Gore.Enabled = GameConfig.S.blood;
-            lunch = new LunchRun(city, DayLength.LunchSeconds(GameConfig.S.dayLength), () => player.Position) { Say = Toast };
-            player.Teleport(city.spawn.position, 0f); player.FaceCameraYaw(0f);
-            player.cinematic = false; player.avatar.SetHeadVisible(!player.firstPerson);
-            ShowKnife(true);
-            mode = Mode.Lunch; SetCursor(true); lastInput = Time.unscaledTime;
-            Toast("Обед! " + Mathf.RoundToInt(lunch.duration / 60f) + " минут. Юрист +10 монет, бухгалтеров не трогать.");
-            yield return Fade(0f, 0.35f);
-        }
-
-        void ShowKnife(bool on)
-        {
-            if (on) { if (knife == null) knife = new Knife(); knife.Attach(player.avatar); }
-            if (knife != null) knife.Show(on);
-            if (player.avatar != null) player.avatar.holdRight = on;
-        }
-
-        public void EndLunch(bool timeUp)
-        {
-            if (mode != Mode.Lunch || lunch == null) return;
-            StartCoroutine(ToOffice(timeUp));
-        }
-
-        IEnumerator ToOffice(bool timeUp)
-        {
-            mode = Mode.Transition;
-            yield return Fade(1f, 0.35f);
-            int coins = lunch.coins, kills = lunch.kills, fines = lunch.fines;
-            FinishLunchNow();
-            player.cinematic = false; player.avatar.SetHeadVisible(!player.firstPerson);
-            mode = Mode.Walk; SetCursor(true); lastInput = Time.unscaledTime;
-            Toast((timeUp ? "Обед закончился. " : "") + "За обед " + (coins >= 0 ? "+" : "") + coins + " монет, выбито " + kills + (fines > 0 ? ", штрафы −" + fines : "") + ". «Сытый»: +10% XP до " + WorkDay.TimeText(Save.satedUntil) + ".");
-            yield return Fade(0f, 0.35f);
-        }
-
-        // Закончить обед сразу (конец таймера, выход в меню или из игры): монеты — в кошелёк, стажёр — в офис
-        void FinishLunchNow()
-        {
-            if (lunch == null) return;
-            Save.money = Mathf.Max(0, Save.money + (lunch.coins > 0 ? Work.Earn(lunch.coins) : lunch.coins));
-            Work.EndLunch(lunch.coins, lunch.kills);
-            lunch.Cleanup(); lunch = null;
-            if (city != null) city.root.gameObject.SetActive(false);
-            ShowKnife(false);
-            if (exitSpot != null) player.Teleport(exitSpot.position, 0f); else player.Teleport(refs.spawn.position, refs.spawn.eulerAngles.y);
-            player.FaceCameraYaw(0f);
-            Persist(); UpdateBoard();
-        }
-
-        void Attack()
-        {
-            if (knife == null || !knife.Ready || player.avatar == null) return;
-            knife.Used();
-            player.FaceYaw(player.CamYaw);
-            player.avatar.swingStart = Time.time;
-            StartCoroutine(HitAfter(0.12f));
-        }
-
-        IEnumerator HitAfter(float delay)
-        {
-            yield return new WaitForSeconds(delay);
-            if (lunch == null) yield break;
-            var fwd = Quaternion.Euler(0, player.CamYaw, 0) * Vector3.forward;
-            var c = player.Position + Vector3.up * 1.0f + fwd * Knife.Reach;
-            CityNpc best = null; float bd = 99f;
-            foreach (var col in Physics.OverlapSphere(c, Knife.Radius, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
-            {
-                var n = col.GetComponentInParent<CityNpc>();
-                if (n == null || !n.Alive) continue;
-                var to = n.transform.position - player.Position; to.y = 0;
-                float d = to.magnitude;
-                if (d < bd && (d < 0.5f || Vector3.Dot(to / d, fwd) > 0.1f)) { bd = d; best = n; }
-            }
-            if (best != null) best.Hit(Knife.Damage, player.Position);
-        }
-
         // ================== Для интерфейса (GameUi) ==================
         public Mode CurMode { get { return mode; } }
         public bool HasProgress { get { return Progress.HasSave() && Save.hasCharacter; } }
@@ -1321,7 +1246,7 @@ namespace Intern.Game
         public int TotalCount { get { return Tasks.tasks.Length; } }
         public int BugCount { get { return bugs.Count; } }
         public bool FirstPerson { get { return player != null && player.firstPerson; } }
-        public string FocusPrompt { get { return focus != null && mode == Mode.Walk ? focus.Prompt : null; } }
+        public string FocusPrompt { get { return focus != null && (mode == Mode.Walk || mode == Mode.Lunch) ? focus.Prompt : null; } }
         public string ToastText { get { return toast; } }
         public float ToastAge { get { return Time.unscaledTime - (toastUntil - 3.2f); } }
         public float ToastLeft { get { return toastUntil - Time.unscaledTime; } }

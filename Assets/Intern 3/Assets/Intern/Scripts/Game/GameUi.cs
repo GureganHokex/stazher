@@ -9,7 +9,7 @@ using UnityEngine.UIElements;
 
 namespace Intern.Game
 {
-    public class GameUi
+    public partial class GameUi
     {
         // ---------- палитра игры ----------
         public static readonly Color Deep = Pal.Hex("0D0F2B"), Card = Pal.Hex("1B1F4A"), CardHi = Pal.Hex("252A62"), Line = Pal.Hex("363C88"),
@@ -93,6 +93,8 @@ namespace Intern.Game
             dim = Layer(); dim.style.backgroundColor = new Color(0.05f, 0.06f, 0.17f, 0.74f); root.Add(dim);
             hud = BuildHud(); root.Add(hud);
             lunchHud = BuildLunchHud(); root.Add(lunchHud);
+            shopLayer = Centered(); root.Add(shopLayer);
+            lunchSum = Centered(); root.Add(lunchSum);
             summary = Centered(); root.Add(summary);
             fired = Centered(); root.Add(fired);
             menu = BuildMenu(); root.Add(menu);
@@ -101,7 +103,7 @@ namespace Intern.Game
             toastRow = BuildToast(); root.Add(toastRow);
             fpsLabel = K.B("", 13f, Mint); fpsLabel.style.position = Position.Absolute; fpsLabel.style.top = 6f; fpsLabel.style.left = 0f; fpsLabel.style.right = 0f;
             fpsLabel.style.unityTextAlign = TextAnchor.MiddleCenter; root.Add(fpsLabel);
-            foreach (var v in new[] { codeBg, dim, hud, menu, pause, settings, lunchHud, summary, fired }) { v.style.display = DisplayStyle.None; visible[v] = false; }
+            foreach (var v in new[] { codeBg, dim, hud, menu, pause, settings, lunchHud, summary, fired, shopLayer, lunchSum }) { v.style.display = DisplayStyle.None; visible[v] = false; }
         }
 
         static VisualElement Layer() { var v = K.Box(); K.Fill(v); v.pickingMode = PickingMode.Ignore; return v; }
@@ -827,71 +829,6 @@ def deploy(env=""staging""):
             return v;
         }
 
-        // ======================= обед =======================
-        VisualElement BuildLunchHud()
-        {
-            var layer = Layer();
-            // таймер обеда сверху по центру
-            var top = K.Box(true); top.pickingMode = PickingMode.Ignore; top.style.position = Position.Absolute; top.style.left = 0f; top.style.right = 0f; top.style.top = 22f;
-            top.style.justifyContent = Justify.Center;
-            var pill = K.Box(true); pill.pickingMode = PickingMode.Ignore; pill.style.alignItems = Align.Center; pill.style.backgroundColor = new Color(Card.r, Card.g, Card.b, 0.92f);
-            K.Radius(pill, 26f); Border(pill, new Color(Sun.r, Sun.g, Sun.b, 0.6f), 2f); K.Pad(pill, 8f, 22f, 8f, 16f);
-            pill.Add(new Icon("clock", Sun, 26f));
-            var lt = K.B("ОБЕД", 14f, Muted); lt.style.marginLeft = 10f; lt.style.letterSpacing = 1.5f; pill.Add(lt);
-            lunchTimer = K.B("6:00", 34f, Text); lunchTimer.style.marginLeft = 12f; lunchTimer.style.unityFontStyleAndWeight = FontStyle.Bold; pill.Add(lunchTimer);
-            top.Add(pill); layer.Add(top);
-
-            // монеты за этот обед: «+10» рядом со счётчиком складываются в серию
-            var card = K.Box(); card.pickingMode = PickingMode.Ignore; card.style.position = Position.Absolute; card.style.left = 24f; card.style.top = 22f; card.style.width = 330f;
-            card.style.backgroundColor = new Color(Card.r, Card.g, Card.b, 0.9f); K.Radius(card, 18f); Border(card, new Color(Line.r, Line.g, Line.b, 0.8f), 1f); K.Pad(card, 14f, 20f, 16f, 20f);
-            card.Add(SectionLabel("ЗА ЭТОТ ОБЕД"));
-            lunchCoinsRow = K.Box(true); lunchCoinsRow.pickingMode = PickingMode.Ignore; lunchCoinsRow.style.alignItems = Align.Center; lunchCoinsRow.style.marginTop = 6f;
-            lunchCoinsRow.Add(new Icon("coin", Sun, 30f));
-            lunchCoins = K.B("0", 38f, Sun); lunchCoins.style.marginLeft = 10f; lunchCoinsRow.Add(lunchCoins);
-            lunchSeries = K.B("", 26f, Mint); lunchSeries.style.marginLeft = 14f; lunchCoinsRow.Add(lunchSeries);
-            lunchPenalty = K.B("", 26f, Pink); lunchPenalty.style.marginLeft = 10f; lunchCoinsRow.Add(lunchPenalty);
-            card.Add(lunchCoinsRow);
-            lunchKills = K.T("", 16f, Muted); lunchKills.style.marginTop = 6f; card.Add(lunchKills);
-            layer.Add(card);
-
-            var hintRow = K.Box(true); hintRow.pickingMode = PickingMode.Ignore; hintRow.style.position = Position.Absolute; hintRow.style.left = 0f; hintRow.style.right = 0f; hintRow.style.bottom = 30f;
-            hintRow.style.justifyContent = Justify.Center;
-            var hp = K.Box(true); hp.pickingMode = PickingMode.Ignore; hp.style.backgroundColor = new Color(Card.r, Card.g, Card.b, 0.85f); K.Radius(hp, 14f); K.Pad(hp, 6f, 16f, 6f, 16f);
-            lunchHint = K.T("ЛКМ — удар ножом  ·  E — дверь  ·  юрист +10, бухгалтер −20", 15f, Text); hp.Add(lunchHint);
-            hintRow.Add(hp); layer.Add(hintRow);
-            return layer;
-        }
-
-        int shownCoins; float coinsShownAt;
-        void UpdateLunchHud()
-        {
-            var L = g.Lunch; if (L == null) return;
-            int sec = Mathf.CeilToInt(L.timeLeft);
-            string t = (sec / 60) + ":" + (sec % 60).ToString("00");
-            if (lunchTimer.text != t) { lunchTimer.text = t; lunchTimer.style.color = sec <= 30 ? Pink : Text; }
-            // счётчик догоняет сумму, когда серия закончилась
-            bool inSeries = L.series > 0;
-            int target = inSeries ? L.coins - L.series : L.coins;
-            if (shownCoins != target && Time.unscaledTime - coinsShownAt > 0.03f)
-            {
-                shownCoins += Math.Sign(target - shownCoins) * Mathf.Max(1, Mathf.Abs(target - shownCoins) / 6);
-                coinsShownAt = Time.unscaledTime;
-            }
-            string key = shownCoins + "|" + L.series + "|" + L.kills + "|" + L.escaped + "|" + (Time.unscaledTime - L.penaltyAt < 1.6f);
-            if (key != lastLunch)
-            {
-                lastLunch = key;
-                lunchCoins.text = shownCoins.ToString();
-                lunchSeries.text = inSeries ? "+" + L.series : "";
-                lunchPenalty.text = Time.unscaledTime - L.penaltyAt < 1.6f ? "−" + L.penaltyShown : "";
-                lunchKills.text = "Выбито " + L.kills + "  ·  убежали " + L.escaped + "  ·  ещё " + Mathf.Max(0, LunchRun.Cap - L.spawned);
-            }
-            // лёгкий толчок цифры серии при каждом новом «+10»
-            float age = Time.unscaledTime - L.seriesAt;
-            float bump = inSeries && age < 0.25f ? 1f + (0.25f - age) * 1.2f : 1f;
-            lunchSeries.style.scale = new Scale(new Vector3(bump, bump, 1f));
-        }
-
         // ======================= итоги дня =======================
         void BuildSummary()
         {
@@ -976,6 +913,7 @@ def deploy(env=""staging""):
             var m = g.CurMode;
             bool inMenu = m == GameRoot.Mode.Menu, inPause = m == GameRoot.Mode.Pause, inWalk = m == GameRoot.Mode.Walk || m == GameRoot.Mode.Dialog;
             bool inLunch = m == GameRoot.Mode.Lunch;
+            bool lunchLive = g.Lunch != null && (inLunch || m == GameRoot.Mode.Shop);
             if (!inMenu && !inPause) settingsOpen = false;
             if (!inMenu) newGamePage = false;
 
@@ -985,7 +923,9 @@ def deploy(env=""staging""):
             if (Show(pause, inPause && !settingsOpen)) { RefreshPause(); Pop(pauseCard); }
             if (Show(settings, (inMenu || inPause) && settingsOpen)) Pop(settingsPanel);
             Show(hud, inWalk || inLunch);
-            Show(lunchHud, inLunch);
+            Show(lunchHud, lunchLive);
+            if (Show(shopLayer, m == GameRoot.Mode.Shop) || (m == GameRoot.Mode.Shop && shopBuilt != g.ShopVersion)) BuildShop();
+            if (Show(lunchSum, m == GameRoot.Mode.LunchSummary)) { BuildLunchSummary(); if (lunchSumCard != null) Pop(lunchSumCard); }
             if (Show(summary, m == GameRoot.Mode.DaySummary)) { BuildSummary(); if (summaryCard != null) Pop(summaryCard); }
             if (Show(fired, m == GameRoot.Mode.Fired)) { BuildFired(); if (firedCard != null) Pop(firedCard); }
             hudCard.style.display = inLunch ? DisplayStyle.None : DisplayStyle.Flex;
@@ -993,7 +933,7 @@ def deploy(env=""staging""):
 
             if (inMenu) TickCode(dt);
             if (inWalk || inLunch) UpdateHud();
-            if (inLunch) UpdateLunchHud();
+            if (lunchLive) UpdateLunchHud();
             UpdateToast(m == GameRoot.Mode.Ide || m == GameRoot.Mode.Transition);
             AnimatePops();
             UpdateFps(dt);
@@ -1100,7 +1040,7 @@ def deploy(env=""staging""):
             }
             bool walking = g.CurMode == GameRoot.Mode.Walk || g.CurMode == GameRoot.Mode.Lunch;
             bool fp = g.FirstPerson && walking;
-            crosshair.style.display = fp ? DisplayStyle.Flex : DisplayStyle.None;
+            crosshair.style.display = fp && g.CurMode != GameRoot.Mode.Lunch ? DisplayStyle.Flex : DisplayStyle.None;
             if (fp)
             {
                 float s = pr != null ? 12f : 7f;

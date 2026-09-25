@@ -349,6 +349,9 @@ namespace Intern.Game
         public float waveUntil;
         public bool holdRight;         // держит предмет в правой руке (нож на обеде)
         public float swingStart = -9f; // начало замаха ножом
+        public bool aimGun, twoHanded;  // оружие в руках: правая рука вытянута к цели, у длинного ствола и левая
+        public float aimPitch;          // наклон камеры (вниз — плюс)
+        public float kickAt = -9f;      // отдача: рука подскакивает
 
         float sit, walkPhase, walkAmt, phase, nextBlink, blinkT = -1, land;
         Vector3[] eyeBase = new Vector3[0];
@@ -858,6 +861,12 @@ namespace Intern.Game
                 bendL = 15f + run * 30f; bendR = 15f + run * 30f;
             }
             if (holdRight && Time.time >= waveUntil && s < 0.5f && grounded) { targetR = -32f; bendR = 62f; zR = 14f; }
+            if (aimGun && s < 0.5f)
+            {
+                float kick = Mathf.Max(0f, 1f - (Time.time - kickAt) / 0.12f) * 9f;
+                targetR = -84f + aimPitch * 0.9f - kick; bendR = 6f; zR = 6f;
+                if (twoHanded) { targetL = -70f + aimPitch * 0.9f - kick * 0.5f; bendL = 38f; zL = -38f; }
+            }
             Spring(ref armFlopL, ref armFlopVelL, targetL, 140f, 8f, dt);
             Spring(ref armFlopR, ref armFlopVelR, targetR, 140f, 8f, dt);
             // замах: рука быстро уходит вверх и рубит вниз-вперёд

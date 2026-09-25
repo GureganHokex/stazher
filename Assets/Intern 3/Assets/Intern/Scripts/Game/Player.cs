@@ -11,9 +11,13 @@ namespace Intern.Game
         public bool firstPerson;
         public bool cinematic;          // камерой управляет сцена (посадка за компьютер, гардероб, меню)
         public float speedBoostUntil;
+        // обед: оружие и эффекты
+        public float speedMul = 1f;     // прицеливание, энергетик, «А зачем?», оглушение (0)
+        public float fovScale = 1f;     // прицел и оптика
+        public bool faceCamera;         // с оружием в руках персонаж смотрит туда же, куда камера
 
         CharacterController cc;
-        float camYaw, camPitch = 12f, bodyYaw, vy, camDist = 3.1f, curDist = 3.1f;
+        float camYaw, camPitch = 12f, bodyYaw, vy, camDist = 3.1f, curDist = 3.1f, kickPitch, kickYaw;
         Vector3 planarVel;
         Vector3 blendPos; Quaternion blendRot; float blendFov, blendStart = -99f, blendDur;
 
@@ -92,6 +96,8 @@ namespace Intern.Game
         public void Tick(bool active)
         {
             float dt = Time.deltaTime;
+            kickPitch = Mathf.MoveTowards(kickPitch, 0f, dt * (4f + kickPitch * 6f));
+            kickYaw = Mathf.MoveTowards(kickYaw, 0f, dt * (3f + Mathf.Abs(kickYaw) * 6f));
             if (active)
             {
                 var look = InputX.Look();
@@ -105,18 +111,18 @@ namespace Intern.Game
             var right = Quaternion.Euler(0, camYaw, 0) * Vector3.right;
             var dir = fwd * mv.y + right * mv.x;
             if (dir.sqrMagnitude > 1) dir.Normalize();
-            float speed = (InputX.Sprint() ? 6.5f : 3.8f) * (Time.time < speedBoostUntil ? 1.35f : 1f);
+            float speed = (InputX.Sprint() && fovScale > 0.99f ? 6.5f : 3.8f) * (Time.time < speedBoostUntil ? 1.35f : 1f) * speedMul;
             planarVel = Vector3.Lerp(planarVel, dir * speed, 1 - Mathf.Exp(-12f * dt));
 
             if (cc.enabled)
             {
-                if (cc.isGrounded) { vy = -1f; if (active && InputX.Jump()) vy = 4.6f; }
+                if (cc.isGrounded) { vy = -1f; if (active && speedMul > 0.01f && InputX.Jump()) vy = 4.6f; }
                 vy -= 14f * dt;
                 cc.Move((planarVel + Vector3.up * vy) * dt);
             }
 
             // Персонаж поворачивается туда, куда идёт (в режиме от первого лица — куда смотрит камера)
-            if (firstPerson) bodyYaw = camYaw;
+            if (firstPerson || faceCamera) bodyYaw = faceCamera && !firstPerson ? Mathf.LerpAngle(bodyYaw, camYaw, 1 - Mathf.Exp(-20f * dt)) : camYaw;
             else if (planarVel.sqrMagnitude > 0.05f)
             {
                 float want = Mathf.Atan2(planarVel.x, planarVel.z) * Mathf.Rad2Deg;
@@ -160,12 +166,12 @@ namespace Intern.Game
             if (firstPerson)
             {
                 cam.transform.position = transform.position + Vector3.up * (Tall ? 1.8f : 1.58f) + transform.forward * 0.12f;
-                cam.transform.rotation = Quaternion.Euler(camPitch, camYaw, 0);
-                cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, FovFirst, dt * 6f);
+                cam.transform.rotation = Quaternion.Euler(camPitch - kickPitch, camYaw + kickYaw, 0);
+                cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, FovFirst * fovScale, dt * 12f);
                 return;
             }
             var pivot = transform.position + Vector3.up * (Tall ? 1.65f : 1.45f);
-            var rot = Quaternion.Euler(camPitch, camYaw, 0);
+            var rot = Quaternion.Euler(camPitch - kickPitch, camYaw + kickYaw, 0);
             var back = rot * Vector3.back;
             var shoulder = rot * Vector3.right * 0.35f;
             float want = camDist;
@@ -176,7 +182,7 @@ namespace Intern.Game
             float k = curDist / camDist;
             cam.transform.position = pivot + back * curDist + shoulder * k;
             cam.transform.rotation = rot;
-            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, FovThird, dt * 6f);
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, FovThird * fovScale, dt * (fovScale < 0.99f ? 12f : 6f));
             // если камера подъехала вплотную — прячем голову, чтобы не смотреть изнутри
             avatar.SetHeadVisible(curDist > 0.9f);
         }
@@ -203,6 +209,28 @@ namespace Intern.Game
         }
 
         public void FaceCameraYaw(float yaw) { camYaw = yaw; }
+        public float CamPitch { get { return camPitch; } }
+
+        // Отдача: камера подпрыгивает вверх и чуть в сторону
+        // Отдача: камера подпрыгивает и потом возвращается (остаётся только пятая часть)
+        public void AddRecoil(float pitch, float yaw)
+        {
+            camPitch = Mathf.Clamp(camPitch - pitch * 0.2f, firstPerson ? -80f : -30f, 70f);
+            kickPitch = Mathf.Min(kickPitch + pitch * 0.8f, 12f); kickYaw += yaw;
+        }
+
+        // Рывок катаной: сдвиг с учётом стен
+        public void Dash(Vector3 delta) { if (cc.enabled) cc.Move(delta); }
+
+        // Куда смотрит прицел: точка попадания луча из центра камеры
+        public Vector3 AimPoint(float maxDist)
+        {
+            var r = new Ray(cam.transform.position, cam.transform.forward);
+            RaycastHit h;
+            int mask = Physics.DefaultRaycastLayers & ~(1 << 2);
+            if (Physics.Raycast(r, out h, maxDist, mask, QueryTriggerInteraction.Ignore)) return h.point;
+            return r.GetPoint(maxDist);
+        }
         // Развернуть персонажа (например, к цели удара)
         public void FaceYaw(float yaw) { bodyYaw = yaw; transform.rotation = Quaternion.Euler(0, bodyYaw, 0); }
     }

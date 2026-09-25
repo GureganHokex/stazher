@@ -59,6 +59,13 @@ namespace Intern.Game
             return false;
         }
         public static bool Attack() { return Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame; }
+        public static bool AttackHeld() { return Mouse.current != null && Mouse.current.leftButton.isPressed; }
+        public static bool AimHeld() { return Mouse.current != null && Mouse.current.rightButton.isPressed; }
+        public static bool AimPressed() { return Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame; }
+        public static bool Reload() { return KD(Key.R); }
+        public static bool Slot1() { return KD(Key.Digit1); }
+        public static bool Slot2() { return KD(Key.Digit2); }
+        public static float Scroll() { return Mouse.current == null ? 0f : Mouse.current.scroll.ReadValue().y; }
 #else
         public static Vector2 Move()
         {
@@ -90,6 +97,13 @@ namespace Intern.Game
         public static bool Screenshot() { return Input.GetKeyDown(KeyCode.F12); }
         public static bool AnyInput() { return Input.anyKey || Mathf.Abs(Input.GetAxisRaw("Mouse X")) + Mathf.Abs(Input.GetAxisRaw("Mouse Y")) > 0.01f; }
         public static bool Attack() { return Input.GetMouseButtonDown(0); }
+        public static bool AttackHeld() { return Input.GetMouseButton(0); }
+        public static bool AimHeld() { return Input.GetMouseButton(1); }
+        public static bool AimPressed() { return Input.GetMouseButtonDown(1); }
+        public static bool Reload() { return Input.GetKeyDown(KeyCode.R); }
+        public static bool Slot1() { return Input.GetKeyDown(KeyCode.Alpha1); }
+        public static bool Slot2() { return Input.GetKeyDown(KeyCode.Alpha2); }
+        public static float Scroll() { return Input.mouseScrollDelta.y; }
 #endif
     }
 
@@ -139,6 +153,18 @@ namespace Intern.Game
     public class TaskFile { public string language; public TaskData[] tasks = new TaskData[0]; }
 
     [Serializable]
+    public class WeaponSave
+    {
+        public string id;
+        public int level;                 // 0..5
+        public int mag = -1;              // патронов в магазине (−1 — полный)
+        public string sight = "", barrel = "", magSlot = "", rail = "";
+    }
+
+    [Serializable]
+    public class AmmoSave { public string id; public int count; }
+
+    [Serializable]
     public class SaveData
     {
         public int difficulty = 0;
@@ -174,6 +200,14 @@ namespace Intern.Game
         public bool warnedTruancy, warnedAwol;  // замечание за прогул и самоволку уже было
         public int workStreak;           // рабочих часов подряд (для похвалы)
         public int dayDebtPaid, dayRemarks;
+        // арсенал обеда (версия 4)
+        public List<WeaponSave> arsenal = new List<WeaponSave>();
+        public List<string> attachments = new List<string>();   // купленные обвесы
+        public List<AmmoSave> ammoBag = new List<AmmoSave>();
+        public string meleeWeapon = "knife", gunWeapon = "";
+        public bool hoodie, hoodieOn;
+        public int coupons;                                       // купоны декана: −20% в мастерской
+        public int bestLunch, bestSeries, knockouts;
 
         public string GetCode(string id) { int i = codeIds.IndexOf(id); return i >= 0 ? codeTexts[i] : null; }
         public void SetCode(string id, string code)

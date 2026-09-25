@@ -1,190 +1,11 @@
-// Обеденный перерыв (прототип v0.8): переулок у бизнес-центра, юристы (+10 монет) и бухгалтеры (−20), нож.
-// Город строится кодом один раз, далеко от офиса, и дальше только включается и выключается.
+// Обеденный перерыв: таймер, горожане (лимит 60 гуманитариев за обед), монеты, здоровье стажёра, шум выстрелов.
+// Город — City.cs, горожане — Citizens.cs, оружие — Weapons.cs, цифры — Balance.cs (lunch.json).
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace Intern.Game
 {
-    public class CityDoor
-    {
-        public Vector3 pos;      // точка на тротуаре перед дверью (мировые координаты)
-        public string kind;      // lawyer | accountant | any
-    }
-
-    public class CityRefs
-    {
-        public Transform root, spawn;
-        public readonly List<CityDoor> doors = new List<CityDoor>();
-        public Vector3 min, max;   // где можно ходить (мировые координаты)
-    }
-
-    public static class CityBuilder
-    {
-        public static readonly Vector3 Origin = new Vector3(0f, 0f, 300f);
-        const float Half = 5f;          // полширины улицы от стены до стены
-        const float Length = 50f;
-
-        static readonly Dictionary<string, Material> facades = new Dictionary<string, Material>();
-
-        public static CityRefs Build()
-        {
-            var r = new CityRefs();
-            var root = new GameObject("City").transform; root.position = Origin;
-            r.root = root;
-            Color asphalt = Pal.Hex("4B4F66"), walk = Pal.Hex("A9A6B8"), mark = Pal.Hex("F4F1EA");
-
-            // земля, тротуары, разметка
-            Look.RBox("Ground", root, new Vector3(0, -0.05f, Length / 2), new Vector3(40f, 0.1f, 90f), asphalt, 0.02f, true, 0.3f);
-            Look.RBox("WalkL", root, new Vector3(-Half + 1f, 0.012f, Length / 2), new Vector3(2f, 0.02f, Length), walk, 0.01f, false, 0.3f, 0f, false);
-            Look.RBox("WalkR", root, new Vector3(Half - 1f, 0.012f, Length / 2), new Vector3(2f, 0.02f, Length), walk, 0.01f, false, 0.3f, 0f, false);
-            for (float z = 3f; z < Length - 2f; z += 5f)
-                Look.RBox("Mark", root, new Vector3(0, 0.012f, z), new Vector3(0.18f, 0.02f, 2.2f), mark, 0.01f, false, 0.2f, 0f, false);
-
-            // дома по обе стороны: (z от, z до, высота, цвет, вывеска, кто выходит из двери)
-            var left = new[] {
-                new Bld(0, 12, 18, "E8B4A0", "Юридическая консультация", "lawyer"),
-                new Bld(12, 26, 24, "A8C5E0", "Бухгалтерия", "accountant"),
-                new Bld(26, 38, 15, "C9B8E8", "Нотариус", "lawyer"),
-                new Bld(38, 50, 21, "F0D38C", "Шаурма", "any"),
-            };
-            var right = new[] {
-                new Bld(0, 14, 21, "9ED9C4", "Адвокатское бюро", "lawyer"),
-                new Bld(14, 24, 15, "E8A0B8", "Книги", "any"),
-                new Bld(24, 38, 24, "B8C9A0", "Налоги и бухучёт", "accountant"),
-                new Bld(38, 50, 18, "D9C4A8", "Юридический факультет", "lawyer"),
-            };
-            foreach (var b in left) Building(r, b, -1);
-            foreach (var b in right) Building(r, b, 1);
-
-            // бизнес-центр в начале улицы (оттуда выходит стажёр) и глухой дом в конце
-            Look.RBox("BusinessCenter", root, new Vector3(0, 15f, -5f), new Vector3(26f, 30f, 10f), Pal.Hex("7FA6D6"), 0.1f, true, 0.6f);
-            Facade(root, new Vector3(0, 16.5f, -0.02f), new Vector2(26f, 27f), 180f, Pal.Hex("7FA6D6"), 9, 9);
-            Look.RBox("BCDoorFrame", root, new Vector3(0, 1.5f, 0.06f), new Vector3(3.2f, 3.0f, 0.12f), Pal.Hex("2B2D42"), 0.04f, false, 0.6f);
-            Look.RBox("BCDoor", root, new Vector3(0, 1.4f, 0.14f), new Vector3(2.6f, 2.7f, 0.06f), Pal.Hex("BDE7FF"), 0.02f, false, 0.4f, 0.2f);
-            var door = Look.RBox("OfficeDoor", root, new Vector3(0, 1.4f, 0.5f), new Vector3(3.0f, 2.8f, 0.8f), Pal.Hex("BDE7FF"), 0.02f, true, 0f);
-            door.GetComponent<MeshRenderer>().enabled = false;
-            door.GetComponent<BoxCollider>().isTrigger = true;
-            door.AddComponent<CityOfficeDoor>();
-            Sign(root, "CODEZILLA", new Vector3(0, 3.6f, 0.2f), 180f, Pal.Hex("FF4F9A"), 0.05f);
-
-            Look.RBox("EndHouse", root, new Vector3(0, 10f, Length + 4f), new Vector3(26f, 20f, 8f), Pal.Hex("E6C9A8"), 0.1f, true, 0.6f);
-            Facade(root, new Vector3(0, 11.5f, Length + 0.02f), new Vector2(26f, 17f), 0f, Pal.Hex("E6C9A8"), 9, 6);
-            Look.RBox("EndDoor", root, new Vector3(0, 1.1f, Length - 0.04f), new Vector3(1.4f, 2.2f, 0.1f), Pal.Hex("6B4226"), 0.03f, false, 0.6f);
-            Sign(root, "Суд", new Vector3(0, 2.8f, Length - 0.1f), 0f, Pal.Hex("2B2D42"), 0.035f);
-            r.doors.Add(new CityDoor { pos = root.TransformPoint(new Vector3(0, 0, Length - 0.8f)), kind = "lawyer" });
-
-            // фонари и скамейки
-            for (float z = 6f; z < Length; z += 12f)
-                foreach (int side in new[] { -1, 1 })
-                {
-                    var x = side * (Half - 0.35f);
-                    Look.Prim("LampPole", root, PrimitiveType.Cylinder, new Vector3(x, 2f, z), new Vector3(0.12f, 2f, 0.12f), Pal.Hex("2B2D42"), true, 0.6f);
-                    Look.Prim("LampHead", root, PrimitiveType.Sphere, new Vector3(x - side * 0.3f, 4.05f, z), new Vector3(0.45f, 0.3f, 0.45f), Pal.Hex("FFE7A8"), false, 0.4f, 1.2f);
-                }
-            Look.RBox("Bench", root, new Vector3(-Half + 0.45f, 0.25f, 20f), new Vector3(0.5f, 0.5f, 1.8f), Pal.Hex("8C6A4F"), 0.05f, true);
-            Look.RBox("Bench", root, new Vector3(Half - 0.45f, 0.25f, 31f), new Vector3(0.5f, 0.5f, 1.8f), Pal.Hex("8C6A4F"), 0.05f, true);
-            Look.RBox("Bin", root, new Vector3(Half - 0.4f, 0.45f, 9f), new Vector3(0.55f, 0.9f, 0.55f), Pal.Hex("3E7B5A"), 0.08f, true);
-            Look.RBox("Bin", root, new Vector3(-Half + 0.4f, 0.45f, 44f), new Vector3(0.55f, 0.9f, 0.55f), Pal.Hex("3E7B5A"), 0.08f, true);
-
-            r.spawn = new GameObject("CitySpawn").transform; r.spawn.SetParent(root, false); r.spawn.localPosition = new Vector3(0, 0.1f, 2.2f);
-            r.min = root.TransformPoint(new Vector3(-Half + 0.6f, 0, 1.2f));
-            r.max = root.TransformPoint(new Vector3(Half - 0.6f, 0, Length - 1.2f));
-            // невидимые стены по краям, чтобы не выйти за город (крыши и щели между домами)
-            Wall(root, new Vector3(-Half - 0.3f, 3f, Length / 2), new Vector3(0.6f, 6f, Length + 2f));
-            Wall(root, new Vector3(Half + 0.3f, 3f, Length / 2), new Vector3(0.6f, 6f, Length + 2f));
-            return r;
-        }
-
-        struct Bld
-        {
-            public float z0, z1, h; public string color, sign, kind;
-            public Bld(float z0, float z1, float h, string color, string sign, string kind) { this.z0 = z0; this.z1 = z1; this.h = h; this.color = color; this.sign = sign; this.kind = kind; }
-        }
-
-        static void Building(CityRefs r, Bld b, int side)
-        {
-            var root = r.root;
-            float depth = 8f, len = b.z1 - b.z0, zc = (b.z0 + b.z1) / 2f;
-            float xc = side * (Half + depth / 2f), face = side * Half;
-            var c = Pal.Hex(b.color);
-            Look.RBox("House", root, new Vector3(xc, b.h / 2f, zc), new Vector3(depth, b.h, len - 0.2f), c, 0.1f, true, 0.6f);
-            float yaw = side < 0 ? -90f : 90f;
-            // окна выше первого этажа
-            float upper = b.h - 4f;
-            Facade(root, new Vector3(face - side * 0.02f, 4f + upper / 2f, zc), new Vector2(len - 0.6f, upper), yaw, c, Mathf.Max(2, Mathf.RoundToInt(len / 3f)), Mathf.Max(1, Mathf.RoundToInt(upper / 3f)));
-            // первый этаж: тёмная полоса, витрина, дверь, вывеска
-            var band = Color.Lerp(c, Pal.Hex("2B2D42"), 0.55f);
-            Look.RBox("Shop", root, new Vector3(face - side * 0.05f, 1.75f, zc), new Vector3(0.1f, 3.5f, len - 0.6f), band, 0.02f, false, 0.5f);
-            Look.RBox("Window", root, new Vector3(face - side * 0.11f, 1.6f, zc + len * 0.22f), new Vector3(0.04f, 1.9f, len * 0.34f), Pal.Hex("BDE7FF"), 0.02f, false, 0.3f, 0.15f);
-            Look.RBox("Door", root, new Vector3(face - side * 0.11f, 1.1f, zc - len * 0.18f), new Vector3(0.05f, 2.2f, 1.2f), Pal.Hex("6B4226"), 0.02f, false, 0.6f);
-            Sign(root, b.sign, new Vector3(face - side * 0.16f, 3.05f, zc), yaw, Pal.Hex("F4F1EA"), 0.028f);
-            r.doors.Add(new CityDoor { pos = root.TransformPoint(new Vector3(face - side * 0.8f, 0, zc - len * 0.18f)), kind = b.kind });
-        }
-
-        static void Sign(Transform root, string text, Vector3 pos, float yaw, Color c, float size)
-        {
-            var t = OfficeBuilder.Label(text, pos, size, c, root, yaw);
-            t.fontStyle = FontStyle.Bold;
-        }
-
-        static void Wall(Transform root, Vector3 pos, Vector3 size)
-        {
-            var go = new GameObject("CityBounds"); go.transform.SetParent(root, false); go.transform.localPosition = pos;
-            go.AddComponent<BoxCollider>().size = size;
-        }
-
-        // Стена с окнами: квад с текстурой «окно на фоне стены», повторённой по этажам и пролётам
-        static void Facade(Transform root, Vector3 pos, Vector2 size, float yaw, Color wall, int cols, int rows)
-        {
-            var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            q.name = "Facade"; UnityEngine.Object.Destroy(q.GetComponent<Collider>());
-            q.transform.SetParent(root, false);
-            q.transform.localPosition = pos; q.transform.localRotation = Quaternion.Euler(0, yaw, 0);
-            q.transform.localScale = new Vector3(size.x, size.y, 1f);
-            var m = FacadeMat(wall);
-            var inst = new Material(m) { mainTextureScale = new Vector2(cols, rows) };
-            var mr = q.GetComponent<MeshRenderer>(); mr.sharedMaterial = inst; mr.shadowCastingMode = ShadowCastingMode.Off;
-        }
-
-        static Material FacadeMat(Color wall)
-        {
-            string key = ColorUtility.ToHtmlStringRGB(wall);
-            Material m;
-            if (facades.TryGetValue(key, out m) && m != null) return m;
-            const int n = 32;
-            var tex = new Texture2D(n, n, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear, name = "Facade_" + key };
-            var glass = Pal.Hex("5E7FB8"); var frame = Color.Lerp(wall, Color.white, 0.35f); var sill = Color.Lerp(wall, Pal.Hex("2B2D42"), 0.25f);
-            var px = new Color[n * n];
-            for (int y = 0; y < n; y++)
-                for (int x = 0; x < n; x++)
-                {
-                    Color col = wall;
-                    bool inFrame = x >= 7 && x < 25 && y >= 8 && y < 26;
-                    bool inGlass = x >= 9 && x < 23 && y >= 10 && y < 24;
-                    if (inFrame) col = frame;
-                    if (inGlass) col = Color.Lerp(glass, Color.white, (y - 10) / 40f + ((x + y) % 11 == 0 ? 0.25f : 0f));
-                    if (y >= 6 && y < 8 && x >= 5 && x < 27) col = sill;
-                    px[y * n + x] = col;
-                }
-            tex.SetPixels(px); tex.Apply(true);
-            var sh = GraphicsSettings.currentRenderPipeline != null ? GraphicsSettings.currentRenderPipeline.defaultShader : Shader.Find("Standard");
-            m = new Material(sh) { name = "Facade_" + key, mainTexture = tex, color = Color.white };
-            if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.2f);
-            facades[key] = m;
-            return m;
-        }
-    }
-
-    // Дверь бизнес-центра в городе: вернуться в офис раньше времени
-    public class CityOfficeDoor : Interactable
-    {
-        public override string Prompt { get { return "[E] Вернуться в офис"; } }
-        public override void Interact(GameRoot g) { g.EndLunch(false); }
-    }
-
     // Дверь из офиса на обед
     public class ExitDoor : Interactable
     {
@@ -201,119 +22,296 @@ namespace Intern.Game
         public override void Interact(GameRoot g) { g.TryStartLunch(); }
     }
 
+    // Итоги одного обеда
+    public class LunchReport
+    {
+        public int coins, kills, escaped, hidden, fines, spent, bestSeries, lost, techHits, hpLeft;
+        public bool knockedOut, coupon, deanMet, earlyReturn;
+        public float seconds;
+    }
+
     // ======================= один обед =======================
     public class LunchRun
     {
-        public const int Cap = 60, MaxAlive = 10, Reward = 10, Penalty = 20;
-        public const float SpawnEvery = 8f;
+        static BalanceData B { get { return Balance.D; } }
+        public int Cap { get { return B.cap; } }
 
         public readonly float duration;
         public float timeLeft;
-        public int coins, kills, fines, spawned, escaped;
+        public int coins, kills, fines, spawned, escaped, hidden, spent, techHits, bestSeries;
         public bool Paused;
-        // серия для HUD: «+30» рядом со счётчиком, пока бьёшь без пауз
         public int series; public float seriesAt = -99f;
         public int penaltyShown; public float penaltyAt = -99f;
         public Action<string> Say;
+        public Action<string> Coupon;
+
+        // здоровье стажёра
+        public int hp, maxHp;
+        public float hurtAt = -99f, stunUntil, slowUntil, energyUntil;
+        public bool knockedOut, hoodie, couponDropped, deanMet;
+        public int Filming { get; private set; }
 
         readonly CityRefs city;
         readonly Func<Vector3> playerPos;
+        readonly Func<Transform> cam;
         readonly List<CityNpc> npcs = new List<CityNpc>();
-        readonly System.Random rnd = new System.Random();
-        float spawnT;
+        readonly List<CitizenDef> hiddenInArchive = new List<CitizenDef>();
+        readonly List<GameObject> tracked = new List<GameObject>();
+        public readonly System.Random Rnd = new System.Random();
+        float spawnT, deanAt = -1f, lodT;
+        // замер FPS за обед (S2-12): средний и худший 1% кадров
+        readonly List<float> frames = new List<float>(8192);
+        public int MaxAlive { get; private set; }
 
-        public LunchRun(CityRefs city, float seconds, Func<Vector3> playerPos)
+        public LunchRun(CityRefs city, float seconds, Func<Vector3> playerPos, Func<Transform> cam, bool hoodie)
         {
-            this.city = city; duration = timeLeft = seconds; this.playerPos = playerPos;
-            for (int i = 0; i < 6; i++) Spawn(true);
-            spawnT = SpawnEvery;
+            this.city = city; duration = timeLeft = seconds; this.playerPos = playerPos; this.cam = cam; this.hoodie = hoodie;
+            maxHp = hp = B.playerHp;
+            // сразу на улицах: гуманитарии в переулках и на площади, технари на проспекте
+            for (int i = 0; i < 10; i++) SpawnHumanitarian(true);
+            for (int i = 0; i < 4; i++) SpawnTechie(true);
+            spawnT = B.spawnEvery;
+            if (Rnd.NextDouble() < B.deanChance) deanAt = Mathf.Lerp(60f, Mathf.Max(90f, seconds - 90f), (float)Rnd.NextDouble());
         }
 
-        public int Alive { get { int n = 0; foreach (var c in npcs) if (c != null && c.Alive) n++; return n; } }
-        public bool Over { get { return timeLeft <= 0f; } }
-        public Vector3 PlayerPos { get { return playerPos(); } }
         public CityRefs City { get { return city; } }
+        public Vector3 PlayerPos { get { return playerPos(); } }
+        public bool Over { get { return timeLeft <= 0f || knockedOut; } }
+        public float Elapsed { get { return duration - timeLeft; } }
+        public int AliveHumanitarians { get { int n = 0; foreach (var c in npcs) if (c != null && c.Alive && c.Humanitarian) n++; return n; } }
+        public int AliveTechies { get { int n = 0; foreach (var c in npcs) if (c != null && c.Alive && !c.Humanitarian) n++; return n; }  }
+        public int Left { get { return Mathf.Max(0, Cap - spawned); } }
+        public float NoticeRange { get { return B.noticeRange * (Filming > 0 ? 2f : 1f); } }
+        public float PlayerSpeedMul
+        {
+            get
+            {
+                if (Time.time < stunUntil) return 0f;
+                float m = Time.time < slowUntil ? 0.5f : 1f;
+                if (Time.time < energyUntil) m *= 1f + B.energySpeed;
+                return m;
+            }
+        }
 
         public void Tick(float dt)
         {
             if (Paused) return;
+            frames.Add(Time.unscaledDeltaTime);
             timeLeft = Mathf.Max(0f, timeLeft - dt);
             spawnT -= dt;
             if (spawnT <= 0f)
             {
-                spawnT = SpawnEvery;
-                if (Alive < MaxAlive && spawned < Cap) Spawn(false);
+                spawnT = B.spawnEvery;
+                if (AliveHumanitarians < B.maxHumanitarians && spawned < Cap) SpawnHumanitarian(false);
+                if (AliveTechies < B.maxTechies && Rnd.NextDouble() < 0.6) SpawnTechie(false);
             }
+            if (deanAt > 0f && Elapsed >= deanAt) { deanAt = -1f; SpawnDean(); }
             if (series > 0 && Time.unscaledTime - seriesAt > 2.2f) series = 0;
+            npcs.RemoveAll(n => n == null);
+            int film = 0; foreach (var n in npcs) if (n.Alive && n.State == CityNpc.St.Film) film++;
+            Filming = film;
+            MaxAlive = Mathf.Max(MaxAlive, npcs.Count);
+            // подписи над головами — только у тех, кто рядом
+            lodT -= dt;
+            if (lodT <= 0f)
+            {
+                lodT = 0.3f; var p = playerPos();
+                foreach (var n in npcs) if (n.Alive) n.SetLabel((n.transform.position - p).sqrMagnitude < 28f * 28f);
+            }
         }
 
-        // На улице (в начале обеда) или из двери подальше от игрока
-        void Spawn(bool onStreet)
+        // ---------- кто и где появляется ----------
+        // Точка появления вне поля зрения: из дверей контор и из концов переулков
+        Vector3? SpawnPoint(string street, bool initial)
         {
-            if (spawned >= Cap) return;
-            bool accountant = rnd.NextDouble() < 0.25;
-            string want = accountant ? "accountant" : "lawyer";
-            Vector3 pos; var p = playerPos();
-            if (onStreet)
-            {
-                pos = Vector3.zero;
-                for (int tries = 0; tries < 20; tries++)
-                {
-                    pos = new Vector3(Mathf.Lerp(city.min.x, city.max.x, (float)rnd.NextDouble()), 0, Mathf.Lerp(city.min.z + 8f, city.max.z, (float)rnd.NextDouble()));
-                    if ((pos - p).sqrMagnitude > 100f) break;
-                }
-            }
+            var p = playerPos(); var c = cam != null ? cam() : null;
+            var cands = new List<Vector3>();
+            if (initial) { for (int i = 0; i < 12; i++) cands.Add(city.RandomNode(Rnd, street) + new Vector3((float)Rnd.NextDouble() * 4f - 2f, 0, (float)Rnd.NextDouble() * 4f - 2f)); }
             else
             {
-                var best = new List<CityDoor>();
-                foreach (var d in city.doors) if ((d.kind == want || d.kind == "any") && (d.pos - p).sqrMagnitude > 144f) best.Add(d);
-                if (best.Count == 0) foreach (var d in city.doors) if ((d.pos - p).sqrMagnitude > 64f) best.Add(d);
-                if (best.Count == 0) return;
-                pos = best[rnd.Next(best.Count)].pos;
+                foreach (var d in city.doors) if (d.kind == "door" && (street == null || d.street == street)) cands.Add(d.pos);
+                foreach (var e in city.alleyEnds) if (street == null || city.StreetAt(e) != null && city.StreetAt(e).id == street) cands.Add(e);
             }
-            pos.y = 0f;
-            var npc = CityNpc.Create(this, accountant ? CityNpc.Kind.Accountant : CityNpc.Kind.Lawyer, pos, rnd);
-            npcs.Add(npc);
-            if (!accountant) spawned++;   // в лимит 60 идут только гуманитарии
+            for (int tries = 0; tries < 24 && cands.Count > 0; tries++)
+            {
+                var q = cands[Rnd.Next(cands.Count)];
+                var to = q - p; to.y = 0; float d = to.magnitude;
+                if (d < (initial ? 18f : 14f)) continue;
+                if (c != null && d < 45f)
+                {
+                    var f = c.forward; f.y = 0;
+                    if (Vector3.Dot(f.normalized, to / d) > 0.35f && d < 45f && !initial) continue;   // на глазах не появляются
+                }
+                q.y = 0f; return q;
+            }
+            return null;
         }
 
-        public Vector3 RandomStreetPoint()
+        CitizenDef PickHumanitarian(out string street)
         {
-            return new Vector3(Mathf.Lerp(city.min.x + 0.6f, city.max.x - 0.6f, (float)rnd.NextDouble()), 0, Mathf.Lerp(city.min.z, city.max.z, (float)rnd.NextDouble()));
+            var list = new List<CitizenDef>(); float total = 0f;
+            foreach (var c in B.citizens) if (c.humanitarian && c.weight > 0f) { list.Add(c); total += c.weight; }
+            float r = (float)Rnd.NextDouble() * total;
+            foreach (var c in list) { r -= c.weight; if (r <= 0f) { street = Rnd.NextDouble() < 0.75 ? c.street : null; return c; } }
+            street = null; return list[0];
         }
 
-        // Ближайшая дверь, которая не за спиной у игрока
-        public Vector3 FleeDoor(Vector3 from)
+        void SpawnHumanitarian(bool initial)
+        {
+            if (spawned >= Cap) return;
+            string street; var def = PickHumanitarian(out street);
+            var at = SpawnPoint(street, initial) ?? SpawnPoint(null, initial);
+            if (at == null) return;
+            if (def.id == "critic" && spawned + 3 <= Cap)
+            {
+                // искусствоведы ходят по трое
+                var lead = Add(def, at.Value); spawned++;
+                for (int i = 1; i <= 2; i++) { var f = Add(def, at.Value + new Vector3(i * 0.8f, 0, -0.8f)); f.leader = lead; f.SetScatter(i); spawned++; }
+                return;
+            }
+            if (def.id == "critic") def = Balance.Citizen("lawyer");
+            Add(def, at.Value); spawned++;
+        }
+
+        void SpawnTechie(bool initial)
+        {
+            var list = new List<CitizenDef>(); foreach (var c in B.citizens) if (!c.humanitarian) list.Add(c);
+            if (list.Count == 0) return;
+            var def = list[Rnd.Next(list.Count)];
+            string street = Rnd.NextDouble() < 0.6 ? (Rnd.NextDouble() < 0.5 ? "av" : "square") : null;
+            var at = SpawnPoint(street, initial) ?? SpawnPoint(null, initial);
+            if (at != null) Add(def, at.Value);
+        }
+
+        void SpawnDean()
+        {
+            var def = Balance.Citizen("dean"); if (def == null) return;
+            var at = SpawnPoint("uni", false) ?? SpawnPoint(null, false); if (at == null) return;
+            Add(def, at.Value); deanMet = true;
+            if (Say != null) Say("В городе декан гумфака! 300 здоровья, за него купон −20% в мастерской.");
+        }
+
+        CityNpc Add(CitizenDef def, Vector3 at)
+        {
+            var n = CityNpc.Create(this, def, at, Rnd);
+            npcs.Add(n); return n;
+        }
+
+        // Юрист позвонил коллегам: через 10 с прибегает второй, с портфелем
+        public void CallColleague(CityNpc from)
+        {
+            if (spawned >= Cap) return;
+            var def = Balance.Citizen("lawyer"); if (def == null) return;
+            var near = FleeDoor(from != null ? from.transform.position : playerPos(), 0);
+            var n = Add(def, near); spawned++;
+            n.colleague = true; n.Alert();
+            if (Say != null) Say("Прибежал коллега юриста — с портфелем наперевес.");
+        }
+
+        // Стихи: соседи-гуманитарии идут послушать
+        public void PoemAt(Vector3 at, CityNpc poet)
+        {
+            foreach (var n in npcs) if (n != poet && n.Alive && n.Calm && (n.transform.position - at).sqrMagnitude < 22f * 22f) n.Listen(at);
+        }
+
+        // Выстрел: кто слышит — пугается; спрятавшиеся в архиве выходят на шум
+        public void Noise(Vector3 at, float radius)
+        {
+            if (radius <= 0f) return;
+            foreach (var n in npcs) if (n.Alive && (n.transform.position - at).sqrMagnitude < radius * radius) n.Hear(at);
+            if (hiddenInArchive.Count > 0 && city.archiveDoor != Vector3.zero && (city.archiveDoor - at).sqrMagnitude < (radius + 12f) * (radius + 12f))
+            {
+                foreach (var def in hiddenInArchive) { var n = Add(def, city.archiveDoor); n.Curious(at); }
+                if (Say != null) Say("Из архива выглянули историки: что за шум?");
+                hidden -= hiddenInArchive.Count; hiddenInArchive.Clear();
+            }
+        }
+
+        // Ближайшая дверь, которая не за спиной у стажёра (skip — искусствоведы разбегаются в разные стороны)
+        public Vector3 FleeDoor(Vector3 from, int skip)
         {
             var p = playerPos(); p.y = 0;
-            Vector3 best = from; float bestScore = float.MaxValue;
+            var scored = new List<KeyValuePair<float, Vector3>>();
             foreach (var d in city.doors)
             {
+                if (d.kind != "door" || !d.open) continue;
                 var toDoor = d.pos - from; toDoor.y = 0;
                 var toPlayer = p - from; toPlayer.y = 0;
                 float score = toDoor.magnitude;
-                if (toPlayer.sqrMagnitude > 0.01f && Vector3.Dot(toDoor.normalized, toPlayer.normalized) > 0.2f) score += 60f;   // бежать мимо игрока — плохая идея
-                if (score < bestScore) { bestScore = score; best = d.pos; }
+                if (toPlayer.sqrMagnitude > 0.01f && Vector3.Dot(toDoor.normalized, toPlayer.normalized) > 0.2f) score += 60f;   // бежать мимо стажёра — плохая идея
+                scored.Add(new KeyValuePair<float, Vector3>(score, d.pos));
             }
-            return best;
+            if (scored.Count == 0) return from;
+            scored.Sort((a, b) => a.Key.CompareTo(b.Key));
+            return scored[Mathf.Min(skip * 2, scored.Count - 1)].Value;
         }
 
+        // ---------- стажёр ----------
+        public void HurtPlayer(int dmg, Vector3 from, float stun, float slow)
+        {
+            if (knockedOut || Paused) return;
+            if (hoodie) dmg = Mathf.RoundToInt(dmg * (1f - B.hoodieArmor));
+            hp = Mathf.Max(0, hp - dmg); hurtAt = Time.unscaledTime;
+            if (stun > 0f) stunUntil = Mathf.Max(stunUntil, Time.time + stun);
+            if (slow > 0f) slowUntil = Mathf.Max(slowUntil, Time.time + slow);
+            if (hp <= 0) knockedOut = true;
+        }
+        public void SlowPlayer(float seconds) { slowUntil = Mathf.Max(slowUntil, Time.time + seconds); hurtAt = Time.unscaledTime - 0.3f; }
+        public void Heal(int n) { hp = Mathf.Min(maxHp, hp + n); }
+        public void Energy() { energyUntil = Time.time + B.energySeconds; }
+
+        // ---------- счёт ----------
         public void OnKill(CityNpc n)
         {
-            coins += Reward; kills++;
-            series += Reward; seriesAt = Time.unscaledTime;
+            if (!n.Humanitarian) return;
+            coins += B.reward; kills++;
+            series += B.reward; seriesAt = Time.unscaledTime;
+            bestSeries = Mathf.Max(bestSeries, series);
+            if (n.Type == "dean" && !couponDropped) { couponDropped = true; if (Coupon != null) Coupon("Декан повержен! Купон «−20% в мастерской» — твой."); }
         }
 
-        public void OnWrongHit(CityNpc n)
+        public void OnWrongHit(CityNpc n, string cry)
         {
-            coins -= Penalty; fines += Penalty;
-            penaltyShown = Penalty; penaltyAt = Time.unscaledTime;
-            if (Say != null) Say("«Я же бухгалтер!» Это технарь: штраф " + Penalty + " монет.");
+            coins -= B.penalty; fines += B.penalty; techHits++;
+            penaltyShown = B.penalty; penaltyAt = Time.unscaledTime;
+            if (Say != null) Say("«" + cry + "» Это технарь: штраф " + B.penalty + " монет.");
         }
 
-        public void OnEscaped(CityNpc n) { escaped++; npcs.Remove(n); }
+        public void OnEscaped(CityNpc n)
+        {
+            if (n.Humanitarian) escaped++;
+            npcs.Remove(n); UnityEngine.Object.Destroy(n.gameObject);
+        }
+
+        public void OnHidden(CityNpc n)
+        {
+            hidden++; hiddenInArchive.Add(n.def);
+            npcs.Remove(n); UnityEngine.Object.Destroy(n.gameObject);
+        }
+
+        // Покупки в городе: сначала из монет обеда, потом из кошелька
+        public int SpendFromLunch(int price) { int take = Mathf.Clamp(coins, 0, price); coins -= take; spent += price; return price - take; }
+
+        public void Track(GameObject go) { tracked.RemoveAll(g => g == null); tracked.Add(go); }
 
         public void SetPaused(bool p) { Paused = p; }
+
+        // Средний FPS и FPS худшего 1% кадров
+        public string PerfLine()
+        {
+            if (frames.Count < 30) return "мало кадров";
+            var f = new List<float>(frames); f.Sort();
+            float sum = 0f; foreach (var x in f) sum += x;
+            float avg = f.Count / Mathf.Max(0.001f, sum);
+            int n = Mathf.Max(1, f.Count / 100); float worst = 0f; for (int i = f.Count - n; i < f.Count; i++) worst += f[i];
+            return "средний FPS " + Mathf.RoundToInt(avg) + ", худший 1% — " + Mathf.RoundToInt(n / Mathf.Max(0.001f, worst)) + " FPS, кадров " + f.Count + ", горожан одновременно до " + MaxAlive;
+        }
+
+        public LunchReport Report(bool early)
+        {
+            return new LunchReport { coins = coins, kills = kills, escaped = escaped, hidden = hidden, fines = fines, spent = spent, bestSeries = bestSeries,
+                                     techHits = techHits, hpLeft = hp, knockedOut = knockedOut, coupon = couponDropped, deanMet = deanMet, seconds = Elapsed, earlyReturn = early };
+        }
 
         // Только для проверки в редакторе: ближайший живой горожанин встаёт перед игроком
         public void DebugPull(Vector3 at, float yaw)
@@ -326,152 +324,10 @@ namespace Intern.Game
         public void Cleanup()
         {
             foreach (var n in npcs) if (n != null) UnityEngine.Object.Destroy(n.gameObject);
-            npcs.Clear();
+            npcs.Clear(); hiddenInArchive.Clear();
+            foreach (var g in tracked) if (g != null) UnityEngine.Object.Destroy(g);
+            tracked.Clear();
             Gore.Clear();
-        }
-    }
-
-    // ======================= горожанин =======================
-    public class CityNpc : MonoBehaviour
-    {
-        public enum Kind { Lawyer, Accountant }
-        enum St { Walk, Flee, Dead }
-
-        static readonly string[] Models = { "Dev1", "Dev2", "Dev3", "Dev4" };
-
-        public Kind kind;
-        public int hp;
-        LunchRun run;
-        CharacterAnim anim;
-        St st;
-        Vector3 target;
-        float speed, yaw, idleUntil, frozenUntil;
-        bool hitOnce;
-
-        public bool Alive { get { return st != St.Dead; } }
-        public bool Humanitarian { get { return kind == Kind.Lawyer; } }
-
-        public static CityNpc Create(LunchRun run, Kind kind, Vector3 pos, System.Random rnd)
-        {
-            string model = Models[rnd.Next(Models.Length)];
-            var ap = new Appearance { skin = rnd.Next(6), eyes = rnd.Next(4), mouth = 2, emotion = 0 };
-            if (kind == Kind.Lawyer) { ap.topColor = 8; ap.pants = 1; ap.tie = 2; ap.shoes = 8; }
-            else { ap.topColor = 7; ap.pants = 9; ap.tie = 4; ap.shoes = 9; }
-            float yaw0 = (float)rnd.NextDouble() * 360f;
-            CharacterAnim a;
-            if (ModelLib.HasCharacter(model)) { a = CharacterAnim.Spawn(model, run.City.root, pos, yaw0, null); a.Tint(ap); a.SetEmotion(0); }
-            else a = Look.Bean(model, run.City.root, pos - run.City.root.position, yaw0, ap);
-            a.transform.position = pos;
-            var n = a.gameObject.AddComponent<CityNpc>();
-            n.run = run; n.anim = a; n.kind = kind; n.yaw = yaw0;
-            n.hp = kind == Kind.Lawyer ? 60 : 9999;
-            var cap = a.gameObject.AddComponent<CapsuleCollider>(); cap.center = new Vector3(0, 0.95f, 0); cap.height = 1.9f; cap.radius = 0.32f;
-            n.AddProp();
-            var tag = OfficeBuilder.Label(kind == Kind.Lawyer ? "Юрист" : "Бухгалтер", new Vector3(0, 2.35f, 0), 0.02f,
-                                          kind == Kind.Lawyer ? Pal.Hex("FF4F9A") : Pal.Hex("89D185"), a.transform);
-            tag.gameObject.AddComponent<Billboard>();
-            n.target = run.RandomStreetPoint();
-            n.speed = 1.2f;
-            return n;
-        }
-
-        // Портфель у юриста, калькулятор у бухгалтера — в правой руке
-        void AddProp()
-        {
-            var hand = anim.elbowR != null ? anim.elbowR : transform;
-            if (kind == Kind.Lawyer)
-                Look.RBox("Briefcase", hand, new Vector3(0, -0.32f, 0.02f), new Vector3(0.1f, 0.3f, 0.42f), Pal.Hex("6B4226"), 0.03f, false, 0.6f);
-            else
-                Look.RBox("Calculator", hand, new Vector3(0, -0.3f, 0.08f), new Vector3(0.14f, 0.2f, 0.03f), Pal.Hex("4A4A5E"), 0.02f, false, 0.6f);
-        }
-
-        void Update()
-        {
-            if (st == St.Dead || run == null) return;
-            if (run.Paused || Time.time < frozenUntil) { anim.moveSpeed = 0f; return; }
-            float dt = Time.deltaTime;
-            var p = run.PlayerPos; p.y = 0;
-            var me = transform.position; me.y = 0;
-            // юрист замечает стажёра с ножом и убегает к ближайшей двери
-            if (st == St.Walk && Humanitarian && (p - me).sqrMagnitude < 8f * 8f) Flee();
-            if (st == St.Walk && Time.time < idleUntil) { anim.moveSpeed = 0f; return; }
-
-            var to = target - me; to.y = 0;
-            float dist = to.magnitude;
-            if (dist < 0.4f)
-            {
-                if (st == St.Flee) { run.OnEscaped(this); Destroy(gameObject); return; }
-                target = run.RandomStreetPoint(); idleUntil = Time.time + UnityEngine.Random.Range(0.5f, 2.5f);
-                return;
-            }
-            var dir = to / dist;
-            float want = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
-            yaw = Mathf.MoveTowardsAngle(yaw, want, 540f * dt);
-            transform.rotation = Quaternion.Euler(0, yaw, 0);
-            transform.position = me + dir * Mathf.Min(dist, speed * dt);
-            anim.moveSpeed = speed;
-        }
-
-        void Flee()
-        {
-            if (st == St.Dead) return;
-            st = St.Flee; target = run.FleeDoor(transform.position);
-            speed = kind == Kind.Lawyer ? 4.4f : 3.4f;
-            anim.React(3, 3f);
-            idleUntil = 0f;
-        }
-
-        public void DebugPlace(Vector3 at, float yaw)
-        {
-            at.y = 0f; transform.position = at; transform.rotation = Quaternion.Euler(0, yaw, 0); this.yaw = yaw;
-            target = at; idleUntil = Time.time + 3f; frozenUntil = Time.time + 15f; st = St.Walk;
-        }
-
-        public void Hit(int damage, Vector3 from)
-        {
-            if (st == St.Dead) return;
-#if UNITY_EDITOR
-            Debug.Log("[Стажёр] Удар по " + kind + ": " + hp + " → " + (kind == Kind.Lawyer ? hp - damage : hp));
-#endif
-            Gore.Hit(transform.position + Vector3.up * 1.2f, (transform.position - from).normalized);
-            if (kind == Kind.Accountant)
-            {
-                if (!hitOnce) { hitOnce = true; run.OnWrongHit(this); }
-                anim.React(5, 2f);
-                Flee();
-                return;
-            }
-            hp -= damage;
-            anim.React(4, 1.5f);
-            if (hp <= 0) Die(from);
-            else if (st != St.Flee) Flee();
-        }
-
-        void Die(Vector3 from)
-        {
-            st = St.Dead;
-            anim.moveSpeed = 0f;
-            foreach (var c in GetComponents<Collider>()) c.enabled = false;
-            var tag = GetComponentInChildren<TextMesh>(); if (tag != null) tag.gameObject.SetActive(false);
-            run.OnKill(this);
-            StartCoroutine(Fall());
-        }
-
-        IEnumerator Fall()
-        {
-            var start = transform.rotation;
-            var end = start * Quaternion.Euler(-88f, 0, 0);   // падает на спину
-            for (float t = 0; t < 1f; t += Time.deltaTime / 0.4f)
-            {
-                float k = t * t;
-                transform.rotation = Quaternion.Slerp(start, end, k);
-                yield return null;
-            }
-            transform.rotation = end;
-            anim.enabled = false;
-            Gore.Pool(transform.position + transform.up * -0.4f + Vector3.up * 0.02f);
-            yield return new WaitForSeconds(20f);
-            Destroy(gameObject);
         }
     }
 
@@ -485,26 +341,42 @@ namespace Intern.Game
         public static void Hit(Vector3 pos, Vector3 dir)
         {
             if (!Enabled) return;
-            var mat = Look.FxMat(new Color(0.55f, 0.03f, 0.05f, 1f), true, false);
+            Burst(pos, dir, new Color(0.62f, 0.04f, 0.06f, 1f), 28, 1.2f);
+            // пятно на асфальте под местом удара
+            Pool(new Vector3(pos.x, 0.02f, pos.z) + new Vector3(dir.x, 0, dir.z).normalized * 0.4f, 0.35f);
+            // брызги на стене, если она рядом за спиной у жертвы
+            RaycastHit h; var d = dir; if (d.sqrMagnitude < 0.01f) return; d.Normalize();
+            int mask = Physics.DefaultRaycastLayers & ~(1 << 2);
+            if (Physics.Raycast(pos + d * 0.45f, d, out h, 2.8f, mask, QueryTriggerInteraction.Ignore) && h.collider.GetComponentInParent<CityNpc>() == null && Mathf.Abs(h.normal.y) < 0.5f)
+                Splat(h.point + h.normal * 0.02f, h.normal, UnityEngine.Random.Range(0.35f, 0.7f));
+        }
+
+        // Пыль от пули в стену
+        public static void Dust(Vector3 pos, Vector3 normal)
+        {
+            Burst(pos, normal, new Color(0.75f, 0.72f, 0.68f, 1f), 10, 0.2f);
+        }
+
+        static void Burst(Vector3 pos, Vector3 dir, Color c, int count, float gravity)
+        {
+            var mat = Look.FxMat(c, true, false);
             if (mat == null) return;
-            var go = new GameObject("BloodHit"); go.transform.position = pos;
+            var go = new GameObject("Burst"); go.transform.position = pos;
             var ps = go.AddComponent<ParticleSystem>();
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = ps.main;
-            main.loop = false; main.duration = 0.2f; main.startLifetime = new ParticleSystem.MinMaxCurve(0.4f, 0.8f);
+            main.loop = false; main.duration = 0.2f; main.startLifetime = new ParticleSystem.MinMaxCurve(0.3f, 0.7f);
             main.startSpeed = new ParticleSystem.MinMaxCurve(1.5f, 4f);
             main.startSize = new ParticleSystem.MinMaxCurve(0.04f, 0.1f);
-            main.startColor = new Color(0.62f, 0.04f, 0.06f, 1f);
-            main.gravityModifier = 1.2f; main.maxParticles = 60;
+            main.startColor = c;
+            main.gravityModifier = gravity; main.maxParticles = 60;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
-            var em = ps.emission; em.rateOverTime = 0f; em.SetBursts(new[] { new ParticleSystem.Burst(0f, 28) });
+            var em = ps.emission; em.rateOverTime = 0f; em.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)count) });
             var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Cone; sh.angle = 35f; sh.radius = 0.05f;
             if (dir.sqrMagnitude > 0.01f) go.transform.rotation = Quaternion.LookRotation(dir);
             var pr = go.GetComponent<ParticleSystemRenderer>(); pr.sharedMaterial = mat; pr.renderMode = ParticleSystemRenderMode.Billboard;
             ps.Play();
             UnityEngine.Object.Destroy(go, 2f);
-            // пятно на асфальте под местом удара
-            Pool(new Vector3(pos.x, 0.02f, pos.z) + dir * 0.4f, 0.35f);
         }
 
         // Лужа, которая растекается за пару секунд
@@ -516,12 +388,33 @@ namespace Intern.Game
             var mesh = Look.Quad(new Vector3(-1, 0, -1), new Vector3(1, 0, -1), new Vector3(-1, 0, 1), new Vector3(1, 0, 1));
             var go = Look.FxObject("BloodPool", null, mesh, mat);
             if (go == null) return;
-            pos.y = 0.015f + pools.Count * 0.0002f;
+            pos.y = 0.015f + (pools.Count % 50) * 0.0003f;
             go.transform.position = pos;
             go.transform.rotation = Quaternion.Euler(0, UnityEngine.Random.Range(0f, 360f), 0);
             var grow = go.AddComponent<PoolGrow>(); grow.target = radius * UnityEngine.Random.Range(0.8f, 1.2f);
+            Keep(go);
+        }
+
+        // Пятно на стене
+        static void Splat(Vector3 pos, Vector3 normal, float size)
+        {
+            var mat = Look.FxMat(new Color(0.45f, 0.02f, 0.04f, 0.85f), true, false);
+            if (mat == null) return;
+            var mesh = Look.Quad(new Vector3(-1, -1, 0), new Vector3(1, -1, 0), new Vector3(-1, 1, 0), new Vector3(1, 1, 0));
+            var go = Look.FxObject("BloodSplat", null, mesh, mat);
+            if (go == null) return;
+            go.transform.position = pos;
+            go.transform.rotation = Quaternion.LookRotation(-normal) * Quaternion.Euler(0, 0, UnityEngine.Random.Range(0f, 360f));
+            var grow = go.AddComponent<PoolGrow>(); grow.target = size; grow.speed = 6f;
+            Keep(go);
+        }
+
+        // Не больше 64 пятен: старые плавно тают
+        static void Keep(GameObject go)
+        {
+            pools.RemoveAll(p => p == null);
             pools.Add(go);
-            while (pools.Count > MaxPools) { if (pools[0] != null) UnityEngine.Object.Destroy(pools[0]); pools.RemoveAt(0); }
+            if (pools.Count > MaxPools) { var old = pools[0]; pools.RemoveAt(0); var g = old.GetComponent<PoolGrow>(); if (g != null) g.Fade(); else UnityEngine.Object.Destroy(old); }
         }
 
         public static void Clear()
@@ -533,41 +426,21 @@ namespace Intern.Game
 
     public class PoolGrow : MonoBehaviour
     {
-        public float target = 0.9f;
-        float t;
+        public float target = 0.9f, speed = 0.5f;
+        float t, fade = -1f;
+        public void Fade() { fade = 1f; }
         void Update()
         {
+            if (fade >= 0f)
+            {
+                fade -= Time.deltaTime; transform.localScale = Vector3.one * Mathf.Max(0.01f, target * fade);
+                if (fade <= 0f) Destroy(gameObject);
+                return;
+            }
             if (t >= 1f) return;
-            t = Mathf.Min(1f, t + Time.deltaTime / 2f);
+            t = Mathf.Min(1f, t + Time.deltaTime * speed);
             float k = 1f - (1f - t) * (1f - t);
             transform.localScale = Vector3.one * Mathf.Max(0.05f, target * k);
         }
-    }
-
-    // ======================= нож =======================
-    public class Knife
-    {
-        public const int Damage = 25;
-        public const float Cooldown = 0.45f, Reach = 1.1f, Radius = 0.9f;
-        GameObject model;
-        float nextAt;
-
-        public void Attach(CharacterAnim avatar)
-        {
-            if (model != null) return;
-            var hand = avatar != null && avatar.elbowR != null ? avatar.elbowR : null;
-            if (hand == null) return;
-            model = new GameObject("Knife");
-            model.transform.SetParent(hand, false);
-            model.transform.localPosition = new Vector3(0, -0.3f, 0.03f);
-            Look.RBox("Handle", model.transform, new Vector3(0, 0, 0.02f), new Vector3(0.035f, 0.035f, 0.12f), Pal.Hex("2B2D42"), 0.01f, false, 0.6f);
-            Look.RBox("Blade", model.transform, new Vector3(0, 0.005f, 0.16f), new Vector3(0.012f, 0.045f, 0.17f), Pal.Hex("D8DCE8"), 0.004f, false, 0.6f, 0.15f);
-            foreach (var t in model.GetComponentsInChildren<Transform>()) t.gameObject.layer = 2;
-        }
-
-        public void Show(bool on) { if (model != null) model.SetActive(on); }
-
-        public bool Ready { get { return Time.time >= nextAt; } }
-        public void Used() { nextAt = Time.time + Cooldown; }
     }
 }
