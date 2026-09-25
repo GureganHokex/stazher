@@ -263,6 +263,9 @@ namespace Intern.Game
                 case "warning":
                     Poly(p, true, P(.5f, .1f), P(.92f, .86f), P(.08f, .86f)); p.Stroke(); Seg(p, P(.5f, .38f), P(.5f, .6f));
                     p.BeginPath(); p.Arc(P(.5f, .73f), s * .04f, 0, 360); p.Fill(); break;
+                case "clock":   // циферблат со стрелками
+                    p.BeginPath(); p.Arc(P(.5f, .5f), s * .38f, 0, 360); p.Stroke();
+                    Seg(p, P(.5f, .5f), P(.5f, .26f)); Seg(p, P(.5f, .5f), P(.68f, .6f)); break;
                 case "coin":
                     p.BeginPath(); p.Arc(P(.5f, .5f), s * .4f, 0, 360); p.Fill();
                     p.strokeColor = new Color(0, 0, 0, 0.35f); p.BeginPath(); p.Arc(P(.5f, .5f), s * .24f, 0, 360); p.Stroke(); break;

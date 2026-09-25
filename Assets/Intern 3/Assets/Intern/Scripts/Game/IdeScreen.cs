@@ -26,6 +26,8 @@ namespace Intern.Game
         readonly Func<Vector2, Vector2?> screenToPanel;   // координаты мыши на экране (как в OnGUI) → точка на панели
 
         // части интерфейса
+        Label statusClock, statusStrikes;
+        int lastClockMin = -1;
         Label commandCenter, crumbs, statusPos, statusErr, statusWarn, statusMode, statusMoney, statusLang, statusIndent, chipMoney, chipRank, chipDiff, chipDeadline, tabName, sideTitle, rightTitle;
         VisualElement statusBar, tabDot, debugBar, noticeBox, deadlineChip, bottomTabsRow, rightBar, bottomPanel, tabIconHost;
         Label debugState;
@@ -468,6 +470,8 @@ namespace Intern.Game
             foreach (var s in new[] { "UTF-8", "LF" }) { var it = SItem(); it.Add(STxt(s)); statusBar.Add(it); }
             var py = SItem(); statusLang = STxt("{ } Python 3"); py.Add(statusLang); statusBar.Add(py);
             var mo = SItem(); mo.Add(new Icon("coin", K.Sun, 14f)); statusMoney = STxt(""); mo.Add(statusMoney); statusBar.Add(mo);
+            var sk = SItem(); sk.Add(new Icon("warning", Color.white, 14f)); statusStrikes = STxt(""); sk.Add(statusStrikes); statusBar.Add(sk);
+            var ck = SItem(); ck.Add(new Icon("clock", Color.white, 14f)); statusClock = STxt(""); ck.Add(statusClock); statusBar.Add(ck);
             var bell = SItem(); bell.Add(new Icon("bell", Color.white, 14f)); statusBar.Add(bell);
             return statusBar;
         }
@@ -538,6 +542,12 @@ namespace Intern.Game
         {
             SetText(statusPos, "Стр. " + (ed.CurL + 1) + ", стлб. " + (ed.CurC + 1));
             SetText(statusMoney, g.Save.money.ToString());
+            if (g.Work != null)
+            {
+                SetText(statusClock, g.Work.Clock);
+                SetText(statusStrikes, g.Work.Strikes > 0 ? "Выговоры " + g.Work.Strikes + "/" + g.Work.StrikeLimit : "0");
+                lastClockMin = Mathf.FloorToInt(g.Work.Minute);
+            }
             SetText(statusErr, (Task != null ? ProblemCount : 0).ToString());
             SetText(statusWarn, "0");
             string mode = Busy ? (jsCheck != null ? "Проверка…" : "Выполняется…") : dbg == null ? "" : dbg.Finished ? "Отладка завершена" : dbg.Paused ? "Отладка: пауза на строке " + dbg.Line : "Отладка: выполняется…";
@@ -662,10 +672,10 @@ namespace Intern.Game
             if (shown < t.hints.Length)
             {
                 Btn b = null;
-                if (Diff == Difficulty.Easy) b = Btn.Text("Подсказка " + (shown + 1) + " из " + t.hints.Length, () => { hintsShown[Task.id] = HintsShown + 1; RefreshSide(); }, K.Button2, K.Button2Hover, 14f, K.Text, "md", K.Blue);
+                if (Diff == Difficulty.Easy) b = Btn.Text("Подсказка " + (shown + 1) + " из " + t.hints.Length, () => { g.ReportWork(WorkKind.Hint); hintsShown[Task.id] = HintsShown + 1; RefreshSide(); }, K.Button2, K.Button2Hover, 14f, K.Text, "md", K.Blue);
                 else if (Diff == Difficulty.Medium)
                 {
-                    b = Btn.Text("Купить подсказку — 30 монет", () => { if (g.Save.money < 30) return; g.Save.money -= 30; hintsShown[Task.id] = HintsShown + 1; g.Persist(); RefreshSide(); RefreshTitle(); }, K.Button2, K.Button2Hover, 14f, K.Text, "coin", K.Sun);
+                    b = Btn.Text("Купить подсказку — 30 монет", () => { if (g.Save.money < 30) return; g.ReportWork(WorkKind.Hint); g.Save.money -= 30; hintsShown[Task.id] = HintsShown + 1; g.Persist(); RefreshSide(); RefreshTitle(); }, K.Button2, K.Button2Hover, 14f, K.Text, "coin", K.Sun);
                     b.Enabled = g.Save.money >= 30;
                 }
                 else Para(c, "Подсказок на тяжёлой сложности нет.", 14f, K.Muted);
@@ -680,7 +690,7 @@ namespace Intern.Game
                     if (revealed.Contains(t.id)) Para(c, "Верные варианты подсвечены зелёным на вкладке «Ответ». Отметь их и ответь — награда будет ×0.5.", 13f, K.Muted, 14f);
                     else if (Fails >= 3)
                     {
-                        var sb = Btn.Text("Показать ответ (награда ×0.5)", () => { revealed.Add(Task.id); usedSolution.Add(Task.id); bottom = Bottom.Answer; RefreshAll(); }, Pal.Hex("5A1D1D"), Pal.Hex("6E2424"), 14f, Pal.Hex("FFB4B4"), "warning", Pal.Hex("FFB4B4"));
+                        var sb = Btn.Text("Показать ответ (награда ×0.5)", () => { g.ReportWork(WorkKind.Hint); revealed.Add(Task.id); usedSolution.Add(Task.id); bottom = Bottom.Answer; RefreshAll(); }, Pal.Hex("5A1D1D"), Pal.Hex("6E2424"), 14f, Pal.Hex("FFB4B4"), "warning", Pal.Hex("FFB4B4"));
                         sb.style.alignSelf = Align.FlexStart; sb.style.marginTop = 14f; c.Add(sb);
                     }
                 }
@@ -1275,6 +1285,7 @@ namespace Intern.Game
                 if (Time.unscaledTime > notices[i].Value) { notices[i].Key.RemoveFromHierarchy(); notices.RemoveAt(i); }
             if (confirmReset && Time.unscaledTime > confirmResetUntil) { confirmReset = false; RefreshEditorFlags(); }
             if (Diff == Difficulty.Hard || Timed || Time.frameCount % 30 == 0) RefreshTitle();
+            if (g.Work != null && Mathf.FloorToInt(g.Work.Minute) != lastClockMin) RefreshStatus();
             // разбор кода и проверка синтаксиса — когда пользователь перестал печатать
             if (dbg == null && !IsChoice && explainedCode != Code && ed.SinceEdit > 0.4f) { RefreshExplanations(true); RefreshRight(); RefreshBottom(); RefreshStatus(); RefreshEditorFlags(); }
             // JavaScript: фоновые запуск и проверка
@@ -1305,6 +1316,7 @@ namespace Intern.Game
 
         void OnCodeChanged()
         {
+            g.ReportWork(WorkKind.Edit);
             runtimeErrorLine = -1; runtimeErrorText = null; confirmReset = false;
             RefreshStatus();
         }
@@ -1339,6 +1351,7 @@ namespace Intern.Game
             if (dbg != null && dbg.Finished) StopDebug();
             if (Task == null || dbg != null || Busy) return;
             if (!CanRun) { Notice(IsChoice ? "Здесь нечего запускать: выбери ответ внизу и нажми «Ответить»." : "Этот файл не запускается — нажми «Проверить», и решение сверится с требованиями.", "md"); return; }
+            g.ReportWork(WorkKind.Run);
             SaveCode();
             if (IsJs) { RunJs(); return; }
             if (IsSql) { RunSql(); return; }
@@ -1469,6 +1482,7 @@ namespace Intern.Game
         {
             if (dbg != null && dbg.Finished) StopDebug();
             if (Task == null || dbg != null || Busy) return;
+            g.ReportWork(WorkKind.Check);
             if (IsChoice) { SubmitChoice(); return; }
             SaveCode();
             switch (TMode)
@@ -1566,6 +1580,7 @@ namespace Intern.Game
         {
             var t = Task;
             if (t == null || !IsChoice) return;
+            g.ReportWork(WorkKind.Check);
             if (g.IsDone(t)) { Notice("Эта задача уже сдана. Разбор — справа и внизу.", "check", K.Green); return; }
             if (Picks.Count == 0) { Notice("Сначала выбери вариант ответа: клик по нему или клавиши 1–9.", "md"); bottom = Bottom.Answer; RefreshBottom(); return; }
             var v = TaskChecks.Choice(t, Picks);

@@ -45,7 +45,19 @@ namespace Intern.Game
         public static bool DebugDump() { return KD(Key.F7); }
         public static bool DebugClose() { return KD(Key.F6); }
         public static bool DebugCareer() { return KD(Key.F9); }
+        public static bool DebugHour() { return KD(Key.F3); }
+        public static bool DebugDoor() { return KD(Key.F1); }
+        public static bool DebugLunchEnd() { return KD(Key.F2); }
         public static bool Screenshot() { return KD(Key.F12); }
+        // Был ли хоть какой-то ввод в этом кадре — для автопаузы
+        public static bool AnyInput()
+        {
+            var kb = Keyboard.current; var m = Mouse.current;
+            if (kb != null && kb.anyKey.isPressed) return true;
+            if (m != null && (m.leftButton.isPressed || m.rightButton.isPressed || m.delta.ReadValue().sqrMagnitude > 0.5f || m.scroll.ReadValue().sqrMagnitude > 0.01f)) return true;
+            return false;
+        }
+        public static bool Attack() { return Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame; }
 #else
         public static Vector2 Move()
         {
@@ -70,7 +82,12 @@ namespace Intern.Game
         public static bool DebugDump() { return Input.GetKeyDown(KeyCode.F7); }
         public static bool DebugClose() { return Input.GetKeyDown(KeyCode.F6); }
         public static bool DebugCareer() { return Input.GetKeyDown(KeyCode.F9); }
+        public static bool DebugHour() { return Input.GetKeyDown(KeyCode.F3); }
+        public static bool DebugDoor() { return Input.GetKeyDown(KeyCode.F1); }
+        public static bool DebugLunchEnd() { return Input.GetKeyDown(KeyCode.F2); }
         public static bool Screenshot() { return Input.GetKeyDown(KeyCode.F12); }
+        public static bool AnyInput() { return Input.anyKey || Mathf.Abs(Input.GetAxisRaw("Mouse X")) + Mathf.Abs(Input.GetAxisRaw("Mouse Y")) > 0.01f; }
+        public static bool Attack() { return Input.GetMouseButtonDown(0); }
 #endif
     }
 
@@ -135,7 +152,20 @@ namespace Intern.Game
         public bool hasCharacter;
         public string profession = "";   // backend frontend devops fullstack
         public int xp;
-        public int version;              // 2 — id задач из направлений
+        public int version;              // 2 — id задач из направлений, 3 — рабочий день
+
+        // ---- рабочий день (версия 3) ----
+        public int day = 1;              // номер рабочего дня, с 1 (Пн)
+        public float minute = 540;       // время в офисе: минуты от полуночи, 9:00 = 540
+        public bool lunchTaken;          // обед сегодня уже был
+        public float satedUntil;         // до этой минуты действует бонус «Сытый»
+        public int strikes, cleanDays;   // выговоры и чистые дни подряд (5 чистых — минус выговор)
+        public bool strikeToday, workedToday;
+        public int hourStart = 540;      // начало текущего учётного часа
+        public float hourMinutes, hourEditSec;
+        public bool hourWorked;
+        public int dayTasks, dayXp, dayMoney, dayLunchMoney, dayKills, dayFines, dayWorkHours, dayIdleHours;
+        public int totalKills, totalLunches, totalFines;
 
         public string GetCode(string id) { int i = codeIds.IndexOf(id); return i >= 0 ? codeTexts[i] : null; }
         public void SetCode(string id, string code)

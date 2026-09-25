@@ -347,6 +347,8 @@ namespace Intern.Game
         public bool handsOnDesk;       // руки на клавиатуре, даже если не печатает
         public bool lookAtPlayer;
         public float waveUntil;
+        public bool holdRight;         // держит предмет в правой руке (нож на обеде)
+        public float swingStart = -9f; // начало замаха ножом
 
         float sit, walkPhase, walkAmt, phase, nextBlink, blinkT = -1, land;
         Vector3[] eyeBase = new Vector3[0];
@@ -700,6 +702,16 @@ namespace Intern.Game
         {
             appearance = ap.Clone();
             if (!imported) { Build(ap); return; }
+            Tint(ap);
+            ShowAccessory(ap.accessory);
+            ApplyOutfit(ap.outfit);
+            SetEmotion(ap.emotion);
+        }
+
+        // Только цвета кожи и одежды — костюм и аксессуары модели остаются как есть
+        public void Tint(Appearance ap)
+        {
+            if (!imported) return;
             Color skin = Catalog.Pick(Catalog.Skins, ap.skin);
             var colors = new Dictionary<string, Color> { { "lp_skin_", skin }, { "lp_sock_", Color.Lerp(skin, Color.black, 0.18f) } };
             if (ap.topColor >= 0) colors["lp_shirt_"] = Catalog.Pick(Catalog.Cloth, ap.topColor);
@@ -724,9 +736,6 @@ namespace Intern.Game
                 }
                 if (changed) r.sharedMaterials = mats;
             }
-            ShowAccessory(ap.accessory);
-            ApplyOutfit(ap.outfit);
-            SetEmotion(ap.emotion);
         }
 
         // Показываем только выбранный костюм (у коллег в модели один костюм — он всегда виден)
@@ -848,8 +857,16 @@ namespace Intern.Game
                 zL = -8f - run * 10f + lean.y * 0.6f; zR = 8f + run * 10f + lean.y * 0.6f;
                 bendL = 15f + run * 30f; bendR = 15f + run * 30f;
             }
+            if (holdRight && Time.time >= waveUntil && s < 0.5f && grounded) { targetR = -32f; bendR = 62f; zR = 14f; }
             Spring(ref armFlopL, ref armFlopVelL, targetL, 140f, 8f, dt);
             Spring(ref armFlopR, ref armFlopVelR, targetR, 140f, 8f, dt);
+            // замах: рука быстро уходит вверх и рубит вниз-вперёд
+            float sk = (Time.time - swingStart) / 0.3f;
+            if (sk >= 0f && sk < 1f)
+            {
+                float e = sk < 0.3f ? Mathf.Lerp(-32f, -155f, sk / 0.3f) : Mathf.Lerp(-155f, -12f, 1f - Mathf.Pow(1f - (sk - 0.3f) / 0.7f, 3f));
+                armFlopR = e; armFlopVelR = 0f; bendR = 22f; zR = 18f;
+            }
             armL.localRotation = Quaternion.Euler(armFlopL, 0, zL);
             armR.localRotation = Quaternion.Euler(armFlopR, 0, zR);
             if (elbowL != null) elbowL.localRotation = Quaternion.Euler(-bendL, 0, 0);

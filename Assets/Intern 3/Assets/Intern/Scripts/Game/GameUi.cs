@@ -24,6 +24,8 @@ namespace Intern.Game
         readonly VisualElement root;
 
         VisualElement codeBg, dim, hud, menu, menuCard, menuMain, menuNew, pause, pauseCard, settings, settingsPanel;
+        VisualElement hudCard, clockChip, strikeRow, satedChip, lunchHud, lunchCoinsRow, summary, summaryCard, fired, firedCard;
+        Label clockLabel, strikeLabel, lunchTimer, lunchCoins, lunchSeries, lunchPenalty, lunchKills, lunchHint;
         VisualElement toastRow, toastPill, promptRow, promptKeys, crosshair, cursorHint, keysPanel, bugRow, progressFill;
         Label toastText, promptText, rankLabel, moneyLabel, taskCode, taskTitle, progressLabel, bugLabel, fpsLabel, pauseTask, pauseDiffDesc;
         UiBtn pauseCamera;
@@ -42,7 +44,7 @@ namespace Intern.Game
         class Column { public VisualElement holder; public Label a; public float speed, y; }
         readonly List<Column> columns = new List<Column>();
 
-        string lastHud;
+        string lastHud, lastLunch;
         int fpsFrames; float fpsTime;
 
         public static GameUi TryCreate(GameRoot g)
@@ -90,13 +92,16 @@ namespace Intern.Game
             codeBg = BuildCodeBackground(); root.Add(codeBg);
             dim = Layer(); dim.style.backgroundColor = new Color(0.05f, 0.06f, 0.17f, 0.74f); root.Add(dim);
             hud = BuildHud(); root.Add(hud);
+            lunchHud = BuildLunchHud(); root.Add(lunchHud);
+            summary = Centered(); root.Add(summary);
+            fired = Centered(); root.Add(fired);
             menu = BuildMenu(); root.Add(menu);
             pause = BuildPause(); root.Add(pause);
             settings = BuildSettings(); root.Add(settings);
             toastRow = BuildToast(); root.Add(toastRow);
             fpsLabel = K.B("", 13f, Mint); fpsLabel.style.position = Position.Absolute; fpsLabel.style.top = 6f; fpsLabel.style.left = 0f; fpsLabel.style.right = 0f;
             fpsLabel.style.unityTextAlign = TextAnchor.MiddleCenter; root.Add(fpsLabel);
-            foreach (var v in new[] { codeBg, dim, hud, menu, pause, settings }) { v.style.display = DisplayStyle.None; visible[v] = false; }
+            foreach (var v in new[] { codeBg, dim, hud, menu, pause, settings, lunchHud, summary, fired }) { v.style.display = DisplayStyle.None; visible[v] = false; }
         }
 
         static VisualElement Layer() { var v = K.Box(); K.Fill(v); v.pickingMode = PickingMode.Ignore; return v; }
@@ -429,6 +434,7 @@ def deploy(env=""staging""):
             menuCard.parent.style.width = 700f;
             RefreshMenu(); Pop(menuCard);
         }
+        public void OpenNewGamePublic() { settingsOpen = false; OpenNewGame(); }
         void CloseNewGame() { newGamePage = false; menuCard.parent.style.width = 540f; RefreshMenu(); Pop(menuCard); }
 
         static Label Caption(string s) { var l = K.T(s, 14f, Muted, false, false, true); l.style.marginTop = 2f; return l; }
@@ -528,8 +534,8 @@ def deploy(env=""staging""):
         }
 
         // ======================= настройки =======================
-        static readonly string[] TabNames = { "Экран", "Графика", "Звук", "Управление", "Интерфейс" };
-        static readonly string[] TabIcons = { "monitor", "image", "sound", "mouse", "layout" };
+        static readonly string[] TabNames = { "Игра", "Экран", "Графика", "Звук", "Управление", "Интерфейс" };
+        static readonly string[] TabIcons = { "clock", "monitor", "image", "sound", "mouse", "layout" };
 
         VisualElement BuildSettings()
         {
@@ -591,8 +597,17 @@ def deploy(env=""staging""):
             PaintTabs();
             var c = settingsScroll.Content; c.Clear();
             var S = GameConfig.S;
-            switch (tab)
+            switch (tab - 1)
             {
+                case -1:
+                    {
+                        c.Add(Row("Длина рабочего дня", DayLength.About[Mathf.Clamp(S.dayLength, 0, 2)],
+                            new UiSelect(DayLength.Names, S.dayLength, v => { S.dayLength = v; GameConfig.Commit(); RefreshSettings(); })));
+                        c.Add(Row("Кровь на обеде", "Брызги, лужи и пятна в городе.", new UiToggle(S.blood, v => { S.blood = v; GameConfig.Commit(); })));
+                        var note = Caption("Длину дня можно менять в любой момент: новая скорость часов включится сразу.");
+                        note.style.marginTop = 14f; c.Add(note);
+                        break;
+                    }
                 case 0:
                     {
                         var res = GameConfig.Resolutions(); var cur = GameConfig.CurrentRes;
@@ -718,10 +733,15 @@ def deploy(env=""staging""):
             var layer = Layer();
             // карточка задачи
             var card = K.Box(); card.pickingMode = PickingMode.Ignore; card.style.position = Position.Absolute; card.style.left = 24f; card.style.top = 22f; card.style.width = 430f;
+            hudCard = card;
             card.style.backgroundColor = new Color(Card.r, Card.g, Card.b, 0.9f); K.Radius(card, 18f); Border(card, new Color(Line.r, Line.g, Line.b, 0.8f), 1f); K.Pad(card, 16f, 20f, 18f, 20f);
             var r1 = K.Box(true); r1.style.alignItems = Align.Center; r1.pickingMode = PickingMode.Ignore;
             var rank = K.Box(true); rank.pickingMode = PickingMode.Ignore; rank.style.backgroundColor = Mint; K.Radius(rank, 12f); K.Pad(rank, 3f, 12f, 3f, 12f);
             rankLabel = K.B("", 13f, Ink); rankLabel.style.letterSpacing = 1f; rank.Add(rankLabel); r1.Add(rank);
+            clockChip = K.Box(true); clockChip.pickingMode = PickingMode.Ignore; clockChip.style.alignItems = Align.Center; clockChip.style.marginLeft = 8f;
+            clockChip.style.backgroundColor = Well; K.Radius(clockChip, 12f); K.Pad(clockChip, 3f, 10f, 3f, 8f);
+            clockChip.Add(new Icon("clock", Sky, 15f)); clockLabel = K.B("", 14f, Text); clockLabel.style.marginLeft = 5f; clockChip.Add(clockLabel);
+            r1.Add(clockChip);
             r1.Add(K.Spacer());
             r1.Add(new Icon("coin", Sun, 22f));
             moneyLabel = K.B("", 22f, Sun); moneyLabel.style.marginLeft = 7f; r1.Add(moneyLabel);
@@ -738,6 +758,13 @@ def deploy(env=""staging""):
             bar.Add(progressFill); r3.Add(bar);
             progressLabel = K.T("", 14f, Muted); progressLabel.style.marginLeft = 12f; r3.Add(progressLabel);
             card.Add(r3);
+            strikeRow = K.Box(true); strikeRow.style.alignItems = Align.Center; strikeRow.style.marginTop = 12f; strikeRow.pickingMode = PickingMode.Ignore;
+            strikeRow.Add(new Icon("warning", Pink, 18f));
+            strikeLabel = K.B("", 15f, Pink); strikeLabel.style.marginLeft = 8f; strikeRow.Add(strikeLabel);
+            card.Add(strikeRow);
+            satedChip = K.Box(true); satedChip.style.alignItems = Align.Center; satedChip.style.marginTop = 10f; satedChip.pickingMode = PickingMode.Ignore;
+            satedChip.Add(new Icon("star", Mint, 18f)); var sl = K.B("Сытый: +10% XP за задачи", 15f, Mint); sl.style.marginLeft = 8f; satedChip.Add(sl);
+            card.Add(satedChip);
             bugRow = K.Box(true); bugRow.style.alignItems = Align.Center; bugRow.style.marginTop = 12f; bugRow.pickingMode = PickingMode.Ignore;
             bugRow.Add(new Icon("bug", Pink, 20f));
             bugLabel = K.B("", 15f, Pink); bugLabel.style.marginLeft = 8f; bugRow.Add(bugLabel);
@@ -800,6 +827,134 @@ def deploy(env=""staging""):
             return v;
         }
 
+        // ======================= обед =======================
+        VisualElement BuildLunchHud()
+        {
+            var layer = Layer();
+            // таймер обеда сверху по центру
+            var top = K.Box(true); top.pickingMode = PickingMode.Ignore; top.style.position = Position.Absolute; top.style.left = 0f; top.style.right = 0f; top.style.top = 22f;
+            top.style.justifyContent = Justify.Center;
+            var pill = K.Box(true); pill.pickingMode = PickingMode.Ignore; pill.style.alignItems = Align.Center; pill.style.backgroundColor = new Color(Card.r, Card.g, Card.b, 0.92f);
+            K.Radius(pill, 26f); Border(pill, new Color(Sun.r, Sun.g, Sun.b, 0.6f), 2f); K.Pad(pill, 8f, 22f, 8f, 16f);
+            pill.Add(new Icon("clock", Sun, 26f));
+            var lt = K.B("ОБЕД", 14f, Muted); lt.style.marginLeft = 10f; lt.style.letterSpacing = 1.5f; pill.Add(lt);
+            lunchTimer = K.B("6:00", 34f, Text); lunchTimer.style.marginLeft = 12f; lunchTimer.style.unityFontStyleAndWeight = FontStyle.Bold; pill.Add(lunchTimer);
+            top.Add(pill); layer.Add(top);
+
+            // монеты за этот обед: «+10» рядом со счётчиком складываются в серию
+            var card = K.Box(); card.pickingMode = PickingMode.Ignore; card.style.position = Position.Absolute; card.style.left = 24f; card.style.top = 22f; card.style.width = 330f;
+            card.style.backgroundColor = new Color(Card.r, Card.g, Card.b, 0.9f); K.Radius(card, 18f); Border(card, new Color(Line.r, Line.g, Line.b, 0.8f), 1f); K.Pad(card, 14f, 20f, 16f, 20f);
+            card.Add(SectionLabel("ЗА ЭТОТ ОБЕД"));
+            lunchCoinsRow = K.Box(true); lunchCoinsRow.pickingMode = PickingMode.Ignore; lunchCoinsRow.style.alignItems = Align.Center; lunchCoinsRow.style.marginTop = 6f;
+            lunchCoinsRow.Add(new Icon("coin", Sun, 30f));
+            lunchCoins = K.B("0", 38f, Sun); lunchCoins.style.marginLeft = 10f; lunchCoinsRow.Add(lunchCoins);
+            lunchSeries = K.B("", 26f, Mint); lunchSeries.style.marginLeft = 14f; lunchCoinsRow.Add(lunchSeries);
+            lunchPenalty = K.B("", 26f, Pink); lunchPenalty.style.marginLeft = 10f; lunchCoinsRow.Add(lunchPenalty);
+            card.Add(lunchCoinsRow);
+            lunchKills = K.T("", 16f, Muted); lunchKills.style.marginTop = 6f; card.Add(lunchKills);
+            layer.Add(card);
+
+            var hintRow = K.Box(true); hintRow.pickingMode = PickingMode.Ignore; hintRow.style.position = Position.Absolute; hintRow.style.left = 0f; hintRow.style.right = 0f; hintRow.style.bottom = 30f;
+            hintRow.style.justifyContent = Justify.Center;
+            var hp = K.Box(true); hp.pickingMode = PickingMode.Ignore; hp.style.backgroundColor = new Color(Card.r, Card.g, Card.b, 0.85f); K.Radius(hp, 14f); K.Pad(hp, 6f, 16f, 6f, 16f);
+            lunchHint = K.T("ЛКМ — удар ножом  ·  E — дверь  ·  юрист +10, бухгалтер −20", 15f, Text); hp.Add(lunchHint);
+            hintRow.Add(hp); layer.Add(hintRow);
+            return layer;
+        }
+
+        int shownCoins; float coinsShownAt;
+        void UpdateLunchHud()
+        {
+            var L = g.Lunch; if (L == null) return;
+            int sec = Mathf.CeilToInt(L.timeLeft);
+            string t = (sec / 60) + ":" + (sec % 60).ToString("00");
+            if (lunchTimer.text != t) { lunchTimer.text = t; lunchTimer.style.color = sec <= 30 ? Pink : Text; }
+            // счётчик догоняет сумму, когда серия закончилась
+            bool inSeries = L.series > 0;
+            int target = inSeries ? L.coins - L.series : L.coins;
+            if (shownCoins != target && Time.unscaledTime - coinsShownAt > 0.03f)
+            {
+                shownCoins += Math.Sign(target - shownCoins) * Mathf.Max(1, Mathf.Abs(target - shownCoins) / 6);
+                coinsShownAt = Time.unscaledTime;
+            }
+            string key = shownCoins + "|" + L.series + "|" + L.kills + "|" + L.escaped + "|" + (Time.unscaledTime - L.penaltyAt < 1.6f);
+            if (key != lastLunch)
+            {
+                lastLunch = key;
+                lunchCoins.text = shownCoins.ToString();
+                lunchSeries.text = inSeries ? "+" + L.series : "";
+                lunchPenalty.text = Time.unscaledTime - L.penaltyAt < 1.6f ? "−" + L.penaltyShown : "";
+                lunchKills.text = "Выбито " + L.kills + "  ·  убежали " + L.escaped + "  ·  ещё " + Mathf.Max(0, LunchRun.Cap - L.spawned);
+            }
+            // лёгкий толчок цифры серии при каждом новом «+10»
+            float age = Time.unscaledTime - L.seriesAt;
+            float bump = inSeries && age < 0.25f ? 1f + (0.25f - age) * 1.2f : 1f;
+            lunchSeries.style.scale = new Scale(new Vector3(bump, bump, 1f));
+        }
+
+        // ======================= итоги дня =======================
+        void BuildSummary()
+        {
+            summary.Clear();
+            var r = g.LastReport; if (r == null) return;
+            VisualElement wrap;
+            summaryCard = CardBox(640f, out wrap);
+            var head = K.Box(true); head.style.alignItems = Align.Center; head.pickingMode = PickingMode.Ignore;
+            head.Add(new Icon("clock", Sun, 36f));
+            var ht = K.B("Итоги дня", 44f, Sun, true); ht.style.marginLeft = 14f; head.Add(ht);
+            summaryCard.Add(head);
+            var sub = K.T(r.weekday + ", день " + r.day + " · 18:00, рабочий день окончен", 16f, Muted); sub.style.marginTop = 2f; sub.style.marginBottom = 14f; summaryCard.Add(sub);
+            summaryCard.Add(StatRow("task", "Решено задач", r.tasks.ToString(), Text));
+            summaryCard.Add(StatRow("star", "Опыт", "+" + r.xp + " XP", Mint));
+            summaryCard.Add(StatRow("coin", "Монеты за работу", "+" + r.money, Sun));
+            summaryCard.Add(StatRow("coin", "Монеты за обед", (r.lunchMoney >= 0 ? "+" : "") + r.lunchMoney + (r.kills > 0 ? "  (выбито " + r.kills + ")" : ""), Sun));
+            if (r.fines > 0) summaryCard.Add(StatRow("warning", "Штрафы за простой", "−" + r.fines, Pink));
+            summaryCard.Add(StatRow("monitor", "Рабочих часов", r.workHours + " из 8" + (r.idleHours > 0 ? "  (простой " + r.idleHours + ")" : ""), Text));
+            summaryCard.Add(StatRow("warning", "Выговоры", r.strikes + " из " + r.limit, r.strikes > 0 ? Pink : Text));
+            string note = r.truancy ? "Гена: «Сегодня ты почти ничего не сделал. Это прогул, выговор.»"
+                        : r.strikeRemoved ? "Гена: «Пять дней без замечаний, снимаю один выговор.»"
+                        : r.tasks >= 5 ? "Гена: «Отличный день. Так держать.»"
+                        : "Гена: «Нормально. Завтра можно бодрее.»";
+            var nl = K.T(note, 16f, r.truancy ? Pink : Muted, false, false, true); nl.style.marginTop = 14f; summaryCard.Add(nl);
+            var row = K.Box(true); row.pickingMode = PickingMode.Ignore; row.style.marginTop = 10f;
+            var next = new UiBtn("Следующий день", () => g.UiNextDay(), Sun, SunHover, SunLip, Ink, "play", g.Work.WeekdayFull + ", 9:00", 60f, false); K.Grow(next); next.style.marginRight = 10f;
+            var home = new UiBtn("В меню", () => g.UiSummaryToMenu(), Ghost, GhostHover, GhostLip, Text, "home", null, 60f, false); home.style.width = 180f;
+            row.Add(next); row.Add(home); summaryCard.Add(row);
+            summary.Add(wrap);
+        }
+
+        // ======================= уволен =======================
+        void BuildFired()
+        {
+            fired.Clear();
+            var r = g.FiredReport; if (r == null) return;
+            VisualElement wrap;
+            firedCard = CardBox(640f, out wrap);
+            var ht = K.B("Уволен", 56f, Pink, true); firedCard.Add(ht);
+            var t = K.T("Гена вызвал тебя в переговорку: «Мы расстаёмся. Сдай пропуск и кружку.» Выговоров " + r.strikes + " из " + r.limit + ".", 17f, Text, false, false, true);
+            t.style.marginTop = 4f; t.style.marginBottom = 14f; firedCard.Add(t);
+            firedCard.Add(StatRow("account", "Кем был", r.weekday, Text));
+            firedCard.Add(StatRow("clock", "Дней в компании", r.day.ToString(), Text));
+            firedCard.Add(StatRow("task", "Решено задач", r.tasks.ToString(), Text));
+            firedCard.Add(StatRow("coin", "Монет на счету", r.money.ToString(), Sun));
+            firedCard.Add(StatRow("star", "Обедов и выбитых", r.lunchMoney + " / " + r.kills, Mint));
+            if (r.fines > 0) firedCard.Add(StatRow("warning", "Штрафов за простой", r.fines.ToString(), Pink));
+            var nl = K.T("Сохранение удалено. Начни заново и работай, а не жди обеда.", 15f, Muted, false, false, true); nl.style.marginTop = 14f; firedCard.Add(nl);
+            firedCard.Add(new UiBtn("Новая игра", () => g.UiFiredNewGame(), Sun, SunHover, SunLip, Ink, "reset", null, 60f, false));
+            fired.Add(wrap);
+        }
+
+        VisualElement StatRow(string icon, string name, string value, Color vc)
+        {
+            var r = K.Box(true); r.style.alignItems = Align.Center; K.Pad(r, 9f, 4f, 9f, 2f); r.pickingMode = PickingMode.Ignore;
+            r.style.borderBottomWidth = 1f; r.style.borderBottomColor = new Color(Line.r, Line.g, Line.b, 0.5f);
+            r.Add(new Icon(icon, Muted, 20f));
+            var n = K.T(name, 17f, Text); n.style.marginLeft = 12f; r.Add(n);
+            r.Add(K.Spacer());
+            r.Add(K.B(value, 19f, vc));
+            return r;
+        }
+
         // ======================= тосты =======================
         VisualElement BuildToast()
         {
@@ -818,6 +973,7 @@ def deploy(env=""staging""):
         {
             var m = g.CurMode;
             bool inMenu = m == GameRoot.Mode.Menu, inPause = m == GameRoot.Mode.Pause, inWalk = m == GameRoot.Mode.Walk || m == GameRoot.Mode.Dialog;
+            bool inLunch = m == GameRoot.Mode.Lunch;
             if (!inMenu && !inPause) settingsOpen = false;
             if (!inMenu) newGamePage = false;
 
@@ -826,10 +982,16 @@ def deploy(env=""staging""):
             if (Show(menu, inMenu && !settingsOpen)) { RefreshMenu(); Pop(menuCard); }
             if (Show(pause, inPause && !settingsOpen)) { RefreshPause(); Pop(pauseCard); }
             if (Show(settings, (inMenu || inPause) && settingsOpen)) Pop(settingsPanel);
-            Show(hud, inWalk);
+            Show(hud, inWalk || inLunch);
+            Show(lunchHud, inLunch);
+            if (Show(summary, m == GameRoot.Mode.DaySummary)) { BuildSummary(); if (summaryCard != null) Pop(summaryCard); }
+            if (Show(fired, m == GameRoot.Mode.Fired)) { BuildFired(); if (firedCard != null) Pop(firedCard); }
+            hudCard.style.display = inLunch ? DisplayStyle.None : DisplayStyle.Flex;
+            keysPanel.style.display = GameConfig.S.keyHints && !inLunch ? DisplayStyle.Flex : DisplayStyle.None;
 
             if (inMenu) TickCode(dt);
-            if (inWalk) UpdateHud();
+            if (inWalk || inLunch) UpdateHud();
+            if (inLunch) UpdateLunchHud();
             UpdateToast(m == GameRoot.Mode.Ide || m == GameRoot.Mode.Transition);
             AnimatePops();
             UpdateFps(dt);
@@ -893,7 +1055,11 @@ def deploy(env=""staging""):
         {
             var t = g.CurrentTaskPublic;
             bool sprintDone = g.PathComplete;
-            string key = g.RankFull + "|" + g.Save.money + "|" + (t != null ? t.id : "") + "|" + g.DoneCount + "|" + g.BugCount + "|" + sprintDone;
+            var w = g.Work;
+            string clock = w != null ? w.Clock : "";
+            bool sated = w != null && w.Sated;
+            int strikes = w != null ? w.Strikes : 0;
+            string key = g.RankFull + "|" + g.Save.money + "|" + (t != null ? t.id : "") + "|" + g.DoneCount + "|" + g.BugCount + "|" + sprintDone + "|" + clock + "|" + sated + "|" + strikes;
             if (key != lastHud)
             {
                 lastHud = key;
@@ -906,6 +1072,10 @@ def deploy(env=""staging""):
                 progressLabel.text = g.DoneCount + " / " + g.TotalCount;
                 bugRow.style.display = g.BugCount > 0 ? DisplayStyle.Flex : DisplayStyle.None;
                 bugLabel.text = "Багов в офисе: " + g.BugCount + " — поймай их!";
+                clockLabel.text = clock;
+                strikeRow.style.display = strikes > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+                if (w != null) strikeLabel.text = "Выговоры: " + strikes + " из " + w.StrikeLimit + (strikes == w.StrikeLimit - 1 ? " — ещё один, и увольнение" : "");
+                satedChip.style.display = sated ? DisplayStyle.Flex : DisplayStyle.None;
             }
             // подсказка действия: «[E] Сесть за компьютер» → клавиша + текст
             string pr = g.FocusPrompt;
@@ -921,7 +1091,8 @@ def deploy(env=""staging""):
                     promptKeys.Add(Keycap(k == "ЛКМ" || k == "Клик" ? "ЛКМ" : k, 1f));
                 }
             }
-            bool fp = g.FirstPerson && g.CurMode == GameRoot.Mode.Walk;
+            bool walking = g.CurMode == GameRoot.Mode.Walk || g.CurMode == GameRoot.Mode.Lunch;
+            bool fp = g.FirstPerson && walking;
             crosshair.style.display = fp ? DisplayStyle.Flex : DisplayStyle.None;
             if (fp)
             {
@@ -929,7 +1100,7 @@ def deploy(env=""staging""):
                 crosshair.style.width = s; crosshair.style.height = s; crosshair.style.marginLeft = -s / 2f; crosshair.style.marginTop = -s / 2f;
                 K.Radius(crosshair, s / 2f); crosshair.style.backgroundColor = pr != null ? Sun : new Color(1f, 1f, 1f, 0.85f);
             }
-            cursorHint.style.display = UnityEngine.Cursor.lockState != CursorLockMode.Locked && g.CurMode == GameRoot.Mode.Walk ? DisplayStyle.Flex : DisplayStyle.None;
+            cursorHint.style.display = UnityEngine.Cursor.lockState != CursorLockMode.Locked && walking ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         void UpdateToast(bool hide)
@@ -962,6 +1133,7 @@ def deploy(env=""staging""):
             float sc = Mathf.Clamp(S.uiScale, 0.7f, 1.5f);
             ps.referenceResolution = new Vector2Int(Mathf.RoundToInt(1920f / sc), Mathf.RoundToInt(1080f / sc));
             if (keysPanel != null) keysPanel.style.display = S.keyHints ? DisplayStyle.Flex : DisplayStyle.None;
+            Gore.Enabled = S.blood;
             if (fpsLabel != null) { fpsLabel.style.display = S.showFps ? DisplayStyle.Flex : DisplayStyle.None; if (!S.showFps) fpsLabel.text = ""; }
         }
 

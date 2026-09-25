@@ -33,6 +33,9 @@ namespace Intern.Game
         public bool keyHints = true;
         public float uiScale = 1f;
         public bool showFps;
+        // игра
+        public int dayLength = 1;           // 0 короткий, 1 обычный, 2 длинный (DayLength)
+        public bool blood = true;           // кровь на обеде
     }
 
     public static class GameConfig
@@ -59,6 +62,7 @@ namespace Intern.Game
             S.fps = Mathf.Clamp(S.fps, 0, FpsValues.Length - 1);
             S.aa = Mathf.Clamp(S.aa, 0, AaNames.Length - 1);
             S.quality = Mathf.Clamp(S.quality, 0, QualityNames.Length - 1);
+            S.dayLength = Mathf.Clamp(S.dayLength, 0, 2);
         }
 
         public static void Save() { PlayerPrefs.SetString(Key, JsonUtility.ToJson(S)); PlayerPrefs.Save(); }

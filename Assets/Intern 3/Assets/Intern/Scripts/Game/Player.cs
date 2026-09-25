@@ -203,5 +203,7 @@ namespace Intern.Game
         }
 
         public void FaceCameraYaw(float yaw) { camYaw = yaw; }
+        // Развернуть персонажа (например, к цели удара)
+        public void FaceYaw(float yaw) { bodyYaw = yaw; transform.rotation = Quaternion.Euler(0, bodyYaw, 0); }
     }
 }
