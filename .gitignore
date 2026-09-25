@@ -118,3 +118,10 @@ InitTestScene*.unity*
 
 # Превью-картинки из сессий Claude
 /Claude outputs/
+
+# Резервные копии сцен после сбоя Unity
+/[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta
+
+# Файлы, отложенные на удаление
+/Art/_to_delete/
