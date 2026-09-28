@@ -198,7 +198,8 @@ namespace Intern.Game
                     if (Time.time >= alertEnd) React();
                     break;
                 case St.Flee:
-                    if (Follow(def.run, dt, def.id == "philologist" ? 1.3f : 0f)) Escape();
+                    // первый обед с обучением: убегают вдвое медленнее — новичок успевает догнать
+                    if (Follow(run.training ? def.run * 0.5f : def.run, dt, def.id == "philologist" ? 1.3f : 0f)) Escape();
                     if (def.id == "philologist" && Time.time >= nextAct) { nextAct = Time.time + 2.5f; Say(PhilologistLines[run.Rnd.Next(PhilologistLines.Length)], 2f); }
                     break;
                 case St.Attack: AttackTick(pl, dist, dt); break;
@@ -398,6 +399,7 @@ namespace Intern.Game
             }
             hp -= damage;
             anim.React(4, 1.5f);
+            if (run.training) stun = Mathf.Max(stun, 0.7f);   // обучение: после удара чуть замирает
             if (knock > 0f) { var k = dir; k.y = 0; knockVel = k.normalized * knock * 6f; }
             if (stun > 0f) staggerUntil = Time.time + stun;
             if (hp <= 0) { Die(); return; }

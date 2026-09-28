@@ -288,7 +288,7 @@ namespace Intern.Game
         OfficeGrid grid;
         List<Vector3> path = new List<Vector3>();
         int pathIdx;
-        float yaw, walkTime, replanIn, lineLeft, pauseLeft;
+        float yaw, walkTime, replanIn, lineLeft, pauseLeft, waitLeft;   // waitLeft — ждёт ответа стажёра (E), не уходит
         Vector3 aimAt;                   // где был стажёр, когда строили путь
         readonly List<KeyValuePair<LeadMood, string>> lines = new List<KeyValuePair<LeadMood, string>>();
         LeadMood mood;
@@ -309,10 +309,12 @@ namespace Intern.Game
             foreach (var tm in GetComponentsInChildren<TextMesh>(true)) if (tm.text == "Тимлид Гена") nameTag = tm.gameObject;
         }
 
-        // Подойти к стажёру и сказать. Если уже идёт или говорит — реплика встаёт в очередь
-        public void Visit(LeadMood m, string text)
+        // Подойти к стажёру и сказать. Если уже идёт или говорит — реплика встаёт в очередь.
+        // wait > 0 — после реплики ждать, пока стажёр заговорит (E), столько секунд
+        public void Visit(LeadMood m, string text, float wait = 0f)
         {
             lines.Add(new KeyValuePair<LeadMood, string>(m, text));
+            waitLeft = Mathf.Max(waitLeft, wait);
             if (st == St.ToPlayer || st == St.Talking || st == St.Listening) return;
             Plan();
         }
@@ -322,7 +324,7 @@ namespace Intern.Game
         {
             var res = new List<string>();
             foreach (var l in lines) res.Add(l.Value);
-            lines.Clear();
+            lines.Clear(); waitLeft = 0f;
             st = St.Listening; path.Clear(); HideBubble();
             if (anim != null) anim.moveSpeed = 0f;
             FacePlayer(true);
@@ -341,7 +343,7 @@ namespace Intern.Game
         // Мгновенно к доске (новый день, обед, новая игра)
         public void ResetHome()
         {
-            lines.Clear(); path.Clear(); HideBubble();
+            lines.Clear(); path.Clear(); HideBubble(); waitLeft = 0f;
             transform.position = home; yaw = homeYaw; transform.rotation = Quaternion.Euler(0, yaw, 0);
             if (anim != null) anim.moveSpeed = 0f;
             st = St.Home;
@@ -397,7 +399,7 @@ namespace Intern.Game
 
         void NextLine()
         {
-            if (lines.Count == 0) { HideBubble(); pauseLeft = 0.8f; return; }
+            if (lines.Count == 0) { if (waitLeft <= 0f) HideBubble(); pauseLeft = 0.8f; return; }
             var l = lines[0]; lines.RemoveAt(0);
             mood = l.Key;
             lineLeft = Mathf.Clamp(2.5f + l.Value.Length * 0.045f, 4f, 9f);
@@ -457,7 +459,20 @@ namespace Intern.Game
                     FacePlayer(false);
                     if (lineLeft > 0f) { lineLeft -= dt; if (lineLeft <= 0f) NextLine(); }
                     else if (lines.Count > 0) NextLine();
-                    else { pauseLeft -= dt; if (pauseLeft <= 0f) { HideBubble(); PlanHome(); } }
+                    else
+                    {
+                        pauseLeft -= dt;
+                        if (pauseLeft > 0f) break;
+                        // ждёт ответа: облачко висит, пока стажёр не нажмёт E, не уйдёт далеко или не выйдет время
+                        if (waitLeft > 0f)
+                        {
+                            waitLeft -= dt;
+                            var wp = playerPos() - transform.position; wp.y = 0f;
+                            if (wp.magnitude > 9f) waitLeft = 0f;
+                            if (waitLeft > 0f) break;
+                        }
+                        HideBubble(); PlanHome();
+                    }
                     break;
                 case St.Listening:
                     FacePlayer(false);

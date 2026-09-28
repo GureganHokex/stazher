@@ -279,6 +279,7 @@ namespace Intern.Game
 #if UNITY_EDITOR
                     if (InputX.DebugSit()) OpenIde();   // только в редакторе: сразу за компьютер (для тестов)
                     if (InputX.DebugCareer()) DebugEndless();   // F9: путь пройден / опыт до следующего титула
+                    if (InputX.DebugBoard()) OpenBoard();       // F11: доска задач спринта
 #endif
                     if (InputX.Esc()) PauseFrom(Mode.Walk);
                     else if (dayOverPending) ShowDaySummary();
@@ -1028,8 +1029,14 @@ namespace Intern.Game
             GUILayout.Label(dlgTitle, Ui.h3);
             GUILayout.Label(UiKit.Esc(dlgText), Ui.body);
             GUILayout.FlexibleSpace();
+            // «!» в начале — главная кнопка (жёлтая), «~» — второстепенная; иначе «Понял…» и «Уйти» — второстепенные
             foreach (var b in dlgButtons.ToList())
-                if (GUILayout.Button(b.Key, b.Key == "Уйти" || b.Key.StartsWith("Понял") ? Ui.btnAlt : Ui.btn, GUILayout.Height(40))) b.Value();
+            {
+                string label = b.Key; bool alt = label == "Уйти" || label.StartsWith("Понял");
+                if (label.StartsWith("!")) { label = label.Substring(1); alt = false; }
+                else if (label.StartsWith("~")) { label = label.Substring(1); alt = true; }
+                if (GUILayout.Button(label, alt ? Ui.btnAlt : Ui.btn, GUILayout.Height(40))) b.Value();
+            }
             GUILayout.EndArea();
         }
 

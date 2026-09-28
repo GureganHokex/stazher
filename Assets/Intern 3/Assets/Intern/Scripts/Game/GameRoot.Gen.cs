@@ -249,8 +249,8 @@ namespace Intern.Game
             else
             {
                 int at; string name = Levels.NextTitle(Level, out at);
-                Save.xp = Mathf.Max(Save.xp, Levels.TotalFor(at) - 10);
-                Toast("Отладка F9: уровень " + Level + ", до " + name + " — 10 XP.");
+                if (Level < at - 1) { Save.xp = Mathf.Max(Save.xp, Levels.TotalFor(at) - 10); Toast("Отладка F9: уровень " + Level + ", до " + name + " — 10 XP."); }
+                else { int ol = Level; string orank = RankName; Save.xp = Levels.TotalFor(at); AfterXp(ol, orank); }   // уже у порога — сразу титул
             }
             Persist(); UpdateBoard();
             Debug.Log("[Стажёр] F9: уровень " + Level + " (" + RankName + "), XP " + Save.xp + ", тикеты дня: " + string.Join(" ", Save.daily.ToArray()));
@@ -267,20 +267,14 @@ namespace Intern.Game
                 "• Уровень, опыт, монеты, оружие и гардероб остаются с тобой.\n" +
                 "• Оклад выше: +" + Mathf.RoundToInt(Levels.CompanyBonus * 100f * (Save.company + 1)) + "% к монетам за задачи навсегда.",
                 Btn("Перейти в «" + next + "»", () => { CloseDialog(); ChangeCompany(); }),
-                Btn("Остаюсь", CloseDialog));
+                Btn("~Остаюсь", CloseDialog));
         }
 
         public void ChangeCompany()
         {
             if (!CanChangeCompany) return;
-            Save.company++;
-            var keep = new HashSet<string>(Path.Topics.Where(tp => tp.gradeIndex == 0).SelectMany(tp => tp.tasks).Select(t => t.id));
-            var pathIds = new HashSet<string>(Path.Tasks.Select(t => t.id));
-            foreach (var id in pathIds) if (!keep.Contains(id)) ForgetCode(id);   // старые решения не подсказывают на новом месте
-            Save.done = Save.done.Where(id => !pathIds.Contains(id) || keep.Contains(id)).ToList();
-            foreach (var s in Save.daily.Concat(Save.practice)) ForgetCode(s);
-            Save.daily.Clear(); Save.dailyDay = 0; Save.genDone.Clear(); Save.practice.Clear(); genCache.Clear();
-            Save.sprintGoal = 0; Save.sprintTasks.Clear();
+            Levels.ResetForCompany(Save, Path);
+            genCache.Clear();
             Persist();
             PlanSprint();
             if (ideUi != null) ideUi.ResetProgress(CurrentTask);

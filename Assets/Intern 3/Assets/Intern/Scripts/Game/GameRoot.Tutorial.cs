@@ -39,7 +39,7 @@ namespace Intern.Game
             bool officeLive = mode == Mode.Walk || mode == Mode.Dialog || mode == Mode.Wardrobe;
             // на ключевых шагах Гена подходит сам, в остальных — пишет
             if ((t == Tut.MeetLead || t == Tut.GoLunch || t == Tut.WorkTillEvening) && leadWalker != null && officeLive && lunch == null)
-                leadWalker.Visit(LeadMood.Info, line);
+                leadWalker.Visit(LeadMood.Info, line, t == Tut.MeetLead ? 90f : 0f);   // знакомство: ждёт, пока стажёр ответит
             else if (mode == Mode.Ide && ideUi != null) ideUi.GameNotice("Гена: " + line);
             else Toast("Гена: " + line);
         }
@@ -59,8 +59,8 @@ namespace Intern.Game
                           "• Работаем спринтами по неделе: план — на доске задач за мной.\n\n" +
                           "Сегодня первый день: штрафов нет, я буду подсказывать.";
             OpenDialog("Тимлид Гена", text,
-                Btn("Понял, иду за стол", () => { CloseDialog(); TutEvent("talk"); }),
-                Btn("Я уже работал — без обучения", () => { CloseDialog(); Tutorial.Skip(); Persist(); Toast("Обучение пропущено. Доска задач — за Геной, у доски."); }));
+                Btn("!Понял, иду за стол", () => { CloseDialog(); TutEvent("talk"); }),
+                Btn("~Я уже работал — без обучения", () => { CloseDialog(); Tutorial.Skip(); Persist(); Toast("Обучение пропущено. Доска задач — за Геной, у доски."); }));
             return true;
         }
 

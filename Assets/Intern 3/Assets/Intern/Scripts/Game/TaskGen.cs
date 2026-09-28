@@ -164,7 +164,7 @@ namespace Intern.Game
                 t.hints = new[] { "Пройди код по шагам и выпиши значения переменных на каждом шаге.", "Проверь границы: включается ли последний элемент, что будет на первом шаге цикла." };
                 var ex = new StringBuilder("Правильный ответ: " + right + ".");
                 foreach (var w in wrong)
-                    if (w.Value != null) ex.Append("\n• «").Append(w.Key).Append("» получилось бы, если в строке ").Append(w.Value.line).Append(' ').Append(WhatIf(w.Value.what)).Append('.');
+                    if (w.Value != null) ex.Append("\n• «").Append(w.Key).Append("» — если бы в строке ").Append(w.Value.line).Append(" было ").Append(Code1(w.Value.after)).Append(" вместо ").Append(Code1(w.Value.before)).Append('.');
                 if (!string.IsNullOrEmpty(s.explanation)) ex.Append("\n\n").Append(s.explanation);
                 t.explanation = ex.ToString();
                 t.xp = Round5(s.xp * 0.4f); t.reward = t.xp;
@@ -182,10 +182,13 @@ namespace Intern.Game
 
         static string ErrorOption(string type) { return "Упадёт с ошибкой " + (string.IsNullOrEmpty(type) ? "" : type); }
 
-        static string WhatIf(string what)
+        // Строка кода для разбора: без отступа, длинная — с многоточием
+        static string Code1(string line)
         {
-            // «заменено «<» на «<=»» → «было бы «<=» вместо «<»» — формулировку оставляем как есть, она уже понятна
-            return "было бы так: " + what;
+            var t = (line ?? "").Trim();
+            if (t.Length == 0) t = "(пусто)";
+            if (t.Length > 60) t = t.Substring(0, 57) + "…";
+            return "«" + t + "»";
         }
 
         // Правдоподобные неверные ответы, если мутантов не хватило
@@ -501,7 +504,9 @@ namespace Intern.Game
                 long n; if (!long.TryParse(m.Value, out n) || n > 100000) continue;
                 // пропускаем числа в объявлениях по умолчанию и в заголовках вида def f(x=0)? — нет, это тоже поведение
                 Add(list, mask, m.Index, m.Length, (n + 1).ToString(), "off", "стоит " + Q((n + 1).ToString()) + " вместо " + Q(m.Value));
-                if (n > 0) Add(list, mask, m.Index, m.Length, (n - 1).ToString(), "off", "стоит " + Q((n - 1).ToString()) + " вместо " + Q(m.Value));
+                // «n + 1» → «n + 0» выглядит нелепо: такой случай уже даёт мутация range/len
+                bool afterSign = Regex.IsMatch(c.Substring(Math.Max(0, m.Index - 3), Math.Min(3, m.Index)), @"[-+]\s*$");
+                if (n > 0 && !(n == 1 && afterSign)) Add(list, mask, m.Index, m.Length, (n - 1).ToString(), "off", "стоит " + Q((n - 1).ToString()) + " вместо " + Q(m.Value));
             }
         }
 

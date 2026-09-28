@@ -49,6 +49,7 @@ namespace Intern.Game
         public static bool DebugDoor() { return KD(Key.F1); }
         public static bool DebugLunchEnd() { return KD(Key.F2); }
         public static bool DebugLead() { return KD(Key.F5); }
+        public static bool DebugBoard() { return KD(Key.F11); }
         public static bool Screenshot() { return KD(Key.F12); }
         // Был ли хоть какой-то ввод в этом кадре — для автопаузы
         public static bool AnyInput()
@@ -94,6 +95,7 @@ namespace Intern.Game
         public static bool DebugDoor() { return Input.GetKeyDown(KeyCode.F1); }
         public static bool DebugLunchEnd() { return Input.GetKeyDown(KeyCode.F2); }
         public static bool DebugLead() { return Input.GetKeyDown(KeyCode.F5); }
+        public static bool DebugBoard() { return Input.GetKeyDown(KeyCode.F11); }
         public static bool Screenshot() { return Input.GetKeyDown(KeyCode.F12); }
         public static bool AnyInput() { return Input.anyKey || Mathf.Abs(Input.GetAxisRaw("Mouse X")) + Mathf.Abs(Input.GetAxisRaw("Mouse Y")) > 0.01f; }
         public static bool Attack() { return Input.GetMouseButtonDown(0); }

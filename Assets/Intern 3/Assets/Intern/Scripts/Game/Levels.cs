@@ -1,6 +1,7 @@
 // Спринт 5 «Без потолка»: уровень игрока по опыту, титулы после Middle и смена компании.
 // Чистая логика без Unity-объектов — её гоняет и selftest.
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Intern.Game
@@ -81,6 +82,24 @@ namespace Intern.Game
         public const float CompanyBonus = 0.1f;       // +10% монет за каждую смену
         static readonly string[] Companies = { "Кодзилла Софт", "ОблакоТех", "Байт и Ко", "Кибер-Пельмень", "Нейролампа", "Гигабайт Групп", "Квант Код" };
         public static string CompanyName(int n) { return n >= 0 && n < Companies.Length ? Companies[n] : "Компания №" + (n + 1); }
+
+        // Переход в новую компанию: темы направления (кроме стажёрских) снова не сданы, код решений забыт,
+        // тикеты и тренировки сброшены, спринт перепланируется. Опыт, монеты, арсенал и другие направления остаются
+        public static void ResetForCompany(SaveData s, TrackPath path)
+        {
+            s.company++;
+            var keep = new HashSet<string>();
+            foreach (var tp in path.Topics) if (tp.gradeIndex == 0) foreach (var t in tp.tasks) keep.Add(t.id);
+            var pathIds = new HashSet<string>();
+            foreach (var t in path.Tasks) pathIds.Add(t.id);
+            var forget = new HashSet<string>(s.daily); forget.UnionWith(s.practice);
+            foreach (var id in pathIds) if (!keep.Contains(id)) forget.Add(id);   // старые решения не подсказывают на новом месте
+            for (int i = s.codeIds.Count - 1; i >= 0; i--)
+                if (forget.Contains(s.codeIds[i])) { s.codeIds.RemoveAt(i); if (i < s.codeTexts.Count) s.codeTexts.RemoveAt(i); }
+            s.done = s.done.FindAll(id => !pathIds.Contains(id) || keep.Contains(id));
+            s.daily.Clear(); s.dailyDay = 0; s.genDone.Clear(); s.practice.Clear();
+            s.sprintGoal = 0; s.sprintTasks.Clear();
+        }
     }
 
     // Звёзды темы: ★ — тема сдана, ★★ — 5 задач из генератора без подсказок, ★★★ — ещё и 10 подряд вовремя

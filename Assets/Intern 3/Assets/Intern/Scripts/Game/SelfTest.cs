@@ -324,6 +324,26 @@ namespace Intern.Game
                 var pt = pr != null ? TaskGen.Build(pr, find) : null;
                 expect(pt != null && pt.topic == topic.id && pt.key == "TR-1", "тренировка по теме " + topic.id);
             }
+            // ---------- смена компании ----------
+            {
+                var path = Tracks.BuildPath("backend", n => tracks[n]);
+                var sv = new SaveData();
+                foreach (var t in path.Tasks) sv.done.Add(t.id);
+                sv.done.Add("fe-other-task");                           // задача другого направления — остаётся
+                var intern = path.Topics.First(tp => tp.gradeIndex == 0).tasks[0].id;
+                var middle = path.Topics.Last(tp => tp.gradeIndex == 3).tasks[0].id;
+                sv.SetCode(intern, "x"); sv.SetCode(middle, "y"); sv.SetCode("gen:fix:a:1", "z");
+                sv.daily.Add("gen:fix:a:1"); sv.genDone.Add("gen:fix:a:1"); sv.practice.Add("gen:ask:b:1000001");
+                sv.xp = 50000; sv.money = 777; sv.sprintGoal = 10; sv.sprintNo = 3;
+                Levels.ResetForCompany(sv, path);
+                var set = new HashSet<string>(sv.done);
+                expect(sv.company == 1 && sv.xp == 50000 && sv.money == 777, "смена компании: опыт и монеты должны остаться");
+                expect(path.GradeIndex(set) == 1, "смена компании: грейд после смены — " + path.GradeIndex(set) + ", ждали Junior (1)");
+                expect(set.Contains("fe-other-task") && set.Contains(intern) && !set.Contains(middle), "смена компании: сданные задачи сброшены неверно");
+                expect(sv.GetCode(intern) == "x" && sv.GetCode(middle) == null && sv.GetCode("gen:fix:a:1") == null, "смена компании: код решений");
+                expect(sv.daily.Count == 0 && sv.genDone.Count == 0 && sv.practice.Count == 0 && sv.sprintGoal == 0 && sv.sprintNo == 3, "смена компании: тикеты и спринт");
+                expect(Mathf.Abs(Levels.CompanyBonus * sv.company - 0.1f) < 1e-4f && Levels.CompanyName(1) != Levels.CompanyName(0), "смена компании: бонус и имя");
+            }
             if (report != null) report.Add("генератор: исходных задач " + sources + ", «Почини баг» " + fixes + ", «Что вернёт» " + asks);
             return bad;
         }
