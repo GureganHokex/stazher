@@ -63,10 +63,14 @@ namespace Intern.Game
         readonly List<float> frames = new List<float>(8192);
         public int MaxAlive { get; private set; }
 
-        public LunchRun(CityRefs city, float seconds, Func<Vector3> playerPos, Func<Transform> cam, bool hoodie)
+        public readonly bool training;   // первый обед с обучением: урон вдвое меньше, замечают ближе, подписи видно издалека
+
+        public LunchRun(CityRefs city, float seconds, Func<Vector3> playerPos, Func<Transform> cam, bool hoodie, bool training = false)
         {
-            this.city = city; duration = timeLeft = seconds; this.playerPos = playerPos; this.cam = cam; this.hoodie = hoodie;
+            this.city = city; duration = timeLeft = seconds; this.playerPos = playerPos; this.cam = cam; this.hoodie = hoodie; this.training = training;
             maxHp = hp = B.playerHp;
+            // на обучении первые юристы гуляют прямо на проспекте
+            if (training) { var law = Balance.Citizen("lawyer"); for (int i = 0; i < 4 && law != null; i++) { var at = SpawnPoint("av", true); if (at != null) { Add(law, at.Value); spawned++; } } }
             // сразу на улицах: гуманитарии в переулках и на площади, технари на проспекте
             for (int i = 0; i < 10; i++) SpawnHumanitarian(true);
             for (int i = 0; i < 4; i++) SpawnTechie(true);
@@ -81,7 +85,7 @@ namespace Intern.Game
         public int AliveHumanitarians { get { int n = 0; foreach (var c in npcs) if (c != null && c.Alive && c.Humanitarian) n++; return n; } }
         public int AliveTechies { get { int n = 0; foreach (var c in npcs) if (c != null && c.Alive && !c.Humanitarian) n++; return n; }  }
         public int Left { get { return Mathf.Max(0, Cap - spawned); } }
-        public float NoticeRange { get { return B.noticeRange * (Filming > 0 ? 2f : 1f); } }
+        public float NoticeRange { get { return B.noticeRange * (Filming > 0 ? 2f : 1f) * (training ? 0.6f : 1f); } }
         public float PlayerSpeedMul
         {
             get
@@ -108,6 +112,7 @@ namespace Intern.Game
             if (deanAt > 0f && Elapsed >= deanAt) { deanAt = -1f; SpawnDean(); }
             if (series > 0 && Time.unscaledTime - seriesAt > 2.2f) series = 0;
             npcs.RemoveAll(n => n == null);
+            foreach (var n in npcs.ToArray()) if (n.Recyclable) Recycle(n);
             int film = 0; foreach (var n in npcs) if (n.Alive && n.State == CityNpc.St.Film) film++;
             Filming = film;
             MaxAlive = Mathf.Max(MaxAlive, npcs.Count);
@@ -116,7 +121,8 @@ namespace Intern.Game
             if (lodT <= 0f)
             {
                 lodT = 0.3f; var p = playerPos();
-                foreach (var n in npcs) if (n.Alive) n.SetLabel((n.transform.position - p).sqrMagnitude < 28f * 28f);
+                float lod = training ? 60f : 28f;
+                foreach (var n in npcs) if (n.Alive) n.SetLabel((n.transform.position - p).sqrMagnitude < lod * lod);
             }
         }
 
@@ -251,6 +257,7 @@ namespace Intern.Game
         {
             if (knockedOut || Paused) return;
             if (hoodie) dmg = Mathf.RoundToInt(dmg * (1f - B.hoodieArmor));
+            if (training) dmg = Mathf.Max(1, dmg / 2);
             hp = Mathf.Max(0, hp - dmg); hurtAt = Time.unscaledTime;
             if (stun > 0f) stunUntil = Mathf.Max(stunUntil, Time.time + stun);
             if (slow > 0f) slowUntil = Mathf.Max(slowUntil, Time.time + slow);
@@ -280,17 +287,28 @@ namespace Intern.Game
         public void OnEscaped(CityNpc n)
         {
             if (n.Humanitarian) escaped++;
-            npcs.Remove(n); UnityEngine.Object.Destroy(n.gameObject);
+            n.gameObject.SetActive(false); n.Recyclable = true;   // исчез в подъезде; тело заберём в пул в своём кадре
         }
 
         public void OnHidden(CityNpc n)
         {
             hidden++; hiddenInArchive.Add(n.def);
-            npcs.Remove(n); UnityEngine.Object.Destroy(n.gameObject);
+            n.gameObject.SetActive(false); n.Recyclable = true;
         }
 
         // Покупки в городе: сначала из монет обеда, потом из кошелька
         public int SpendFromLunch(int price) { int take = Mathf.Clamp(coins, 0, price); coins -= take; spent += price; return price - take; }
+
+        // Ближайший спокойный гуманитарий — для маркера обучения
+        public CityNpc NearestTarget(Vector3 from)
+        {
+            CityNpc best = null; float bd = float.MaxValue;
+            foreach (var n in npcs) if (n != null && n.Alive && n.Humanitarian && n.gameObject.activeSelf) { float d = (n.transform.position - from).sqrMagnitude; if (d < bd) { bd = d; best = n; } }
+            return best;
+        }
+
+        // Тело — обратно в пул города
+        public void Recycle(CityNpc n) { npcs.Remove(n); city.Recycle(n); }
 
         public void Track(GameObject go) { tracked.RemoveAll(g => g == null); tracked.Add(go); }
 
@@ -323,7 +341,7 @@ namespace Intern.Game
 
         public void Cleanup()
         {
-            foreach (var n in npcs) if (n != null) UnityEngine.Object.Destroy(n.gameObject);
+            foreach (var n in npcs.ToArray()) if (n != null) city.Recycle(n);
             npcs.Clear(); hiddenInArchive.Clear();
             foreach (var g in tracked) if (g != null) UnityEngine.Object.Destroy(g);
             tracked.Clear();

@@ -26,13 +26,15 @@ namespace Intern.Game
     public enum WorkKind { Edit, Run, Check, Solved, Theory, Hint, Terminal }
 
     // С каким настроением Гена подходит к столу
-    public enum LeadMood { Warn, Fine, Strike, Praise }
+    public enum LeadMood { Warn, Fine, Strike, Praise, Info }
 
     public class DayReport
     {
         public int day, tasks, xp, money, lunchMoney, kills, fines, workHours, idleHours, strikes, limit, debt, debtPaid;
         public bool strikeToday, strikeRemoved, truancy;
         public string weekday, remark;   // remark — замечание вместо выговора (первый прогул)
+        public string retro;             // ретро спринта (пятница)
+        public bool retroSuccess, tutorialDone;
     }
 
     public class WorkDay

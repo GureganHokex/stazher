@@ -63,6 +63,9 @@ namespace Intern.Game
             var wd = WorkdaySim();
             foreach (var line in wd) { fail++; sb.AppendLine("FAIL рабочий день: " + line); }
             sb.AppendLine("рабочий день: " + (wd.Count == 0 ? "сценарии прошли" : wd.Count + " ошибок"));
+            var fd = FirstDaySim();
+            foreach (var line in fd) { fail++; sb.AppendLine("FAIL первый день: " + line); }
+            sb.AppendLine("первый день и спринт: " + (fd.Count == 0 ? "сценарии прошли" : fd.Count + " ошибок"));
             sb.AppendLine("режимы: " + string.Join(", ", counts.Select(kv => kv.Key + " " + kv.Value).ToArray()));
             sb.AppendLine("итог: " + ok + " ок, " + fail + " ошибок, " + (DateTime.Now - started).TotalSeconds.ToString("0") + " с");
             string file = Path.Combine(Application.persistentDataPath, "selftest.txt");
@@ -179,6 +182,54 @@ namespace Intern.Game
                 var w = new WorkDay(s, () => 0); var moods = new List<LeadMood>(); w.Visit = (m, t) => moods.Add(m);
                 for (int h = 0; h < 3; h++) { w.Activity(WorkKind.Solved); w.Advance(60f, true); }
                 expect(moods.Count == 1 && moods[0] == LeadMood.Praise, "нет похвалы за три часа работы");
+            }
+            return bad;
+        }
+
+        // Обучение первого дня по шагам и спринт на неделю: план, бонус, неполная неделя
+        public static List<string> FirstDaySim()
+        {
+            var bad = new List<string>();
+            Action<bool, string> expect = (c, msg) => { if (!c) bad.Add(msg); };
+            {
+                var s = new SaveData(); WorkDay.Reset(s);
+                expect(s.tutorial == -1, "старое сохранение без обучения: шаг " + s.tutorial);
+                var o = new Onboarding(s); var seen = new List<Tut>(); o.Entered = t => seen.Add(t);
+                o.Begin();
+                expect(o.Active && o.Step == Tut.MeetLead, "обучение не началось");
+                o.Event("sit"); o.Event("talk");
+                expect(o.Step == Tut.RunCode, "после знакомства и посадки шаг " + o.Step);
+                o.Event("run"); expect(o.Step == Tut.SolveFirst, "после запуска шаг " + o.Step);
+                s.dayTasks = 1; o.Event("solved"); expect(o.Step == Tut.SolveSecond, "после первой задачи шаг " + o.Step);
+                s.minute = 600; s.dayTasks = 2; o.Event("solved"); expect(o.Step == Tut.WaitLunch, "после второй задачи до обеда шаг " + o.Step);
+                o.Poll(700, 0, false); expect(o.Step == Tut.WaitLunch, "обед наступил раньше 12:00");
+                o.Poll(720, 0, false); expect(o.Step == Tut.GoLunch, "в 12:00 шаг " + o.Step);
+                o.Event("lunch"); expect(o.Step == Tut.FirstKills, "в городе шаг " + o.Step);
+                o.Poll(730, 2, true); expect(o.Step == Tut.FirstKills, "двое выбитых уже засчитаны за троих");
+                o.Poll(731, 3, true); expect(o.Step == Tut.BackToOffice, "трое выбитых: шаг " + o.Step);
+                o.Event("lunchEnd"); expect(o.Step == Tut.WorkTillEvening, "после обеда шаг " + o.Step);
+                o.Event("dayEnd"); expect(!o.Active && s.tutorial == -1, "обучение не закончилось в конце дня");
+                // сел за стол раньше разговора — шаг «Сядь за компьютер» пропущен: 11 шагов с «Готово» минус 1
+                expect(seen.Count == Onboarding.Count && !seen.Contains(Tut.SitDown), "шагов показано " + seen.Count);
+                // ранний обед и пропуск
+                var s2 = new SaveData(); var o2 = new Onboarding(s2); o2.Begin(); o2.Event("talk"); o2.Event("sit"); o2.Event("run"); o2.Event("solved");
+                o2.Event("lunch"); expect(o2.Step == Tut.FirstKills, "обед до второй задачи: шаг " + o2.Step);
+                var s3 = new SaveData(); var o3 = new Onboarding(s3); o3.Begin(); o3.Skip(); expect(!o3.Active, "пропуск обучения не сработал");
+            }
+            {
+                var s = new SaveData(); WorkDay.Reset(s);
+                var sp = new WeekSprint(s); var ids = new List<string>(); for (int i = 0; i < 40; i++) ids.Add("t" + i);
+                sp.Plan(1, 0, ids);
+                expect(sp.Planned && sp.Number == 1 && sp.Goal == 8 && sp.Tasks.Count == 11, "первый спринт: цель " + sp.Goal + ", задач " + sp.Tasks.Count);
+                for (int i = 0; i < 8; i++) sp.TaskDone("t" + i);
+                var r = sp.Close(0);
+                expect(r.success && r.bonus == WeekSprint.BonusFor(8, 0) && !sp.Planned, "ретро первого спринта: " + r.text);
+                sp.Plan(6, 1, ids);
+                expect(sp.Number == 2 && sp.Goal == 15, "второй спринт Junior: цель " + sp.Goal);
+                r = sp.Close(1); expect(!r.success && r.bonus == 0, "невыполненный спринт дал бонус");
+                sp.Plan(8, 2, ids);   // среда: осталось 3 дня из 5
+                expect(sp.Goal == Mathf.RoundToInt(12 * 3 / 5f), "спринт со среды: цель " + sp.Goal);
+                expect(WeekSprint.Monday(6) && WeekSprint.Friday(5) && !WeekSprint.Friday(6), "дни недели");
             }
             return bad;
         }

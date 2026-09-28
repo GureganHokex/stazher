@@ -601,6 +601,8 @@ namespace Intern.Game
         }
 
         // ---------- Модель из Blender ----------
+        static readonly HashSet<string> loggedModels = new HashSet<string>();   // сводку по модели пишем в лог один раз
+
         public static CharacterAnim Spawn(string model, Transform parent, Vector3 pos, float yaw, Appearance ap)
         {
             var root = new GameObject(model);
@@ -637,7 +639,7 @@ namespace Intern.Game
                     inst.transform.rotation = fix * inst.transform.rotation;
                     inst.transform.position += transform.position - rootT.position;
                 }
-                Debug.Log("[Стажёр] " + modelName + ": вверх " + (headT.position - rootT.position).normalized + ", вперёд " +
+                if (loggedModels.Add(modelName + "|up")) Debug.Log("[Стажёр] " + modelName + ": вверх " + (headT.position - rootT.position).normalized + ", вперёд " +
                           Vector3.ProjectOnPlane(noseT.position - headT.position, transform.up).normalized);
             }
             // Кости в FBX могут быть в осях Blender — пересобираем скелет в осях персонажа
@@ -645,7 +647,7 @@ namespace Intern.Game
             rig = NormalizeRig(srcRoot, transform);
             rig.name = "Rig";
             int skins = BindSkins(inst.transform);
-            if (skins > 0) Debug.Log("[Стажёр] " + modelName + ": модель со скелетом, сеток с костями: " + skins);
+            if (skins > 0 && loggedModels.Add(modelName + "|skins")) Debug.Log("[Стажёр] " + modelName + ": модель со скелетом, сеток с костями: " + skins);
             inst.SetActive(false); Destroy(inst);
             hips = F("Hips"); torso = F("Torso"); neck = F("Neck"); head = F("Head");
             legL = F("HipL"); legR = F("HipR"); kneeL = F("KneeL"); kneeR = F("KneeR");

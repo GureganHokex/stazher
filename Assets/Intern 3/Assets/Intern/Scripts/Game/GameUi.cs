@@ -45,6 +45,7 @@ namespace Intern.Game
         readonly List<Column> columns = new List<Column>();
 
         string lastHud, lastLunch;
+        VisualElement goalRow;
         int fpsFrames; float fpsTime;
 
         public static GameUi TryCreate(GameRoot g)
@@ -95,6 +96,8 @@ namespace Intern.Game
             lunchHud = BuildLunchHud(); root.Add(lunchHud);
             shopLayer = Centered(); root.Add(shopLayer);
             lunchSum = Centered(); root.Add(lunchSum);
+            boardLayer = Centered(); root.Add(boardLayer);
+            goalRow = BuildGoal(); root.Add(goalRow);
             summary = Centered(); root.Add(summary);
             fired = Centered(); root.Add(fired);
             menu = BuildMenu(); root.Add(menu);
@@ -103,7 +106,7 @@ namespace Intern.Game
             toastRow = BuildToast(); root.Add(toastRow);
             fpsLabel = K.B("", 13f, Mint); fpsLabel.style.position = Position.Absolute; fpsLabel.style.top = 6f; fpsLabel.style.left = 0f; fpsLabel.style.right = 0f;
             fpsLabel.style.unityTextAlign = TextAnchor.MiddleCenter; root.Add(fpsLabel);
-            foreach (var v in new[] { codeBg, dim, hud, menu, pause, settings, lunchHud, summary, fired, shopLayer, lunchSum }) { v.style.display = DisplayStyle.None; visible[v] = false; }
+            foreach (var v in new[] { codeBg, dim, hud, menu, pause, settings, lunchHud, summary, fired, shopLayer, lunchSum, boardLayer }) { v.style.display = DisplayStyle.None; visible[v] = false; }
         }
 
         static VisualElement Layer() { var v = K.Box(); K.Fill(v); v.pickingMode = PickingMode.Ignore; return v; }
@@ -855,6 +858,8 @@ def deploy(env=""staging""):
                         : r.tasks >= 5 ? "Гена: «Отличный день. Так держать.»"
                         : "Гена: «Нормально. Завтра можно бодрее.»";
             var nl = K.T(note, 16f, r.truancy ? Pink : r.remark != null ? Sun : Muted, false, false, true); nl.style.marginTop = 14f; summaryCard.Add(nl);
+            if (r.retro != null) { var rl = K.T(r.retro, 16f, r.retroSuccess ? Mint : Sun, false, true, true); rl.style.marginTop = 8f; summaryCard.Add(rl); }
+            if (r.tutorialDone) { var tl = K.T("Первый день пройден! С завтрашнего дня Гена штрафует за простой, а обед — только после работы.", 16f, Mint, false, false, true); tl.style.marginTop = 8f; summaryCard.Add(tl); }
             var row = K.Box(true); row.pickingMode = PickingMode.Ignore; row.style.marginTop = 10f;
             var next = new UiBtn("Следующий день", () => g.UiNextDay(), Sun, SunHover, SunLip, Ink, "play", g.Work.WeekdayFull + ", 9:00", 60f, false); K.Grow(next); next.style.marginRight = 10f;
             var home = new UiBtn("В меню", () => g.UiSummaryToMenu(), Ghost, GhostHover, GhostLip, Text, "home", null, 60f, false); home.style.width = 180f;
@@ -926,6 +931,8 @@ def deploy(env=""staging""):
             Show(lunchHud, lunchLive);
             if (Show(shopLayer, m == GameRoot.Mode.Shop) || (m == GameRoot.Mode.Shop && shopBuilt != g.ShopVersion)) BuildShop();
             if (Show(lunchSum, m == GameRoot.Mode.LunchSummary)) { BuildLunchSummary(); if (lunchSumCard != null) Pop(lunchSumCard); }
+            if (Show(boardLayer, m == GameRoot.Mode.Board)) BuildBoard();
+            UpdateGoal(goalRow);
             if (Show(summary, m == GameRoot.Mode.DaySummary)) { BuildSummary(); if (summaryCard != null) Pop(summaryCard); }
             if (Show(fired, m == GameRoot.Mode.Fired)) { BuildFired(); if (firedCard != null) Pop(firedCard); }
             hudCard.style.display = inLunch ? DisplayStyle.None : DisplayStyle.Flex;

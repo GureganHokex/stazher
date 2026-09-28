@@ -9,7 +9,7 @@ namespace Intern.Game
 {
     public partial class GameRoot : MonoBehaviour
     {
-        public enum Mode { Menu, Walk, Transition, Ide, Dialog, Pause, Wardrobe, Lunch, DaySummary, Fired, Shop, LunchSummary }
+        public enum Mode { Menu, Walk, Transition, Ide, Dialog, Pause, Wardrobe, Lunch, DaySummary, Fired, Shop, LunchSummary, Board }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
@@ -133,6 +133,7 @@ namespace Intern.Game
             Work.Notice = t => Toast(t);
             Work.DayOver = () => { dayOverPending = true; dayOverNoticed = false; };
             Work.Fired = OnFired;
+            SetupTutorial();
         }
 
 #if UNITY_EDITOR
@@ -186,6 +187,7 @@ namespace Intern.Game
             UpdateBoard();
             PlaceExitDoor();
             PlaceArsenalCase();
+            PlaceTaskBoard();
             if (refs.lead != null)
             {
                 leadWalker = refs.lead.gameObject.AddComponent<LeadWalker>();
@@ -239,6 +241,7 @@ namespace Intern.Game
             var tp = cur != null ? Path.TopicOf(cur) : null;
             refs.board.text = ProfessionName.ToUpperInvariant() + " · " + RankName + "\n\nСделано: " + done + " / " + total +
                          (cur != null && !PathComplete ? "\nТема: " + (tp != null ? tp.title : "") + "\nСейчас: " + cur.key + " " + cur.title : "\nНаправление пройдено!") +
+                         (Sprint != null && Sprint.Planned ? "\n\nСПРИНТ " + Sprint.Number + ": " + Sprint.DoneCount + " / " + Sprint.Goal : "") +
                          "\n\nБагов поймано: " + Save.bugsCaught;
         }
 
@@ -277,6 +280,7 @@ namespace Intern.Game
                 case Mode.Lunch: LunchUpdate(); break;
                 case Mode.Shop: ShopUpdate(); break;
                 case Mode.LunchSummary: player.Tick(false); break;
+                case Mode.Board: BoardUpdate(); break;
                 case Mode.Ide:
                     if (ideUi != null) ideUi.Tick(Time.deltaTime); else ide.Tick(Time.deltaTime);
                     TrackTheory(Time.deltaTime);
@@ -303,6 +307,7 @@ namespace Intern.Game
                     break;
             }
             TickWorkday();
+            TutTick();
             if (InputX.Screenshot()) TakeScreenshot();
             if (toast == null || Time.unscaledTime > toastUntil)
             {
@@ -574,6 +579,7 @@ namespace Intern.Game
             }
             player.SetCamera(camB, rotB, fovB);
             mode = Mode.Ide;
+            TutEvent("sit");
             ideShownAt = Time.unscaledTime;
             if (ideUi != null) ideUi.SetActive(true);
             SetCursor(false);
@@ -668,6 +674,8 @@ namespace Intern.Game
             Save.money += got; Save.xp += xp; Save.done.Add(t.id);
             Save.dayTasks++; Save.dayXp += xp; Save.dayMoney += reward;
             if (Work != null) Work.Activity(WorkKind.Solved);
+            if (Sprint != null) Sprint.TaskDone(t.id);
+            TutEvent("solved");
             Persist(); UpdateBoard();
             Toast("Задача сдана! +" + xp + " XP" + (sated ? " (сытый +10%)" : "") + ", +" + reward + " монет" + (late ? " (срок сорван)" : "") +
                   (got < reward ? ", из них " + (reward - got) + " в счёт долга Гене" : ""));
@@ -758,7 +766,8 @@ namespace Intern.Game
             player.BlendFromCurrent(0.6f);
             player.avatar.SetHeadVisible(!player.firstPerson);
             mode = Mode.Walk; SetCursor(true);
-            if (firstWardrobe) Toast("Первый рабочий день! Подойди к тимлиду у доски и нажми E.");
+            if (tutorialPending) { tutorialPending = false; Tutorial.Begin(); }
+            else if (firstWardrobe) Toast("Первый рабочий день! Подойди к тимлиду у доски и нажми E.");
         }
 
         // ================== Диалоги ==================
@@ -789,6 +798,7 @@ namespace Intern.Game
 
         public void TalkToLead()
         {
+            if (TutorialTalk()) return;
             if (refs.lead != null) refs.lead.React(1, 2.5f);
             var pending = leadWalker != null ? leadWalker.Interrupt() : new List<string>();
             int done = DoneCount, total = TotalCount;
@@ -886,7 +896,7 @@ namespace Intern.Game
         {
             if (fresh)
             {
-                Progress.Wipe(); Save = new SaveData { version = 4, profession = Career.CanPick(profession) && !string.IsNullOrEmpty(profession) ? profession : "backend" };
+                Progress.Wipe(); Save = new SaveData { version = 5, profession = Career.CanPick(profession) && !string.IsNullOrEmpty(profession) ? profession : "backend" };
                 WorkDay.Reset(Save);
                 LoadPath();
                 SetupWork();
@@ -895,9 +905,11 @@ namespace Intern.Game
                 foreach (var b in bugs) if (b != null) Destroy(b.gameObject);
                 SetupArsenal(player.gameObject);
                 player.SetAvatar(LookNow());
+                tutorialPending = true;
             }
             Save.difficulty = (int)d; Persist(); UpdateBoard();
             lastInput = Time.unscaledTime;
+            if (!Sprint.Planned) PlanSprint();
             if (leadWalker != null) leadWalker.ResetHome();
             if (Work.Ended) dayOverPending = true;
             if (fresh) Toast("Направление: " + ProfessionName + ". Начинаем с общей базы — грейд «Стажёр».");
@@ -1106,7 +1118,7 @@ namespace Intern.Game
             }
 #endif
             // часы идут в офисе, за компьютером, в разговоре и в гардеробе
-            bool office = mode == Mode.Walk || mode == Mode.Ide || mode == Mode.Dialog || mode == Mode.Wardrobe || ((mode == Mode.Transition || mode == Mode.Shop || mode == Mode.LunchSummary) && lunch == null);
+            bool office = mode == Mode.Walk || mode == Mode.Ide || mode == Mode.Dialog || mode == Mode.Wardrobe || ((mode == Mode.Transition || mode == Mode.Shop || mode == Mode.LunchSummary || mode == Mode.Board) && lunch == null);
             if (office && !Work.Ended) Work.Advance(Time.deltaTime / DayLength.SecondsPerGameMinute(GameConfig.S.dayLength), true);
             // автопауза: 2 минуты без ввода — часы и обед стоят
             if ((mode == Mode.Walk || mode == Mode.Ide || mode == Mode.Lunch) && Time.unscaledTime - lastInput > 120f)
@@ -1129,6 +1141,7 @@ namespace Intern.Game
                 return;
             }
             Work.Activity(kind);
+            if (kind == WorkKind.Run || kind == WorkKind.Check) TutEvent("run");
         }
 
         // Теория новой задачи: минута за открытой задачей засчитывается один раз
@@ -1148,7 +1161,10 @@ namespace Intern.Game
             LastReport = Work.Finish();
             summaryNow = false;
             if (FiredReport != null) return;      // уволили по итогам дня
+            SprintAtDayEnd(LastReport);
+            if (Tutorial != null && Tutorial.Active) { TutEvent("dayEnd"); LastReport.tutorialDone = true; }
             Work.NextDay();
+            SprintAtDayStart();
             Persist(); UpdateBoard();
             mode = Mode.DaySummary; player.cinematic = true; SetCursor(false);
         }

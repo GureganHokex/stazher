@@ -40,6 +40,7 @@ namespace Intern.Game
             Work.StartLunch(); Persist();
             if (FiredReport != null) return;      // самоволка оказалась последней каплей
             if (leadWalker != null) leadWalker.ResetHome();
+            TutEvent("lunch");
             StartCoroutine(ToCity());
         }
 
@@ -51,11 +52,13 @@ namespace Intern.Game
             {
                 float t0 = Time.realtimeSinceStartup;
                 city = CityBuilder.Build();
+                city.Prewarm(new[] { "Dev1", "Dev2", "Dev3", "Dev4" }, 12);   // тела горожан про запас, пока экран тёмный
                 Debug.Log("[Стажёр] Город построен за " + ((Time.realtimeSinceStartup - t0) * 1000f).ToString("0") + " мс: дверей " + city.doors.Count + ", узлов " + city.nodes.Count + ", баланс: " + Balance.Source);
             }
             city.root.gameObject.SetActive(true);
             Gore.Enabled = GameConfig.S.blood;
-            lunch = new LunchRun(city, DayLength.LunchSeconds(GameConfig.S.dayLength), () => player.Position, () => player.cam.transform, Save.hoodie && Save.hoodieOn)
+            bool training = Tutorial != null && Tutorial.Active && Tutorial.Step == Tut.FirstKills;
+            lunch = new LunchRun(city, DayLength.LunchSeconds(GameConfig.S.dayLength), () => player.Position, () => player.cam.transform, Save.hoodie && Save.hoodieOn, training)
             { Say = Toast, Coupon = t => { Save.coupons++; Toast(t); } };
             player.Teleport(city.spawn.position, 0f); player.FaceCameraYaw(0f);
             player.cinematic = false; player.avatar.SetHeadVisible(!player.firstPerson);
@@ -97,7 +100,7 @@ namespace Intern.Game
         {
             if (lunch == null) return;
             var rep = lunch.Report(early);
-            Debug.Log("[Стажёр] Обед: " + lunch.PerfLine() + ", выбито " + lunch.kills + ", убежали " + lunch.escaped + ", монет " + lunch.coins);
+            Debug.Log("[Стажёр] Обед: тел в пуле " + (city != null ? city.Pooled : 0) + ", " + lunch.PerfLine() + ", выбито " + lunch.kills + ", убежали " + lunch.escaped + ", монет " + lunch.coins);
             int coins = lunch.coins;
             if (lunch.knockedOut && coins > 0) { rep.lost = Mathf.RoundToInt(coins * Balance.D.knockedLose); coins -= rep.lost; }
             rep.coins = coins;
@@ -111,6 +114,7 @@ namespace Intern.Game
             if (city != null) city.root.gameObject.SetActive(false);
             if (exitSpot != null) player.Teleport(exitSpot.position, 0f); else player.Teleport(refs.spawn.position, refs.spawn.eulerAngles.y);
             player.FaceCameraYaw(0f);
+            TutEvent("lunchEnd");
             Persist(); UpdateBoard();
         }
 

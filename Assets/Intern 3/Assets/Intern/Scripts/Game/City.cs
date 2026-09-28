@@ -39,6 +39,47 @@ namespace Intern.Game
         public Vector3 officeDoor, archiveDoor;
         public readonly List<GameObject> shopKeepers = new List<GameObject>();
 
+        // Пул тел горожан по моделям: живёт вместе с городом, между обедами тоже
+        readonly Dictionary<string, Stack<CharacterAnim>> pool = new Dictionary<string, Stack<CharacterAnim>>();
+        public int Pooled { get { int n = 0; foreach (var s in pool.Values) n += s.Count; return n; } }
+
+        public CharacterAnim TakePooled(string model)
+        {
+            Stack<CharacterAnim> st;
+            if (pool.TryGetValue(model, out st)) while (st.Count > 0) { var a = st.Pop(); if (a != null) return a; }
+            foreach (var kv in pool) while (kv.Value.Count > 0) { var a = kv.Value.Pop(); if (a != null) return a; }
+            return null;
+        }
+
+        // Заранее собрать несколько тел, пока экран затемнён: первые появления без рывков
+        public void Prewarm(string[] models, int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                string m = models[i % models.Length];
+                if (!ModelLib.HasCharacter(m)) continue;
+                var a = CharacterAnim.Spawn(m, root, root.position + Vector3.down * 20f, 0f, null);
+                a.gameObject.SetActive(false);
+                Stack<CharacterAnim> st;
+                if (!pool.TryGetValue(m, out st)) pool[m] = st = new Stack<CharacterAnim>();
+                st.Push(a);
+            }
+        }
+
+        public void Recycle(CityNpc n)
+        {
+            if (n == null) return;
+            var a = n.Anim;
+            n.Strip();
+            UnityEngine.Object.DestroyImmediate(n);   // сразу: тело может понадобиться в этом же кадре
+            if (a == null) return;
+            a.gameObject.SetActive(false);
+            string key = string.IsNullOrEmpty(a.model) ? "bean" : a.model;
+            Stack<CharacterAnim> st;
+            if (!pool.TryGetValue(key, out st)) pool[key] = st = new Stack<CharacterAnim>();
+            st.Push(a);
+        }
+
         public Vector3 Local(Vector3 world) { return world - root.position; }
 
         public CityStreet StreetAt(Vector3 world)

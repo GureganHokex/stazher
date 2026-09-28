@@ -208,6 +208,10 @@ namespace Intern.Game
         public bool hoodie, hoodieOn;
         public int coupons;                                       // купоны декана: −20% в мастерской
         public int bestLunch, bestSeries, knockouts;
+        // первый день и спринты (версия 5)
+        public int tutorial = -1;                                 // шаг обучения; −1 — не идёт (пройдено или пропущено)
+        public int sprintNo, sprintGoal, sprintDone, sprintStartDay;
+        public List<string> sprintTasks = new List<string>();
 
         public string GetCode(string id) { int i = codeIds.IndexOf(id); return i >= 0 ? codeTexts[i] : null; }
         public void SetCode(string id, string code)

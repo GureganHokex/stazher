@@ -29,6 +29,9 @@ namespace Intern.Game
         LunchRun run;
         CityRefs city;
         CharacterAnim anim;
+        readonly List<GameObject> props = new List<GameObject>();
+        public CharacterAnim Anim { get { return anim; } }
+        public bool Recyclable;          // можно вернуть тело в пул (обед заберёт в своём кадре)
         TextMesh tag;
         SpeechBubble bubble;
         St st = St.Walk;
@@ -44,21 +47,35 @@ namespace Intern.Game
         {
             string model = Models[rnd.Next(Models.Length)];
             float yaw0 = (float)rnd.NextDouble() * 360f;
-            CharacterAnim a;
             var ap = Outfit(def.id, rnd);
-            if (ModelLib.HasCharacter(model)) { a = CharacterAnim.Spawn(model, run.City.root, pos, yaw0, null); a.Tint(ap); a.SetEmotion(0); }
+            // тело берём из пула: собрать скелет модели заново — самое дорогое при появлении горожанина
+            CharacterAnim a = run.City.TakePooled(model);
+            if (a != null)
+            {
+                a.gameObject.SetActive(true);
+                a.transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw0, 0));
+                if (a.imported) a.Tint(ap); else a.Build(ap);
+                a.SetEmotion(0);
+            }
+            else if (ModelLib.HasCharacter(model)) { a = CharacterAnim.Spawn(model, run.City.root, pos, yaw0, null); a.Tint(ap); a.SetEmotion(0); }
             else a = Look.Bean(model, run.City.root, pos - run.City.root.position, yaw0, ap);
             a.transform.position = pos;
-            if (def.id == "dean") a.transform.localScale = Vector3.one * 1.12f;
+            a.transform.localScale = Vector3.one * (def.id == "dean" ? 1.12f : 1f);
             var n = a.gameObject.AddComponent<CityNpc>();
             n.run = run; n.city = run.City; n.anim = a; n.def = def; n.yaw = yaw0;
             n.hp = def.hp; n.speed = def.walk * (0.9f + (float)rnd.NextDouble() * 0.2f);
             n.lane = (float)rnd.NextDouble() * 2f - 1f;
-            var cap = a.gameObject.AddComponent<CapsuleCollider>(); cap.center = new Vector3(0, 0.95f, 0); cap.height = 1.9f; cap.radius = 0.32f;
+            var cap = a.GetComponent<CapsuleCollider>();
+            if (cap == null) cap = a.gameObject.AddComponent<CapsuleCollider>();
+            cap.center = new Vector3(0, 0.95f, 0); cap.height = 1.9f; cap.radius = 0.32f; cap.enabled = true;
             // кинематическое тело: двигаем через transform, и физике не приходится пересобирать статичный коллайдер
-            var rb = a.gameObject.AddComponent<Rigidbody>(); rb.isKinematic = true; rb.useGravity = false;
+            if (a.GetComponent<Rigidbody>() == null) { var rb = a.gameObject.AddComponent<Rigidbody>(); rb.isKinematic = true; rb.useGravity = false; }
+            // всё, что добавит Props, — приметы этого горожанина; при возврате в пул их снимаем
+            var before = new HashSet<Transform>(a.GetComponentsInChildren<Transform>(true));
             n.Props(rnd);
-            n.tag = OfficeBuilder.Label(def.name, new Vector3(0, 2.35f, 0), 0.018f, Pal.Hex(def.humanitarian ? def.color : "89D185"), a.transform);
+            foreach (var t in a.GetComponentsInChildren<Transform>(true)) if (!before.Contains(t) && before.Contains(t.parent)) n.props.Add(t.gameObject);
+            string label = run.training ? (def.humanitarian ? def.name + " · +10" : def.name + " · не трогать") : def.name;
+            n.tag = OfficeBuilder.Label(label, new Vector3(0, 2.35f, 0), 0.018f, Pal.Hex(def.humanitarian ? def.color : "89D185"), a.transform);
             n.tag.gameObject.AddComponent<Billboard>();
             n.nextThink = Time.time + (float)rnd.NextDouble() * 0.3f;
             n.NewWalk(rnd);
@@ -413,7 +430,21 @@ namespace Intern.Game
             anim.enabled = false;
             Gore.Pool(transform.position + transform.up * -0.4f + Vector3.up * 0.02f);
             yield return new WaitForSeconds(20f);
-            Destroy(gameObject);
+            if (run != null) Recyclable = true; else Destroy(gameObject);
+        }
+
+        // Снять всё своё перед возвратом тела в пул: приметы, подпись, облачко, позу
+        public void Strip()
+        {
+            StopAllCoroutines();
+            foreach (var p in props) if (p != null) Destroy(p);
+            props.Clear();
+            if (tag != null) Destroy(tag.gameObject);
+            if (bubble != null) Destroy(bubble.gameObject);
+            anim.enabled = true; anim.moveSpeed = 0f; anim.aimGun = false; anim.holdRight = false; anim.swingStart = -9f;
+            foreach (var c in GetComponents<Collider>()) c.enabled = true;
+            transform.localScale = Vector3.one;
+            run = null;
         }
 
         // Только для проверки в редакторе: поставить перед игроком и заморозить

@@ -413,10 +413,10 @@ namespace Intern.Game
 
         void HideBubble() { bubble.Hide(); if (nameTag != null) nameTag.SetActive(true); }
 
-        static int Emotion(LeadMood m) { return m == LeadMood.Praise ? 1 : m == LeadMood.Warn ? 3 : 5; }
+        static int Emotion(LeadMood m) { return m == LeadMood.Praise || m == LeadMood.Info ? 1 : m == LeadMood.Warn ? 3 : 5; }
         static Color BubbleColor(LeadMood m)
         {
-            return m == LeadMood.Praise ? Pal.Hex("D8F7E4") : m == LeadMood.Warn ? Pal.Hex("FFF3C4") : m == LeadMood.Fine ? Pal.Hex("FFE3EA") : Pal.Hex("FFC2D4");
+            return m == LeadMood.Info ? Pal.Hex("DCEBFF") : m == LeadMood.Praise ? Pal.Hex("D8F7E4") : m == LeadMood.Warn ? Pal.Hex("FFF3C4") : m == LeadMood.Fine ? Pal.Hex("FFE3EA") : Pal.Hex("FFC2D4");
         }
 
         void FacePlayer(bool instant)
