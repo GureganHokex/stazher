@@ -66,6 +66,11 @@ namespace Intern.Game
             var fd = FirstDaySim();
             foreach (var line in fd) { fail++; sb.AppendLine("FAIL первый день: " + line); }
             sb.AppendLine("первый день и спринт: " + (fd.Count == 0 ? "сценарии прошли" : fd.Count + " ошибок"));
+            var genInfo = new List<string>();
+            var gs = GenSim(null, genInfo);
+            foreach (var line in gs) { fail++; sb.AppendLine("FAIL без потолка: " + line); }
+            foreach (var line in genInfo) sb.AppendLine(line);
+            sb.AppendLine("уровни, звёзды, генератор: " + (gs.Count == 0 ? "сценарии прошли" : gs.Count + " ошибок"));
             sb.AppendLine("режимы: " + string.Join(", ", counts.Select(kv => kv.Key + " " + kv.Value).ToArray()));
             sb.AppendLine("итог: " + ok + " ок, " + fail + " ошибок, " + (DateTime.Now - started).TotalSeconds.ToString("0") + " с");
             string file = Path.Combine(Application.persistentDataPath, "selftest.txt");
@@ -231,6 +236,95 @@ namespace Intern.Game
                 expect(sp.Goal == Mathf.RoundToInt(12 * 3 / 5f), "спринт со среды: цель " + sp.Goal);
                 expect(WeekSprint.Monday(6) && WeekSprint.Friday(5) && !WeekSprint.Friday(6), "дни недели");
             }
+            return bad;
+        }
+
+        // Спринт 5: уровни и титулы, звёзды тем, генератор задач (эталон проходит, мутант валит тест), тикеты дня
+        public static List<string> GenSim(Func<string, TrackData> load = null, List<string> report = null)
+        {
+            var bad = new List<string>();
+            Action<bool, string> expect = (c, msg) => { if (!c) bad.Add(msg); };
+            // ---------- уровни ----------
+            for (int l = 1; l <= 200; l++)
+            {
+                if (Levels.Of(Levels.TotalFor(l)) != l) { bad.Add("уровень " + l + ": Of(TotalFor) = " + Levels.Of(Levels.TotalFor(l))); break; }
+                if (l > 1 && Levels.Of(Levels.TotalFor(l) - 1) != l - 1) { bad.Add("уровень " + l + ": на 1 XP меньше — не " + (l - 1)); break; }
+                if (Levels.TotalFor(l + 1) - Levels.TotalFor(l) != Levels.Cost(l)) { bad.Add("стоимость уровня " + l); break; }
+            }
+            expect(Levels.Of(0) == 1 && Levels.Cost(1) == 220 && Levels.TotalFor(2) == 220, "первый уровень: 220 XP");
+            expect(Levels.Title(29) == "Middle" && Levels.Title(30) == "Senior" && Levels.Title(40) == "Lead" && Levels.Title(50) == "Principal" && Levels.Title(60) == "Architect", "титулы 30/40/50/60");
+            expect(Levels.Title(70) == "Architect ★" && Levels.Title(95) == "Architect ★★★", "звёзды Architect: " + Levels.Title(70) + ", " + Levels.Title(95));
+            expect(Mathf.Abs(Levels.TitleBonus(30) - 0.1f) < 1e-4f && Mathf.Abs(Levels.TitleBonus(80) - 0.5f) < 1e-4f && Levels.TitleBonus(29) == 0f, "бонус титула");
+            int at; expect(Levels.NextTitle(35, out at) == "Lead" && at == 40, "следующий титул после 35");
+            // ---------- звёзды ----------
+            {
+                var st = new TopicStat { id = "t" };
+                expect(TopicStars.Of(st, false) == 0 && TopicStars.Of(st, true) == 1, "одна звезда за сданную тему");
+                int got = 0;
+                for (int i = 0; i < 4; i++) got += TopicStars.Record(st, true, true);
+                expect(got == 0 && TopicStars.Of(st, true) == 1, "4 задачи — ещё одна звезда");
+                expect(TopicStars.Record(st, true, false) == 2 && st.streak == 0, "5 без подсказок — две звезды, опоздание сбрасывает серию");
+                for (int i = 0; i < 9; i++) got += TopicStars.Record(st, false, true);
+                expect(got == 0 && st.best == 9, "9 подряд — ещё не три звезды");
+                expect(TopicStars.Record(st, false, true) == 3 && TopicStars.Of(st, true) == 3, "10 подряд вовремя — три звезды");
+                expect(TopicStars.Record(st, true, true) == 0, "звезда выдаётся один раз");
+            }
+            // ---------- генератор ----------
+            load = load ?? Tracks.Load;
+            var all = new Dictionary<string, TaskData>();
+            var tracks = new Dictionary<string, TrackData>();
+            foreach (var tr in Tracks.All) { var d = load(tr); tracks[tr] = d; foreach (var tp in d.topics) foreach (var t in tp.tasks) all[t.id] = t; }
+            Func<string, TaskData> find = id => { TaskData t; return all.TryGetValue(id, out t) ? t : null; };
+            int sources = 0, fixes = 0, asks = 0;
+            foreach (var s in all.Values.Where(TaskGen.CanGenerate))
+            {
+                sources++;
+                if (TaskGen.Original(s) == null) { bad.Add("генератор: эталон " + s.id + " не проходит свои тесты"); continue; }
+                foreach (var seed in new[] { 1, 2 })
+                {
+                    var f = TaskGen.Build(TaskGen.Spec("fix", s.id, seed), find);
+                    if (f != null)
+                    {
+                        fixes++;
+                        var again = TaskGen.Build(TaskGen.Spec("fix", s.id, seed), find);
+                        expect(again != null && again.starter == f.starter, "генератор: " + f.id + " собирается по-разному");
+                        expect(f.starter != s.solution && f.solution == s.solution, "генератор: " + f.id + " — мутант совпал с эталоном");
+                        var r = TaskGen.RunTests(s, f.starter, 300000);
+                        expect(r.Count > 0 && r.Any(x => !x.Passed), "генератор: " + f.id + " — мутант проходит все тесты");
+                        expect(f.hints.Length == 2 && f.explanation.Length > 0 && f.xp >= 5, "генератор: " + f.id + " — нет подсказок или разбора");
+                    }
+                    var a = TaskGen.Build(TaskGen.Spec("ask", s.id, seed), find);
+                    if (a != null)
+                    {
+                        asks++;
+                        expect(a.IsChoice && a.answer.Length == 1 && a.answer[0] >= 0 && a.answer[0] < a.options.Length, "генератор: " + a.id + " — неверный индекс ответа");
+                        expect(a.options.Length >= 3 && a.options.Distinct().Count() == a.options.Length, "генератор: " + a.id + " — варианты повторяются или их мало");
+                    }
+                }
+            }
+            expect(sources >= 60, "генератор: исходных задач мало — " + sources);
+            expect(fixes >= sources * 2 * 8 / 10, "генератор «Почини баг»: собрано " + fixes + " из " + sources * 2);
+            expect(asks >= sources * 2 * 6 / 10, "генератор «Что вернёт»: собрано " + asks + " из " + sources * 2);
+            foreach (var p in new[] { "backend", "frontend", "devops", "fullstack" })
+            {
+                var path = Tracks.BuildPath(p, n => tracks[n]);
+                var d1 = TaskGen.Daily(path.Tasks, 12, p, find);
+                var d2 = TaskGen.Daily(path.Tasks, 12, p, find);
+                var d3 = TaskGen.Daily(path.Tasks, 13, p, find);
+                expect(d1.Count >= 6 && d1.Count <= 8, "тикеты дня " + p + ": " + d1.Count);
+                expect(d1.SequenceEqual(d2), "тикеты дня " + p + " не повторяются при пересборке");
+                expect(!d1.SequenceEqual(d3), "тикеты дня " + p + " одинаковые в разные дни");
+                expect(d1.Distinct().Count() == d1.Count, "тикеты дня " + p + " с повторами");
+                if (report != null) report.Add("тикеты дня " + p + ": " + d1.Count + " (" + string.Join(", ", d1.Select(x => { var t = TaskGen.Build(x, find); return t != null ? t.key + " " + t.genKind : "?"; }).ToArray()) + ")");
+            }
+            var topic = tracks["backend"].topics.FirstOrDefault(tp => tp.tasks.Any(TaskGen.CanGenerate));
+            if (topic != null)
+            {
+                var pr = TaskGen.Practice(topic.tasks, 1, find);
+                var pt = pr != null ? TaskGen.Build(pr, find) : null;
+                expect(pt != null && pt.topic == topic.id && pt.key == "TR-1", "тренировка по теме " + topic.id);
+            }
+            if (report != null) report.Add("генератор: исходных задач " + sources + ", «Почини баг» " + fixes + ", «Что вернёт» " + asks);
             return bad;
         }
 

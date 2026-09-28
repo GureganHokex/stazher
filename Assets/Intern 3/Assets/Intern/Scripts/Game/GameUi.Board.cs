@@ -62,7 +62,10 @@ namespace Intern.Game
             var bar = K.Box(); bar.pickingMode = PickingMode.Ignore; bar.style.height = 12f; K.Grow(bar); bar.style.marginLeft = 16f; bar.style.backgroundColor = Well; K.Radius(bar, 6f); bar.style.overflow = Overflow.Hidden;
             var fill = K.Box(); fill.style.height = 12f; fill.style.width = Length.Percent(k * 100f); fill.style.backgroundColor = k >= 1f ? Mint : Sun; K.Radius(fill, 6f); bar.Add(fill); pr.Add(bar);
             card.Add(pr);
-            var note = K.T("Выполнишь цель к вечеру пятницы — бонус " + WeekSprint.BonusFor(S.Goal, Mathf.Min(g.GradeIdx, 3)) + " монет. Задачи открываются по порядку: следующая — после текущей.", 14f, Muted, false, false, true);
+            bool daily = g.PathComplete && g.Save.daily.Count > 0;
+            var note = K.T("Выполнишь цель к вечеру пятницы — бонус " + WeekSprint.BonusFor(S.Goal, Mathf.Min(g.GradeIdx, 3)) + " монет. " +
+                (daily ? "Путь пройден: на доске тикеты дня из генератора, каждое утро — новые. Тренировки по темам тоже идут в зачёт спринта."
+                       : "Задачи открываются по порядку: следующая — после текущей."), 14f, Muted, false, false, true);
             note.style.marginTop = 6f; note.style.marginBottom = 12f; card.Add(note);
 
             // колонки: к выполнению, в работе, готово
@@ -71,16 +74,16 @@ namespace Intern.Game
             cols.Add(todo.Item1); cols.Add(doing.Item1); cols.Add(done.Item1);
             var cur = g.CurrentTaskPublic;
             int nTodo = 0, nDone = 0;
-            foreach (var id in S.Tasks)
+            foreach (var id in daily ? g.Save.daily : S.Tasks)
             {
                 var t = g.TaskById(id); if (t == null) continue;
-                bool isDone = g.Save.done.Contains(id), isCur = cur != null && cur.id == id;
+                bool isDone = g.IsDone(t), isCur = cur != null && cur.id == id;
                 var target = isDone ? done.Item2 : isCur ? doing.Item2 : todo.Item2;
-                target.Add(Ticket(t, isDone, isCur, !isDone && !isCur && !g.IsOpen(t)));
+                target.Add(Ticket(t, isDone, isCur, !isDone && !isCur && !t.generated && !g.IsOpen(t)));
                 if (isDone) nDone++; else if (!isCur) nTodo++;
             }
             // текущая задача вне спринта (например, дошли дальше плана) — тоже в «В работе»
-            if (cur != null && !S.Tasks.Contains(cur.id) && !g.Save.done.Contains(cur.id)) doing.Item2.Add(Ticket(cur, false, true, false));
+            if (cur != null && !S.Tasks.Contains(cur.id) && !g.Save.daily.Contains(cur.id) && !g.IsDone(cur)) doing.Item2.Add(Ticket(cur, false, true, false));
             if (nTodo == 0) todo.Item2.Add(EmptyNote("Всё из спринта взято в работу"));
             if (nDone == 0) done.Item2.Add(EmptyNote("Пока пусто — сдай первую задачу"));
             card.Add(cols);

@@ -76,13 +76,15 @@ namespace Intern.Game
         public string ProfessionName { get { return Professions.Name(Profession); } }
         public int GradeIdx { get { return Path.GradeIndex(Done); } }          // 0..3, 4 — направление пройдено
         public bool PathComplete { get { return GradeIdx >= 4; } }
-        public string RankName { get { return Grades.Name(Mathf.Min(GradeIdx, 3)); } }
+        // после конца пути вместо грейда — титул по уровню (Middle → Senior 30 → Lead 40 → Principal 50 → Architect 60)
+        public string RankName { get { int g = GradeIdx; return g >= 4 ? Levels.Title(Level) : Grades.Name(Mathf.Min(g, 3)); } }
         public string RankFull { get { return RankName + " · " + ProfessionName; } }
 
         void LoadPath()
         {
             Path = Tracks.BuildPath(Profession);
             Tasks = new TaskFile { language = Profession, tasks = Path.Tasks };
+            ResetGenCache();
             Debug.Log("[Стажёр] Направление " + Profession + ": тем " + Path.Topics.Count + ", задач " + Path.Tasks.Length + ", грейд " + RankName);
         }
 
@@ -162,6 +164,7 @@ namespace Intern.Game
             MigrateSave();
             MigrateDay();
             MigrateArsenal();
+            MigrateGen();
 #if UNITY_EDITOR
             Balance.ExportIfMissing();
 #endif
@@ -220,7 +223,7 @@ namespace Intern.Game
 
         public bool IsUnlocked(int i) { return i >= 0 && i < Tasks.tasks.Length && Path.TaskOpen(Tasks.tasks[i], Done); }
         public bool IsOpen(TaskData t) { return Path.TaskOpen(t, Done); }
-        public bool IsDone(TaskData t) { return t != null && Done.Contains(t.id); }
+        public bool IsDone(TaskData t) { return t != null && (Done.Contains(t.id) || GenDone(t)); }
 
         public TaskData CurrentTaskPublic { get { return CurrentTask; } }
 
@@ -230,6 +233,8 @@ namespace Intern.Game
             {
                 var t = Path.Current(Done);
                 if (t != null) return t;
+                var d = NextDaily();   // путь пройден — тикеты дня из генератора
+                if (d != null) return d;
                 return Tasks.tasks.Length > 0 ? Tasks.tasks[Tasks.tasks.Length - 1] : null;
             }
         }
@@ -240,7 +245,7 @@ namespace Intern.Game
             var cur = CurrentTask;
             var tp = cur != null ? Path.TopicOf(cur) : null;
             refs.board.text = ProfessionName.ToUpperInvariant() + " · " + RankName + "\n\nСделано: " + done + " / " + total +
-                         (cur != null && !PathComplete ? "\nТема: " + (tp != null ? tp.title : "") + "\nСейчас: " + cur.key + " " + cur.title : "\nНаправление пройдено!") +
+                         (cur != null && !PathComplete ? "\nТема: " + (tp != null ? tp.title : "") + "\nСейчас: " + cur.key + " " + cur.title : "\nНаправление пройдено!" + (Save.daily.Count > 0 ? "\nТикеты дня: " + DailyDone + " / " + DailyTotal : "")) +
                          (Sprint != null && Sprint.Planned ? "\n\nСПРИНТ " + Sprint.Number + ": " + Sprint.DoneCount + " / " + Sprint.Goal : "") +
                          "\n\nБагов поймано: " + Save.bugsCaught;
         }
@@ -273,6 +278,7 @@ namespace Intern.Game
                     if (InputX.ToggleView()) { player.ToggleView(); Save.firstPerson = player.firstPerson; Persist(); }
 #if UNITY_EDITOR
                     if (InputX.DebugSit()) OpenIde();   // только в редакторе: сразу за компьютер (для тестов)
+                    if (InputX.DebugCareer()) DebugEndless();   // F9: путь пройден / опыт до следующего титула
 #endif
                     if (InputX.Esc()) PauseFrom(Mode.Walk);
                     else if (dayOverPending) ShowDaySummary();
@@ -655,23 +661,15 @@ namespace Intern.Game
         }
 
         // ================== Прогресс ==================
-        public void CompleteTask(TaskData t, bool usedSolution, bool late)
+        public void CompleteTask(TaskData t, bool usedSolution, bool late, bool usedHints = false, float spent = -1f)
         {
+            if (t != null && t.generated) { CompleteGenerated(t, usedSolution, late, usedHints, spent); return; }
             if (Save.done.Contains(t.id)) { Toast("Эта задача уже сдана. Повторить — всегда полезно!"); return; }
-            int oldGrade = GradeIdx;
+            int oldGrade = GradeIdx, oldLevel = Level; string oldRank = RankName;
             bool fsWasOpen = Career.FullstackOpen;
-            float mult = 1f;
-            var diff = (Difficulty)Save.difficulty;
-            if (diff == Difficulty.Medium) mult *= 1.2f;
-            if (diff == Difficulty.Hard) mult *= late ? 0.5f : 1.6f;
-            else if (late) mult *= 0.75f;   // задача с таймером (инцидент) сдана после срока
-            if (usedSolution) mult *= 0.5f;
-            int reward = Mathf.Max(1, Mathf.RoundToInt(t.reward * mult));
-            int xp = usedSolution ? t.xp / 2 : t.xp;
-            bool sated = Work != null && Work.Sated;
-            if (sated) xp = Mathf.RoundToInt(xp * 1.1f);
-            int got = Work != null ? Work.Earn(reward) : reward;
-            Save.money += got; Save.xp += xp; Save.done.Add(t.id);
+            int xp, reward, got; bool sated;
+            Pay(t, usedSolution, late, out xp, out reward, out got, out sated);
+            Save.done.Add(t.id);
             Save.dayTasks++; Save.dayXp += xp; Save.dayMoney += reward;
             if (Work != null) Work.Activity(WorkKind.Solved);
             if (Sprint != null) Sprint.TaskDone(t.id);
@@ -686,7 +684,9 @@ namespace Intern.Game
             if (g >= 4 && oldGrade < 4)
             {
                 Career.MarkDone(Profession);
-                Toast("НАПРАВЛЕНИЕ ПРОЙДЕНО! Ты — Middle " + ProfessionName + "-разработчик.");
+                Toast("НАПРАВЛЕНИЕ ПРОЙДЕНО! Ты — " + RankName + " " + ProfessionName + "-разработчик, уровень " + Level + ".");
+                EnsureDaily(true);
+                if (Save.daily.Count > 0) Toast("Теперь каждый день — тикеты дня из генератора: баги и код-ревью по пройденным темам. " + NextTitleLine());
                 if (!fsWasOpen && Career.FullstackOpen) Toast("ОТКРЫТ FULLSTACK! Сменить направление можно в паузе (Esc).");
                 else if (Profession != "fullstack") Toast("Попробуй другое направление: смена — в паузе (Esc), прогресс сохранится.");
             }
@@ -695,8 +695,9 @@ namespace Intern.Game
                 Toast("ПОВЫШЕНИЕ! Теперь ты " + RankName + " " + ProfessionName + ". Открыты новые темы.");
                 if (g == 2) Toast("В гардеробе открылась корона для Junior+.");
             }
+            AfterXp(oldLevel, oldRank);
             var next = CurrentTask;
-            if (next != null && next != t && !Save.done.Contains(next.id)) Toast("Новая задача: " + next.key + " " + next.title);
+            if (next != null && next != t && !IsDone(next)) Toast("Новая задача: " + next.key + " " + next.title);
         }
 
         public void SpawnBug()
@@ -810,17 +811,25 @@ namespace Intern.Game
                        "Все тикеты — в IDE за компьютером, слева «Проводник» со всеми темами.\n\n" +
                        "Рабочий день с 9:00 до 18:00, обед с 12:00 до 16:00 — дверь «Выход» у входа. Час без работы — штраф, но первый раз за день просто предупрежу.";
             else if (PathComplete)
-                text = "Ты прошёл всё направление " + ProfessionName + ". Для меня ты теперь Middle — и это заслуженно: " +
-                       "ревью, инциденты, архитектура, оценки — ты всё это уже делал руками.\n\n" +
-                       (Career.FullstackOpen ? "Fullstack открыт — переключайся в паузе (Esc), там сквозные задачи через весь стек." :
+                text = "Ты прошёл всё направление " + ProfessionName + ". Для меня ты теперь " + RankName + ", уровень " + Level + ". " + NextTitleLine() + "\n\n" +
+                       "Каждое утро — тикеты дня: генератор ломает эталонные решения по пройденным темам, а ты чинишь баги и отвечаешь на вопросы с код-ревью. " +
+                       "Сегодня закрыто " + DailyDone + " из " + DailyTotal + ". Тренировки по темам — в проводнике IDE, за них дают звёзды.\n\n" +
+                       (CanChangeCompany ? "Кстати, с таким уровнем тебя уже переманивают. Захочешь сменить компанию — скажи." :
+                        Career.FullstackOpen ? "Fullstack открыт — переключайся в паузе (Esc), там сквозные задачи через весь стек." :
                         "Хочешь вырасти шире — возьми другое направление в паузе (Esc). Общая база уже закрыта, начнёшь сразу с Junior-тем.");
             else
                 text = "Ты сейчас " + RankName + " " + ProfessionName + ", сделано " + done + " из " + total + ". Следующая задача: " + cur.key + " «" + cur.title + "».\n\n" + Tip(done);
             if (Work != null && done > 0) text = TodayLine() + "\n\n" + text;
             if (pending.Count > 0) text = "«" + string.Join(" ", pending.ToArray()) + "»\n\n" + text;
-            OpenDialog("Тимлид Гена", text,
-                Btn("Понял, иду работать", LeaveLead),
-                Btn("Как у нас с дисциплиной?", DisciplineTalk));
+            if (CanChangeCompany)
+                OpenDialog("Тимлид Гена", text,
+                    Btn("Понял, иду работать", LeaveLead),
+                    Btn("Как у нас с дисциплиной?", DisciplineTalk),
+                    Btn("Хочу в другую компанию", CompanyTalk));
+            else
+                OpenDialog("Тимлид Гена", text,
+                    Btn("Понял, иду работать", LeaveLead),
+                    Btn("Как у нас с дисциплиной?", DisciplineTalk));
         }
 
         void LeaveLead() { CloseDialog(); }
@@ -896,7 +905,7 @@ namespace Intern.Game
         {
             if (fresh)
             {
-                Progress.Wipe(); Save = new SaveData { version = 5, profession = Career.CanPick(profession) && !string.IsNullOrEmpty(profession) ? profession : "backend" };
+                Progress.Wipe(); Save = new SaveData { version = 6, profession = Career.CanPick(profession) && !string.IsNullOrEmpty(profession) ? profession : "backend" };
                 WorkDay.Reset(Save);
                 LoadPath();
                 SetupWork();
@@ -909,6 +918,7 @@ namespace Intern.Game
             }
             Save.difficulty = (int)d; Persist(); UpdateBoard();
             lastInput = Time.unscaledTime;
+            EnsureDaily();
             if (!Sprint.Planned) PlanSprint();
             if (leadWalker != null) leadWalker.ResetHome();
             if (Work.Ended) dayOverPending = true;
@@ -1151,7 +1161,7 @@ namespace Intern.Game
             if (t == null) return;
             if (t.id != ideTaskId) { ideTaskId = t.id; ideTaskTime = 0f; }
             ideTaskTime += dt;
-            if (ideTaskTime >= 60f && !Save.done.Contains(t.id) && theoryCredited.Add(t.id)) Work.Activity(WorkKind.Theory);
+            if (ideTaskTime >= 60f && !IsDone(t) && theoryCredited.Add(t.id)) Work.Activity(WorkKind.Theory);
         }
 
         void ShowDaySummary()
@@ -1277,7 +1287,7 @@ namespace Intern.Game
             if (p == Profession || !Career.CanPick(p)) return false;
             if (ideUi != null && ideUi.Task != null) ideUi.Close();
             Save.profession = p; Persist();
-            LoadPath(); UpdateBoard();
+            LoadPath(); EnsureDaily(true); UpdateBoard();
             ide = new IdeWindow(this);
             if (ideUi != null && CurrentTask != null) ideUi.Open(CurrentTask);
             Toast("Направление: " + ProfessionName + " · " + RankName + ". Сдано " + DoneCount + " из " + TotalCount + ".");

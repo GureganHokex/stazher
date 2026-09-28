@@ -132,11 +132,16 @@ namespace Intern.Game
         void SprintAtDayStart()
         {
             if (Sprint == null) return;
+            EnsureDaily();
             if (!Sprint.Planned || (WeekSprint.Monday(Save.day) && Sprint.StartDay != Save.day)) PlanSprint();
         }
 
-        public string TopicTitleOf(TaskData t) { var tp = Path.TopicOf(t); return tp != null ? tp.title : ""; }
-        public TaskData TaskById(string id) { foreach (var t in Tasks.tasks) if (t.id == id) return t; return null; }
+        public string TopicTitleOf(TaskData t) { var tp = TopicOfAny(t); return tp != null ? tp.title : ""; }
+        public TaskData TaskById(string id)
+        {
+            if (TaskGen.IsSpec(id)) return GenTask(id);
+            return PathTask(id);
+        }
 
         // ================== доска задач ==================
         public void OpenBoard()

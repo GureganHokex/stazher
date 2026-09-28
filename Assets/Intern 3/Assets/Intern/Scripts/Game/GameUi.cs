@@ -27,6 +27,7 @@ namespace Intern.Game
         VisualElement hudCard, clockChip, strikeRow, satedChip, lunchHud, lunchCoinsRow, summary, summaryCard, fired, firedCard;
         Label clockLabel, strikeLabel, lunchTimer, lunchCoins, lunchSeries, lunchPenalty, lunchKills, lunchHint;
         VisualElement toastRow, toastPill, promptRow, promptKeys, crosshair, cursorHint, keysPanel, bugRow, progressFill;
+        Label levelLabel;
         Label toastText, promptText, rankLabel, moneyLabel, taskCode, taskTitle, progressLabel, bugLabel, fpsLabel, pauseTask, pauseDiffDesc;
         UiBtn pauseCamera;
         readonly List<VisualElement> pauseDiffPills = new List<VisualElement>();
@@ -743,6 +744,8 @@ def deploy(env=""staging""):
             var r1 = K.Box(true); r1.style.alignItems = Align.Center; r1.pickingMode = PickingMode.Ignore;
             var rank = K.Box(true); rank.pickingMode = PickingMode.Ignore; rank.style.backgroundColor = Mint; K.Radius(rank, 12f); K.Pad(rank, 3f, 12f, 3f, 12f);
             rankLabel = K.B("", 13f, Ink); rankLabel.style.letterSpacing = 1f; rank.Add(rankLabel); r1.Add(rank);
+            var lvl = K.Box(true); lvl.pickingMode = PickingMode.Ignore; lvl.style.backgroundColor = Sky; K.Radius(lvl, 12f); K.Pad(lvl, 3f, 10f, 3f, 10f); lvl.style.marginLeft = 6f;
+            levelLabel = K.B("", 13f, Ink); lvl.Add(levelLabel); r1.Add(lvl);
             clockChip = K.Box(true); clockChip.pickingMode = PickingMode.Ignore; clockChip.style.alignItems = Align.Center; clockChip.style.marginLeft = 8f;
             clockChip.style.backgroundColor = Well; K.Radius(clockChip, 12f); K.Pad(clockChip, 3f, 10f, 3f, 8f);
             clockChip.Add(new Icon("clock", Sky, 15f)); clockLabel = K.B("", 14f, Text); clockLabel.style.marginLeft = 5f; clockChip.Add(clockLabel);
@@ -846,6 +849,8 @@ def deploy(env=""staging""):
             var sub = K.T(r.weekday + ", день " + r.day + " · 18:00, рабочий день окончен", 16f, Muted); sub.style.marginTop = 2f; sub.style.marginBottom = 14f; summaryCard.Add(sub);
             summaryCard.Add(StatRow("task", "Решено задач", r.tasks.ToString(), Text));
             summaryCard.Add(StatRow("star", "Опыт", "+" + r.xp + " XP", Mint));
+            int lvNow = g.Level, lvWas = Levels.Of(g.Save.xp - r.xp), lvInto, lvNeed, lvTmp; Levels.Progress(g.Save.xp, out lvTmp, out lvInto, out lvNeed);
+            summaryCard.Add(StatRow("star", "Уровень", (lvNow > lvWas ? lvWas + " → " + lvNow : lvNow.ToString()) + "  (до " + (lvNow + 1) + "-го ещё " + (lvNeed - lvInto) + " XP)", lvNow > lvWas ? Sun : Text));
             summaryCard.Add(StatRow("coin", "Монеты за работу", "+" + r.money, Sun));
             summaryCard.Add(StatRow("coin", "Монеты за обед", (r.lunchMoney >= 0 ? "+" : "") + r.lunchMoney + (r.kills > 0 ? "  (выбито " + r.kills + ")" : ""), Sun));
             if (r.fines > 0) summaryCard.Add(StatRow("warning", "Штрафы за простой", "−" + r.fines, Pink));
@@ -1003,22 +1008,35 @@ def deploy(env=""staging""):
         void UpdateHud()
         {
             var t = g.CurrentTaskPublic;
-            bool sprintDone = g.PathComplete;
+            bool pathDone = g.PathComplete;
+            bool dailyMode = pathDone && g.Save.daily.Count > 0;
+            bool sprintDone = pathDone && !(t != null && t.generated && !g.IsDone(t));
             var w = g.Work;
             string clock = w != null ? w.Clock : "";
             bool sated = w != null && w.Sated;
             int strikes = w != null ? w.Strikes : 0, debt = w != null ? w.Debt : 0;
-            string key = g.RankFull + "|" + g.Save.money + "|" + (t != null ? t.id : "") + "|" + g.DoneCount + "|" + g.BugCount + "|" + sprintDone + "|" + clock + "|" + sated + "|" + strikes + "|" + debt;
+            string key = g.RankFull + "|" + g.Save.money + "|" + (t != null ? t.id : "") + "|" + g.DoneCount + "|" + g.BugCount + "|" + sprintDone + "|" + clock + "|" + sated + "|" + strikes + "|" + debt + "|" + g.Save.xp + "|" + g.Save.genDone.Count;
             if (key != lastHud)
             {
                 lastHud = key;
                 rankLabel.text = g.RankFull.ToUpperInvariant();
+                levelLabel.text = "УР. " + g.Level;
                 moneyLabel.text = g.Save.money.ToString();
                 taskCode.text = t != null && !sprintDone ? g.TaskCodeOf(t) : "ГОТОВО";
-                taskTitle.text = t != null && !sprintDone ? K.Esc(t.title) : "Направление пройдено!";
-                float p = g.TotalCount > 0 ? (float)g.DoneCount / g.TotalCount : 0f;
-                progressFill.style.width = Length.Percent(p * 100f);
-                progressLabel.text = g.DoneCount + " / " + g.TotalCount;
+                taskTitle.text = t != null && !sprintDone ? K.Esc(t.title) : dailyMode ? "Тикеты дня закрыты!" : "Направление пройдено!";
+                if (dailyMode)
+                {
+                    // после конца пути полоса — тикеты дня
+                    int dd = g.DailyDone, dt = Mathf.Max(1, g.DailyTotal);
+                    progressFill.style.width = Length.Percent(100f * dd / dt);
+                    progressLabel.text = "день: " + dd + " / " + g.DailyTotal;
+                }
+                else
+                {
+                    float p = g.TotalCount > 0 ? (float)g.DoneCount / g.TotalCount : 0f;
+                    progressFill.style.width = Length.Percent(p * 100f);
+                    progressLabel.text = g.DoneCount + " / " + g.TotalCount;
+                }
                 bugRow.style.display = g.BugCount > 0 ? DisplayStyle.Flex : DisplayStyle.None;
                 bugLabel.text = "Багов в офисе: " + g.BugCount + " — поймай их!";
                 clockLabel.text = clock;

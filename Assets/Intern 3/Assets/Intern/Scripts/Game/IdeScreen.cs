@@ -624,6 +624,7 @@ namespace Intern.Game
             var code = K.T(TaskCode(t), 12f, Color.white, false, true); K.Pad(code, 2f, 8f, 2f, 8f); code.style.backgroundColor = K.Accent; K.Radius(code, 3f); head.Add(code);
             string tsh, tname; Color tcol; TypeInfo(t.type, out tsh, out tname, out tcol);
             var tb = K.T(tname, 11f, K.EditorBg, false, true); K.Pad(tb, 2f, 7f, 2f, 7f); tb.style.backgroundColor = tcol; K.Radius(tb, 3f); tb.style.marginLeft = 6f; head.Add(tb);
+            if (t.generated) { var gb = K.T(g.Save.daily.Contains(t.id) ? "ТИКЕТ ДНЯ" : "ТРЕНИРОВКА", 11f, K.EditorBg, false, true); K.Pad(gb, 2f, 7f, 2f, 7f); gb.style.backgroundColor = K.Sun; K.Radius(gb, 3f); gb.style.marginLeft = 6f; head.Add(gb); }
             var ch = K.T(K.Esc(t.chapter), 13f, K.Muted); ch.style.marginLeft = 10f; ch.style.flexShrink = 1f; ch.style.overflow = Overflow.Hidden; head.Add(ch);
             c.Add(head);
             Para(c, "<b>" + K.Esc(t.title) + "</b>", 21f, K.TextHi, 10f);
@@ -761,14 +762,24 @@ namespace Intern.Game
         {
             var P = g.Path; var done = g.Done;
             int grade = P.GradeIndex(done), gcur = Mathf.Min(grade, 3);
-            var curTopic = P.TopicOf(Task);
+            Topic curTopic = P.TopicOf(Task);
+            if (curTopic == null && Task.generated && Task.topic != null) P.TopicById.TryGetValue(Task.topic, out curTopic);   // тренировка — раскрыть её тему
             // шапка: направление, грейд, прогресс
             var card = K.Box(); card.style.backgroundColor = Pal.Hex("202020"); K.Radius(card, 6f); K.Pad(card, 10f, 12f, 10f, 12f); K.Line(card, Pal.Hex("2B2B2B"), 1f, 1f, 1f, 1f); card.style.marginTop = 2f;
             var hr = K.Box(true); hr.style.alignItems = Align.Center;
             hr.Add(new Icon(Professions.Icon(g.Profession), GameUi.ProfColor(g.Profession), 18f));
-            var hn = K.T("<b>" + g.ProfessionName + "</b>  <color=#9D9D9D>·</color>  " + (grade >= 4 ? "Middle · пройдено" : g.RankName), 15f, K.TextHi); hn.style.marginLeft = 8f; hr.Add(hn);
+            var hn = K.T("<b>" + g.ProfessionName + "</b>  <color=#9D9D9D>·</color>  " + g.RankName + (grade >= 4 ? "  <color=#9D9D9D>· путь пройден</color>" : ""), 15f, K.TextHi); hn.style.marginLeft = 8f; hr.Add(hn);
             hr.Add(K.Spacer()); hr.Add(K.T(g.Save.xp + " XP", 13f, K.Green, false, true));
             card.Add(hr);
+            // уровень: опыт без потолка
+            int lv, into, need; Levels.Progress(g.Save.xp, out lv, out into, out need);
+            var lr = K.Box(true); lr.style.alignItems = Align.Center; lr.style.marginTop = 8f;
+            var lvl = K.T("УР. " + lv, 12f, K.EditorBg, false, true); K.Pad(lvl, 1f, 6f, 1f, 6f); K.Radius(lvl, 3f); lvl.style.backgroundColor = K.Blue; lr.Add(lvl);
+            var lb = K.Box(); lb.style.height = 4f; K.Grow(lb); lb.style.marginLeft = 8f; lb.style.backgroundColor = Pal.Hex("333333"); K.Radius(lb, 2f);
+            var lf = K.Box(); lf.style.height = 4f; K.Radius(lf, 2f); lf.style.backgroundColor = K.Blue; lf.style.width = Length.Percent(need > 0 ? 100f * into / need : 0f); lb.Add(lf); lr.Add(lb);
+            var ln = K.T(into + " / " + need, 12f, K.Muted); ln.style.marginLeft = 8f; lr.Add(ln);
+            card.Add(lr);
+            if (grade >= 4) { var nt = K.T(K.Esc(g.NextTitleLine()) + (g.CoinMult > 1.001f ? "  Монеты за задачи +" + Mathf.RoundToInt((g.CoinMult - 1f) * 100f) + "%." : ""), 12f, K.Muted, false, false, true); nt.style.marginTop = 4f; card.Add(nt); }
             int dn = g.DoneCount, tot = g.TotalCount;
             var bar = K.Box(); bar.style.height = 6f; bar.style.backgroundColor = Pal.Hex("333333"); K.Radius(bar, 3f); bar.style.marginTop = 8f;
             var fill = K.Box(); fill.style.height = 6f; K.Radius(fill, 3f); fill.style.backgroundColor = K.Green; fill.style.width = Length.Percent(tot > 0 ? 100f * dn / tot : 0f); bar.Add(fill); card.Add(bar);
@@ -786,9 +797,18 @@ namespace Intern.Game
             }
             gl.Add(K.Spacer()); gl.Add(K.T(dn + " / " + tot, 12f, K.Muted));
             card.Add(gl); c.Add(card);
+            var daily = g.DailyTickets;
+            if (daily.Count > 0)
+            {
+                var dh = K.Box(true); dh.style.alignItems = Align.Center; dh.style.marginTop = 12f;
+                dh.Add(new Icon("fire", K.Sun, 14f)); var dt = K.T("ТИКЕТЫ ДНЯ", 12f, K.Sun, false, true); dt.style.marginLeft = 6f; dh.Add(dt);
+                dh.Add(K.Spacer()); dh.Add(K.T(g.DailyDone + " / " + daily.Count, 12f, K.Muted)); c.Add(dh);
+                foreach (var t in daily) c.Add(GenRow(t, 8f));
+                if (g.DailyDone >= daily.Count) Para(c, "Все тикеты дня закрыты. Новые — завтра утром; пока можно потренироваться в темах ниже.", 13f, K.Muted, 4f);
+            }
 
             var rootRow = K.Box(true); rootRow.style.alignItems = Align.Center; rootRow.style.marginTop = 12f; rootRow.style.marginLeft = -12f;
-            rootRow.Add(new Icon("chevD", K.Text, 16f)); rootRow.Add(K.T("KODZILLA-SOFT", 12f, K.Text, false, true)); c.Add(rootRow);
+            rootRow.Add(new Icon("chevD", K.Text, 16f)); rootRow.Add(K.T(g.Save.company > 0 ? g.CompanyName.ToUpperInvariant() : "KODZILLA-SOFT", 12f, K.Text, false, true)); c.Add(rootRow);
             for (int gi = 0; gi < 4; gi++)
             {
                 var topics = P.Topics.Where(tp => tp.gradeIndex == gi).ToList();
@@ -817,7 +837,9 @@ namespace Intern.Game
                     tr.Add(new Icon(open ? "folder" : "lock", open ? (tdone ? K.Green : Pal.Hex("DCB67A")) : K.Dim, 16f));
                     var tl = K.T(K.Esc(tp.title), 14f, open ? (tp == curTopic ? K.TextHi : K.Text) : K.Dim); tl.style.marginLeft = 6f; tl.style.flexShrink = 1f; tl.style.overflow = Overflow.Hidden; tr.Add(tl);
                     tr.Add(K.Spacer());
-                    if (tdone) tr.Add(new Icon("check", K.Green, 14f)); else tr.Add(K.T(d + "/" + tp.tasks.Count, 12f, K.Muted));
+                    bool trainable = g.TopicTrainable(tp);
+                    if (tdone && trainable) { int st = g.StarsOf(tp); for (int si = 1; si <= 3; si++) tr.Add(new Icon("star", si <= st ? K.Sun : Pal.Hex("3C3C3C"), 13f)); }
+                    else if (tdone) tr.Add(new Icon("check", K.Green, 14f)); else tr.Add(K.T(d + "/" + tp.tasks.Count, 12f, K.Muted));
                     c.Add(tr);
                     if (!tOpen) continue;
                     if (!open && !gLocked)
@@ -846,9 +868,41 @@ namespace Intern.Game
                         else if (t.type == "incident") row.Add(new Icon("fire", K.Red, 14f));
                         c.Add(row);
                     }
+                    if (tdone && trainable)
+                    {
+                        foreach (var pt in g.PracticeIn(tp)) c.Add(GenRow(pt, 46f));
+                        var st = g.StatOf(tp.id, false);
+                        var sl = Para(c, "★★ — " + GameRoot.StarClean + " задач без подсказок: " + Mathf.Min(st != null ? st.clean : 0, GameRoot.StarClean) + "/" + GameRoot.StarClean +
+                                        "  ·  ★★★ — " + GameRoot.StarStreak + " подряд вовремя: " + Mathf.Min(st != null ? st.best : 0, GameRoot.StarStreak) + "/" + GameRoot.StarStreak, 12f, K.Muted, 4f);
+                        sl.style.marginLeft = 46f;
+                        var tpp = tp;
+                        var nb = Btn.Text("Новая задача по теме", () =>
+                        {
+                            var nt = g.NewPractice(tpp);
+                            if (nt != null) Open(nt); else Notice("Генератор не смог собрать задачу по этой теме.", "error", K.Orange);
+                        }, K.Button2, K.Button2Hover, 13f, K.Text, "continue", K.Blue);
+                        nb.style.alignSelf = Align.FlexStart; nb.style.marginLeft = 46f; nb.style.marginTop = 6f; nb.style.height = 28f; c.Add(nb);
+                    }
                 }
             }
             Para(c, "Сдано " + dn + " из " + tot + " · " + g.RankFull, 13f, K.Muted, 16f);
+        }
+
+        // Строка задачи из генератора в проводнике (тикет дня или тренировка)
+        VisualElement GenRow(TaskData t, float indent)
+        {
+            bool cur = t == Task, done = g.IsDone(t);
+            var tt = t;
+            var row = new Btn(() => { if (tt != Task) Open(tt); });
+            row.style.height = 28f; K.Pad(row, 0f, 8f, 0f, indent);
+            row.SetColors(cur ? K.Press : Color.clear, cur ? K.Press : K.Hover);
+            row.Add(FileIcon(t, true));
+            var nl = K.T(TaskCode(t).ToLower().Replace("-", "_") + Ext(t), 14f, cur ? K.TextHi : K.Text, true); nl.style.marginLeft = 8f; nl.style.flexShrink = 0f; row.Add(nl);
+            var ttl = K.T(K.Esc(t.title), 13f, K.Muted); ttl.style.marginLeft = 10f; ttl.style.flexShrink = 1f; ttl.style.overflow = Overflow.Hidden; row.Add(ttl);
+            row.Add(K.Spacer());
+            if (done) row.Add(new Icon("check", K.Green, 16f));
+            else row.Add(new Icon(t.genKind == "ask" ? "md" : "bug", t.genKind == "ask" ? K.Blue : K.Orange, 14f));
+            return row;
         }
 
         void SideDebug(VisualElement c)
@@ -1157,7 +1211,9 @@ namespace Intern.Game
                 string ic = t.multi ? (on ? "boxOn" : "box") : (on ? "radioOn" : "ring");
                 var icon = new Icon(ic, on ? K.Blue : K.Muted, 18f); icon.style.marginTop = 1f; row.Add(icon);
                 var num = K.T((i + 1).ToString(), 13f, K.Dim, true); num.style.marginLeft = 8f; num.style.width = 14f; num.style.marginTop = 1f; row.Add(num);
-                var tl = K.T(K.Esc(t.options[i]), 15f, isWrong ? Pal.Hex("FF8FA3") : K.Text, false, false, true); tl.style.marginLeft = 6f; tl.style.flexShrink = 1f; tl.style.flexGrow = 1f; row.Add(tl);
+                bool mono = t.genKind == "ask";
+                var tl = K.T(K.Esc(t.options[i]), mono ? 14f : 15f, isWrong ? Pal.Hex("FF8FA3") : K.Text, mono, false, true); tl.style.marginLeft = 6f; tl.style.flexShrink = 1f; tl.style.flexGrow = 1f; row.Add(tl);
+                if (mono) tl.style.whiteSpace = WhiteSpace.PreWrap;
                 if (isRight) { var ok = new Icon("check", K.Green, 18f); ok.style.marginLeft = 8f; row.Add(ok); }
                 else if (isWrong) { var no = new Icon("error", K.Red, 18f); no.style.marginLeft = 8f; row.Add(no); }
                 c.Add(row);
@@ -1544,7 +1600,7 @@ namespace Intern.Game
                 string msg = (IsStatic ? "Все требования выполнены: " : "Все тесты пройдены: ") + passed + " из " + passed + "!";
                 terminal.Append("<color=#89D185><b>" + msg + "</b></color>\n");
                 Notice(msg, "check", K.Green);
-                g.CompleteTask(Task, usedSolution.Contains(Task.id), Late);
+                g.CompleteTask(Task, usedSolution.Contains(Task.id), Late, HintsShown > 0, Spent);
             }
             else
             {
@@ -1588,7 +1644,7 @@ namespace Intern.Game
             {
                 choiceOk = true; choiceVerdict = "Верно!";
                 Notice("Верно! Разбор решения — на вкладке «Ответ» и справа.", "check", K.Green);
-                g.CompleteTask(t, usedSolution.Contains(t.id), Late);
+                g.CompleteTask(t, usedSolution.Contains(t.id), Late, HintsShown > 0, Spent);
             }
             else
             {

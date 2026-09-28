@@ -130,6 +130,9 @@ namespace Intern.Game
         public bool legacy;
         public string legacyId;              // id задачи в старом python.json (py01…) — для переноса сохранений
         [NonSerialized] public List<object> testCases;   // test_cases из JSON как есть
+        // задачи из генератора (спринт 5): id = gen:<fix|ask>:<исходная задача>:<seed>
+        [NonSerialized] public bool generated;
+        [NonSerialized] public string srcId, genKind;    // genKind: fix — «Почини баг», ask — «Что вернёт код?»
 
         public bool IsChoice { get { return options != null && options.Length > 0; } }
         // Как проверяется: choice | py | js | sql | static
@@ -163,6 +166,10 @@ namespace Intern.Game
 
     [Serializable]
     public class AmmoSave { public string id; public int count; }
+
+    // Звёзды темы: сколько задач из генератора сдано, из них без подсказок, серия вовремя, выданные звёзды
+    [Serializable]
+    public class TopicStat { public string id; public int solved, clean, streak, best, stars; }
 
     [Serializable]
     public class SaveData
@@ -212,6 +219,14 @@ namespace Intern.Game
         public int tutorial = -1;                                 // шаг обучения; −1 — не идёт (пройдено или пропущено)
         public int sprintNo, sprintGoal, sprintDone, sprintStartDay;
         public List<string> sprintTasks = new List<string>();
+        // без потолка (версия 6): уровни, тикеты дня из генератора, тренировки и звёзды тем, компании
+        public int company;                                        // сколько раз сменил компанию (+10% монет за каждую)
+        public List<string> daily = new List<string>();            // тикеты дня (строки gen:…)
+        public int dailyDay;                                       // день, на который собраны тикеты
+        public List<string> genDone = new List<string>();          // сданные задачи из генератора (текущие тикеты и тренировки)
+        public List<string> practice = new List<string>();         // открытые тренировочные задачи
+        public int practiceNo, genSolved;
+        public List<TopicStat> topicStats = new List<TopicStat>();
 
         public string GetCode(string id) { int i = codeIds.IndexOf(id); return i >= 0 ? codeTexts[i] : null; }
         public void SetCode(string id, string code)
