@@ -1,0 +1,1164 @@
+{
+ "track": "lang-php",
+ "roadmap": [
+  {
+   "topic_id": "php-basics",
+   "lang": "php",
+   "replaces": [
+    "be-py-basics"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "PHP: переменные и типы",
+   "grade": "junior",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "<?php и echo, переменные с $, int/float/string/bool, склейка точкой и подстановка в строки, / и intdiv, == и ===, функции с типами.",
+   "theory": "PHP — язык, на котором работает большая часть сайтов: WordPress, интернет-магазины, Laravel-сервисы. Код выполняется построчно, без отдельной сборки.\n\n    <?php\n    $title = \"Лампа\";\n    $price = 1990;\n    echo \"Товар: \" . $title . \"\\n\";   // . склеивает строки\n    echo \"Цена: $price ₽\\n\";            // в двойных кавычках переменные подставляются\n\n• Файл начинается с <?php. Имена переменных — всегда с $.\n• В 'одинарных кавычках' ничего не подставляется и \\n не превращается в перевод строки.\n• echo печатает, через запятую можно передать несколько значений.\n\nТипы: int, float, string, bool, null, массивы. PHP сам приводит типы, и это источник сюрпризов:\n• 7 / 2 == 3.5 — деление всегда может дать дробь; целое деление — intdiv(7, 2).\n• \"5\" + 3 == 8 — строка превратилась в число.\n• == сравнивает с приведением типов (\"5\" == 5 — true), === — ещё и тип (\"5\" === 5 — false). В новом коде почти всегда нужен ===.\n• Арифметика выполняется раньше склейки: \"Итого: \" . 7 + 3 даёт \"Итого: 10\".\n\nФункции с типами параметров и результата:\n\n    function cartTotal(int $price, int $qty): int {\n        return $price * $qty;\n    }\n\nСтрока declare(strict_types=1); в начале файла запрещает PHP молча превращать \"5\" в 5 при вызове таких функций."
+  },
+  {
+   "topic_id": "php-control",
+   "lang": "php",
+   "replaces": [
+    "be-py-control"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "PHP: условия и циклы",
+   "grade": "junior",
+   "requires": [
+    "php-basics"
+   ],
+   "description": "if/elseif, сравнения и логика, match и switch, циклы for/while/foreach, break и continue, ссылки в foreach.",
+   "theory": "Условия:\n\n    if ($score >= 90) {\n        $grade = 'отлично';\n    } elseif ($score >= 75) {\n        $grade = 'хорошо';\n    } else {\n        $grade = 'на доработку';\n    }\n\n• Логика: && (и), || (или), ! (не). Тернарный оператор: $qty > 0 ? 'есть' : 'нет'.\n• ?? — значение по умолчанию: $name = $input['name'] ?? 'гость';\n\nmatch (PHP 8) — выражение, которое сравнивает строго (===) и не требует break:\n\n    $title = match ($level) {\n        1 => 'junior',\n        2, 3 => 'middle',\n        default => 'senior',\n    };\n\nПриём match (true) заменяет цепочку if: первое верное условие выигрывает.\n\nswitch — старый вариант: сравнивает нестрого (==) и без break «проваливается» в следующий case.\n\nЦиклы:\n\n    for ($i = 0; $i < 10; $i++) { … }\n    while ($total < 100) { … }\n    foreach ($prices as $price) { … }            // значения\n    foreach ($stock as $name => $qty) { … }      // ключи и значения\n\n• break выходит из цикла, continue переходит к следующему шагу.\n• foreach ($prices as &$p) — по ссылке: можно менять элементы. После такого цикла обязательно unset($p), иначе $p так и останется ссылкой на последний элемент."
+  },
+  {
+   "topic_id": "php-arrays",
+   "lang": "php",
+   "replaces": [
+    "be-py-collections"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "PHP: массивы",
+   "grade": "junior",
+   "requires": [
+    "php-control"
+   ],
+   "description": "Списки и ассоциативные массивы, [] и count, ?? и isset, array_sum/array_filter/array_map, ключи после фильтра, массивы копируются.",
+   "theory": "Массив в PHP — и список, и словарь сразу:\n\n    $cart = ['лампа', 'стол'];          // список: ключи 0, 1\n    $cart[] = 'стул';                   // добавить в конец\n    count($cart);                        // 3\n\n    $stock = ['лампа' => 3, 'стол' => 1];   // ассоциативный: ключ => значение\n    $stock['лампа'] = 5;\n    $stock['шкаф'] ?? 0;                     // 0 — ключа нет, берём запасное значение\n    isset($stock['шкаф']);                   // false\n    foreach ($stock as $name => $qty) { … }\n\n• Чтение несуществующего ключа — предупреждение «Undefined array key». В тестах игры оно считается ошибкой: пользуйся ?? или isset.\n• Массив помнит порядок добавления ключей.\n\nФункции для массивов:\n\n    array_sum($prices);                            // сумма\n    max($prices);                                  // максимум\n    array_filter($prices, fn($p) => $p < 1000);    // отбор — КЛЮЧИ СОХРАНЯЮТСЯ\n    array_values(...);                             // перенумеровать ключи 0, 1, 2…\n    array_map(fn($p) => $p * 2, $prices);          // преобразовать каждый\n    in_array('лампа', $cart, true);                // есть ли значение (true — строго)\n    implode(', ', $cart);                          // склеить в строку\n\nВажно: массивы в PHP передаются и присваиваются копией. Функция, которая получила массив и что-то в него добавила, изменила свою копию. Чтобы менять исходный массив — параметр по ссылке: function addItem(array &$cart, …), или верни новый массив."
+  },
+  {
+   "topic_id": "php-functions",
+   "lang": "php",
+   "replaces": [
+    "be-py-functions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "PHP: функции и строки",
+   "grade": "junior",
+   "requires": [
+    "php-arrays"
+   ],
+   "description": "Типы параметров, значения по умолчанию, ссылки &, ...variadic, стрелочные функции, строки UTF-8 и функции mb_*, intdiv.",
+   "theory": "Функции:\n\n    function price(int $rub, string $cur = '₽'): string {   // значение по умолчанию\n        return \"$rub $cur\";\n    }\n    function total(int ...$nums): int { return array_sum($nums); }   // любое число аргументов\n    function bump(int &$x): void { $x += 10; }                      // & — меняет переменную вызывающего\n\n• Без & функция получает копию значения.\n• Стрелочная функция: $double = fn($n) => $n * 2; — она запоминает внешние переменные в момент создания.\n\nСтроки и кириллица. Обычные функции PHP работают с байтами, а русская буква в UTF-8 занимает два байта:\n\n    strlen('Лампа');          // 10 — байты\n    mb_strlen('Лампа');       // 5 — буквы\n    strtoupper('лампа');      // сломает кириллицу\n    mb_strtoupper('лампа');   // \"ЛАМПА\"\n    mb_substr('Лампа', 0, 1); // \"Л\"\n\nДля текста на русском всегда бери функции с приставкой mb_.\n\nПолезное:\n• trim($s) — убрать пробелы по краям; explode(' ', $s) — разбить; preg_split('/\\s+/', $s) — разбить по любым пробелам.\n• str_contains($s, 'admin') — есть ли подстрока (PHP 8).\n• / всегда может дать дробь: 1990 / 10 == 199, но 199 / 10 == 19.9. Целое деление — intdiv($n, 10).\n• sprintf('%.2f', $x) и number_format($x, 2, ',', ' ') — красивые числа."
+  },
+  {
+   "topic_id": "php-oop",
+   "lang": "php",
+   "replaces": [
+    "be-py-oop"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "PHP: классы и объекты",
+   "grade": "junior",
+   "requires": [
+    "php-functions"
+   ],
+   "description": "Классы и $this, продвижение свойств в конструкторе, readonly, private, __toString, static, интерфейсы, объекты по ссылке и clone.",
+   "theory": "Класс и объект:\n\n    class Product {\n        public function __construct(\n            private string $name,        // продвижение свойства: объявление и присвоение сразу\n            private int $price,\n        ) {}\n\n        public function price(): int {\n            return $this->price;         // доступ к своим свойствам — только через $this->\n        }\n\n        public function __toString(): string {\n            return \"{$this->name} — {$this->price} ₽\";\n        }\n    }\n\n    $lamp = new Product('Лампа', 1990);\n    echo $lamp;                           // вызовет __toString\n\n• private — свойство видно только внутри класса, public — всем.\n• readonly — свойство можно задать один раз.\n• Без __toString объект нельзя превратить в строку — будет ошибка.\n• static — общее для класса: self::$created, Counter::$created.\n\nОбъекты, в отличие от массивов, не копируются при присваивании: $b = $a — это тот же объект. Копию делают явно: $c = clone $a (конструктор при этом не вызывается).\n\nИнтерфейс — договор о методах:\n\n    interface Shape { public function area(): float; }\n    class Circle implements Shape { … }"
+  },
+  {
+   "topic_id": "php-errors",
+   "lang": "php",
+   "replaces": [
+    "be-py-exceptions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "PHP: исключения",
+   "grade": "junior",
+   "requires": [
+    "php-functions"
+   ],
+   "description": "try/catch/finally, throw, InvalidArgumentException и RuntimeException, цепочка причин, свой класс исключения, Error и TypeError.",
+   "theory": "Исключения:\n\n    try {\n        $port = parsePort($text);\n    } catch (InvalidArgumentException $e) {\n        echo 'ошибка: ', $e->getMessage(), \"\\n\";\n    } finally {\n        echo \"выполнится в любом случае\\n\";\n    }\n\n    throw new InvalidArgumentException('сумма должна быть больше нуля');\n\nЧастые стандартные исключения:\n• InvalidArgumentException — неверный аргумент.\n• RuntimeException — ошибка во время работы: не хватает денег, сервис не ответил.\n• DomainException — значение не подходит по смыслу предметной области.\n\nОшибки самого PHP — тоже объекты: DivisionByZeroError, TypeError (не тот тип аргумента), ArgumentCountError. Все исключения и ошибки реализуют интерфейс Throwable — catch (Throwable $e) поймает что угодно, но так прячут настоящие баги.\n\n• Можно передать причину: new RuntimeException('порт кривой', 0, $e) — исходное исключение сохранится.\n• Своё исключение — наследник с нужными данными:\n\n    class StockException extends RuntimeException {\n        public function __construct(public readonly int $have) {\n            parent::__construct(\"на складе только $have\");\n        }\n    }\n\n• (int)'80a' молча даёт 80 — для проверки строк есть ctype_digit и filter_var."
+  }
+ ],
+ "tasks": [
+  {
+   "task_id": "php-basics-01",
+   "topic_id": "php-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Итог корзины на PHP",
+   "story": "Гена: «Витрина магазина на PHP. Начнём с простого: стоимость позиции.»",
+   "content": {
+    "question": "Допиши функцию cartTotal(int $price, int $qty): int — стоимость позиции: цена × количество.",
+    "entry": "cartTotal",
+    "code": "<?php\n// стоимость позиции: цена × количество\nfunction cartTotal(int $price, int $qty): int {\n    return 0;\n}\n\necho cartTotal(1990, 2), \"\\n\";",
+    "correct_answer": "<?php\n// стоимость позиции: цена × количество\nfunction cartTotal(int $price, int $qty): int {\n    return $price * $qty;\n}\n\necho cartTotal(1990, 2), \"\\n\";",
+    "tests_code": "<?php\ncheck::eq('1990 × 2', fn() => cartTotal(1990, 2), 3980);\ncheck::eq('250 × 0', fn() => cartTotal(250, 0), 0);\ncheck::eq('99 × 3', fn() => cartTotal(99, 3), 297);",
+    "requirements": [
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "\\$price\\s*\\*\\s*\\$qty|\\$qty\\s*\\*\\s*\\$price"
+      }
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "Переменные в PHP всегда пишутся со знаком $, а типы параметров и результата (int) защищают от случайных строк. Результат возвращают через return.",
+   "hints": [
+    "Верни произведение через return.",
+    "Не забудь $ перед именами: $price * $qty."
+   ]
+  },
+  {
+   "task_id": "php-basics-02",
+   "topic_id": "php-basics",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Точка, плюс и два равенства",
+   "story": "Ира: «В отчёте PHP то склеивает, то складывает, а сравнение ведёт себя по-разному. Что напечатает этот код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "<?php\n$price = 7;\necho $price / 2, \"\\n\";\necho intdiv($price, 2), \"\\n\";\necho $price % 4, \"\\n\";\necho \"Итого: \" . $price + 3, \"\\n\";\necho \"Цена: $price ₽\\n\";\necho 'Цена: $price ₽', \"\\n\";\necho \"5\" + 3, \"\\n\";\nvar_dump(\"5\" == 5, \"5\" === 5);",
+    "language": "php",
+    "output": "3.5\n3\n3\nИтого: 10\nЦена: 7 ₽\nЦена: $price ₽\n8\nbool(true)\nbool(false)"
+   },
+   "explanation": "/ в PHP даёт дробь — 3.5, целое деление — intdiv. Арифметика выполняется раньше склейки, поэтому «Итого: » . (7 + 3). В двойных кавычках $price подставляется, в одинарных — нет. \"5\" + 3 — строка превратилась в число. == сравнивает с приведением типов, === — строго.",
+   "hints": [
+    "В одинарных кавычках переменные не подставляются.",
+    "== приводит типы, === — нет."
+   ]
+  },
+  {
+   "task_id": "php-basics-03",
+   "topic_id": "php-basics",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Цена на витрине",
+   "story": "Гена: «Допиши пропуски — без них строка про товар не соберётся.»",
+   "content": {
+    "question": "Заполни пропуски: переменная, оператор склейки и подстановка цены в строку.",
+    "code": "<?php\n[[1]] = \"Лампа\";\n$price = 1990;\necho $title [[2]] \" стоит \" . $price . \" ₽\\n\";\necho \"{$title} — [[3]] ₽\\n\";",
+    "blanks": [
+     {
+      "answer": [
+       "$title"
+      ]
+     },
+     {
+      "answer": [
+       "."
+      ]
+     },
+     {
+      "answer": [
+       "$price",
+       "{$price}"
+      ]
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "Переменная объявляется простым присваиванием, имя — с $. Строки склеивает точка. В двойных кавычках переменная подставляется сама: $price или {$price}.",
+   "hints": [
+    "Имя переменной начинается с $.",
+    "Склейка строк в PHP — точка."
+   ]
+  },
+  {
+   "task_id": "php-basics-04",
+   "topic_id": "php-basics",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Админ не проходит",
+   "story": "Ира: «Проверка „в адресе есть admin“ отказывает самому admin@kodzilla.ru. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "<?php\nfunction isAdminEmail(string $email): bool {\n    if (strpos($email, 'admin') == false) {\n        return false;\n    }\n    return true;\n}\n\nvar_dump(isAdminEmail('admin@kodzilla.ru'));",
+    "bug_line": 3,
+    "options": [
+     "strpos вернул 0 (найдено в самом начале), а 0 == false — истина; нужно === false или str_contains",
+     "strpos ищет только с конца строки",
+     "Функция не может возвращать bool",
+     "var_dump не печатает bool"
+    ],
+    "correct_answer": 0,
+    "language": "php"
+   },
+   "explanation": "strpos возвращает позицию найденного — для «admin@…» это 0, а если не нашёл — false. Нестрогое 0 == false истинно, и функция отказывает. Нужно strpos(...) === false или просто str_contains($email, 'admin').",
+   "hints": [
+    "Что вернёт strpos, если admin в самом начале?",
+    "Сравнивай строго: === false."
+   ]
+  },
+  {
+   "task_id": "php-basics-05",
+   "topic_id": "php-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Цена с НДС",
+   "story": "Стас: «На витрине цены с НДС 20 %. Посчитай — и никаких копеечных хвостов.»",
+   "content": {
+    "question": "Напиши withVat(float $price): float — цена × 1.2, округлённая до копеек (2 знака).",
+    "entry": "withVat",
+    "code": "<?php\n// цена с НДС 20 %, до копеек\nfunction withVat(float $price): float {\n    return $price;\n}\n\necho withVat(1990.99), \"\\n\";",
+    "correct_answer": "<?php\n// цена с НДС 20 %, до копеек\nfunction withVat(float $price): float {\n    return round($price * 1.2, 2);\n}\n\necho withVat(1990.99), \"\\n\";",
+    "tests_code": "<?php\ncheck::near('100 ₽', fn() => withVat(100), 120);\ncheck::near('1990.99 ₽', fn() => withVat(1990.99), 2389.19);\ncheck::near('1 копейка', fn() => withVat(0.01), 0.01);\ncheck::near('бесплатно', fn() => withVat(0), 0);",
+    "requirements": [
+     {
+      "input": "умножает на 1.2",
+      "expected": {
+       "regex": "1\\.2\\b|\\*\\s*120\\s*/|/\\s*100"
+      }
+     },
+     {
+      "input": "округляет до двух знаков",
+      "expected": {
+       "regex": "round\\s*\\([^;]*,\\s*2"
+      }
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "1990.99 × 1.2 = 2389.188 — лишняя доля копейки. round(значение, 2) округляет до двух знаков после запятой. Для настоящих денег в PHP хранят копейки целым числом или пользуются bcmath, но для витрины round достаточно.",
+   "hints": [
+    "$price * 1.2",
+    "round(значение, 2)"
+   ]
+  },
+  {
+   "task_id": "php-control-01",
+   "topic_id": "php-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Оценка за код-ревью",
+   "story": "Гена: «Бот код-ревью ставит оценку по баллам. Перенеси правило на PHP — можно через match.»",
+   "content": {
+    "question": "Напиши reviewGrade(int $score): string: от 90 — «отлично», от 75 — «хорошо», от 50 — «зачёт», иначе «на доработку».",
+    "entry": "reviewGrade",
+    "code": "<?php\n// оценка за код-ревью по баллам\nfunction reviewGrade(int $score): string {\n    return '';\n}\n\necho reviewGrade(80), \"\\n\";",
+    "correct_answer": "<?php\n// оценка за код-ревью по баллам\nfunction reviewGrade(int $score): string {\n    return match (true) {\n        $score >= 90 => 'отлично',\n        $score >= 75 => 'хорошо',\n        $score >= 50 => 'зачёт',\n        default => 'на доработку',\n    };\n}\n\necho reviewGrade(80), \"\\n\";",
+    "tests_code": "<?php\ncheck::eq('95', fn() => reviewGrade(95), 'отлично');\ncheck::eq('ровно 90', fn() => reviewGrade(90), 'отлично');\ncheck::eq('80', fn() => reviewGrade(80), 'хорошо');\ncheck::eq('ровно 75', fn() => reviewGrade(75), 'хорошо');\ncheck::eq('50', fn() => reviewGrade(50), 'зачёт');\ncheck::eq('12', fn() => reviewGrade(12), 'на доработку');",
+    "requirements": [
+     {
+      "input": "сравнивает с 90",
+      "expected": {
+       "regex": ">=?\\s*(90|89)\\b|\\b(90|89)\\s*<=?"
+      }
+     },
+     {
+      "input": "сравнивает с 75",
+      "expected": {
+       "regex": ">=?\\s*(75|74)\\b|\\b(75|74)\\s*<=?"
+      }
+     },
+     {
+      "input": "сравнивает с 50",
+      "expected": {
+       "regex": ">=?\\s*(50|49)\\b|\\b(50|49)\\s*<=?"
+      }
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "match (true) проверяет условия сверху вниз и берёт первое истинное — это короткая замена цепочки if/elseif. Порог 90 — первым, иначе 95 получит «зачёт». default ловит всё остальное. Обычные if тоже подходят.",
+   "hints": [
+    "return match (true) { $score >= 90 => 'отлично', … };",
+    "Последний вариант — default."
+   ]
+  },
+  {
+   "task_id": "php-control-02",
+   "topic_id": "php-control",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "switch и match по-разному",
+   "story": "Ира: «Уровень пришёл из формы строкой \"2\". switch его узнал, а match — нет. Что напечатается?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "<?php\n$total = 0;\nfor ($i = 1; $i <= 10; $i++) {\n    if ($i % 2 == 0) continue;\n    if ($i > 7) break;\n    $total += $i;\n}\necho \"total = $total\\n\";\n\n$level = \"2\";\nswitch ($level) {\n    case 2:\n        echo \"switch: middle\\n\";\n        break;\n    default:\n        echo \"switch: ?\\n\";\n}\necho match ($level) {\n    2 => \"match: middle\",\n    default => \"match: ?\",\n}, \"\\n\";",
+    "language": "php",
+    "output": "total = 16\nswitch: middle\nmatch: ?"
+   },
+   "explanation": "В сумму попадают нечётные 1, 3, 5, 7 — это 16. switch сравнивает нестрого (==): строка \"2\" равна числу 2. match сравнивает строго (===): строка \"2\" не равна числу 2, поэтому срабатывает default.",
+   "hints": [
+    "switch сравнивает через ==.",
+    "match сравнивает через ===."
+   ]
+  },
+  {
+   "task_id": "php-control-03",
+   "topic_id": "php-control",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "FizzBuzz на match",
+   "story": "Гена: «Классика собеседований, по-современному — match (true). Собери функцию.»",
+   "content": {
+    "question": "Собери label(int $n): string: кратно 15 — FizzBuzz, кратно 3 — Fizz, кратно 5 — Buzz, иначе само число строкой.",
+    "lines": [
+     "function label(int $n): string {",
+     "    return match (true) {",
+     "        $n % 15 === 0 => 'FizzBuzz',",
+     "        $n % 3 === 0 => 'Fizz',",
+     "        $n % 5 === 0 => 'Buzz',",
+     "        default => (string)$n,",
+     "    };",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "function label(int $n): string {",
+      "    return match (true) {",
+      "        $n % 15 === 0 => 'FizzBuzz',",
+      "        $n % 5 === 0 => 'Buzz',",
+      "        $n % 3 === 0 => 'Fizz',",
+      "        default => (string)$n,",
+      "    };",
+      "}"
+     ]
+    ],
+    "distractors": [
+     "        else => (string)$n,",
+     "    switch (true) {"
+    ],
+    "language": "php"
+   },
+   "explanation": "match (true) берёт первое истинное условие, поэтому кратность 15 — первой. Fizz и Buzz можно поменять местами. «Всё остальное» в match — default, слова else там нет. (string)$n превращает число в строку, как требует тип результата.",
+   "hints": [
+    "Самый частный случай — первым.",
+    "«Всё остальное» — default."
+   ]
+  },
+  {
+   "task_id": "php-control-04",
+   "topic_id": "php-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма кратных",
+   "story": "Гена: «Для акции нужны все номера заказов меньше n, кратные 3 или 5, — точнее, их сумма.»",
+   "content": {
+    "question": "Напиши sumMultiples(int $n): int — сумму всех чисел от 1 до n - 1, которые делятся на 3 или на 5.",
+    "entry": "sumMultiples",
+    "code": "<?php\n// сумма чисел меньше n, кратных 3 или 5\nfunction sumMultiples(int $n): int {\n    return 0;\n}\n\necho sumMultiples(10), \"\\n\";",
+    "correct_answer": "<?php\n// сумма чисел меньше n, кратных 3 или 5\nfunction sumMultiples(int $n): int {\n    $sum = 0;\n    for ($i = 1; $i < $n; $i++) {\n        if ($i % 3 === 0 || $i % 5 === 0) {\n            $sum += $i;\n        }\n    }\n    return $sum;\n}\n\necho sumMultiples(10), \"\\n\";",
+    "tests_code": "<?php\ncheck::eq('n = 10: 3 + 5 + 6 + 9', fn() => sumMultiples(10), 23);\ncheck::eq('n = 1', fn() => sumMultiples(1), 0);\ncheck::eq('n = 16: 15 не входит', fn() => sumMultiples(16), 60);\ncheck::eq('n = 1000', fn() => sumMultiples(1000), 233168);",
+    "requirements": [
+     {
+      "input": "обходит числа циклом",
+      "expected": {
+       "regex": "\\b(for|while|foreach)\\s*\\("
+      }
+     },
+     {
+      "input": "проверяет кратность 3",
+      "expected": {
+       "regex": "%\\s*3\\b"
+      }
+     },
+     {
+      "input": "проверяет кратность 5",
+      "expected": {
+       "regex": "%\\s*5\\b"
+      }
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "Цикл от 1 до n - 1 (условие $i < $n), в сумму — числа, у которых остаток от деления на 3 или на 5 равен нулю. Числа, кратные 15, учитываются один раз, потому что условие через || — это одно условие, а не два прибавления.",
+   "hints": [
+    "for ($i = 1; $i < $n; $i++)",
+    "if ($i % 3 === 0 || $i % 5 === 0)"
+   ]
+  },
+  {
+   "task_id": "php-control-05",
+   "topic_id": "php-control",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Последняя цена задвоилась",
+   "story": "Ира: «После удвоения цен последняя цена почему-то равна предпоследней: [200, 400, 400]. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "<?php\n$prices = [100, 200, 300];\nforeach ($prices as &$p) {\n    $p = $p * 2;\n}\nforeach ($prices as $p) {\n}\necho implode(', ', $prices), \"\\n\";",
+    "bug_line": 6,
+    "options": [
+     "После первого цикла $p осталась ссылкой на последний элемент, и второй цикл записывает в него каждое значение — нужен unset($p) после первого цикла",
+     "Второй цикл пустой — PHP такое не выполняет",
+     "implode меняет массив",
+     "Удваивать нужно через array_map, иначе не работает"
+    ],
+    "correct_answer": 0,
+    "language": "php"
+   },
+   "explanation": "foreach ($prices as &$p) оставляет $p ссылкой на последний элемент и после цикла. Второй цикл по значению записывает в эту же $p каждое значение по очереди — и последний элемент становится равен предпоследнему. После цикла по ссылке пишут unset($p);.",
+   "hints": [
+    "Чем остаётся $p после цикла с &$p?",
+    "Разорви ссылку: unset($p)."
+   ]
+  },
+  {
+   "task_id": "php-arrays-01",
+   "topic_id": "php-arrays",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Частота тегов",
+   "story": "Стас: «Хочу видеть, какие теги у товаров встречаются чаще. Посчитай их.»",
+   "content": {
+    "question": "Напиши tagCounts(array $tags): array — массив «тег => сколько раз встретился», в порядке первого появления.",
+    "entry": "tagCounts",
+    "code": "<?php\n// сколько раз встретился каждый тег\nfunction tagCounts(array $tags): array {\n    $counts = [];\n    return $counts;\n}\n\nprint_r(tagCounts(['sale', 'new', 'sale']));",
+    "correct_answer": "<?php\n// сколько раз встретился каждый тег\nfunction tagCounts(array $tags): array {\n    $counts = [];\n    foreach ($tags as $tag) {\n        $counts[$tag] = ($counts[$tag] ?? 0) + 1;\n    }\n    return $counts;\n}\n\nprint_r(tagCounts(['sale', 'new', 'sale']));",
+    "tests_code": "<?php\ncheck::eq('sale, new, sale', fn() => tagCounts(['sale', 'new', 'sale']), ['sale' => 2, 'new' => 1]);\ncheck::eq('один тег', fn() => tagCounts(['hit']), ['hit' => 1]);\ncheck::eq('пустой список', fn() => tagCounts([]), []);\ncheck::eq('регистр важен', fn() => tagCounts(['New', 'new', 'new']), ['New' => 1, 'new' => 2]);",
+    "requirements": [
+     {
+      "input": "обходит теги",
+      "expected": {
+       "regex": "foreach|array_count_values"
+      }
+     },
+     {
+      "input": "берёт текущее значение безопасно",
+      "expected": {
+       "regex": "\\?\\?|isset|array_key_exists|array_count_values"
+      }
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "$counts[$tag]++ для нового тега читает несуществующий ключ — PHP выдаст предупреждение «Undefined array key», а тесты игры считают его ошибкой. ?? 0 берёт ноль, если ключа ещё нет. Встроенная функция array_count_values делает то же самое одной строкой.",
+   "hints": [
+    "foreach ($tags as $tag)",
+    "$counts[$tag] = ($counts[$tag] ?? 0) + 1;"
+   ]
+  },
+  {
+   "task_id": "php-arrays-02",
+   "topic_id": "php-arrays",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Списки и словари",
+   "story": "Гена: «Прежде чем писать склад, проверь, как ведут себя массивы PHP.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "<?php\n$cart = ['лампа', 'стол'];\n$cart[] = 'стул';\narray_unshift($cart, 'полка');\necho count($cart), ' ', $cart[1], \"\\n\";\n$stock = ['лампа' => 3];\n$stock['лампа'] = 5;\necho $stock['лампа'], ' ', $stock['шкаф'] ?? 0, \"\\n\";\necho isset($stock['шкаф']) ? 'есть' : 'нет', \"\\n\";\necho implode(', ', array_keys($stock)), \"\\n\";\n$prices = [500, 1500, 999];\necho array_sum($prices), ' ', max($prices), \"\\n\";\necho implode(' ', array_filter($prices, fn($p) => $p < 1000)), \"\\n\";",
+    "language": "php",
+    "output": "4 лампа\n5 0\nнет\nлампа\n2999 1500\n500 999"
+   },
+   "explanation": "[] добавляет в конец, array_unshift — в начало: полка, лампа, стол, стул — 4 элемента, под индексом 1 «лампа». Запись по тому же ключу заменяет значение. ?? берёт запасное значение для отсутствующего ключа, и isset его тоже не находит. array_filter оставляет цены меньше 1000.",
+   "hints": [
+    "array_unshift вставляет в начало.",
+    "?? — значение по умолчанию."
+   ]
+  },
+  {
+   "task_id": "php-arrays-03",
+   "topic_id": "php-arrays",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Цены из справочника",
+   "story": "Гена: «Справочник цен почти готов. Заполни пропуски.»",
+   "content": {
+    "question": "Заполни пропуски: обход ключей и значений, значение по умолчанию и сумма.",
+    "code": "<?php\n$prices = ['лампа' => 1990, 'стол' => 7500];\nforeach ($prices as $name [[1]] $price) {\n    echo \"$name: $price\\n\";\n}\necho $prices['шкаф'] [[2]] 'нет в продаже', \"\\n\";\necho [[3]]($prices), \"\\n\";",
+    "blanks": [
+     {
+      "answer": [
+       "=>"
+      ]
+     },
+     {
+      "answer": [
+       "??"
+      ]
+     },
+     {
+      "answer": [
+       "array_sum"
+      ]
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "foreach ($массив as $ключ => $значение) обходит пары. ?? возвращает правую часть, если ключа нет, — без предупреждения. array_sum складывает значения: 1990 + 7500 = 9490.",
+   "hints": [
+    "Ключ и значение разделяет стрелка.",
+    "Сумма массива — array_sum."
+   ]
+  },
+  {
+   "task_id": "php-arrays-04",
+   "topic_id": "php-arrays",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товары по бюджету",
+   "story": "Стас: «Покупатель ввёл бюджет. Оставь цены, которые в него укладываются, в том же порядке.»",
+   "content": {
+    "question": "Напиши affordable(array $prices, int $budget): array — список цен не дороже бюджета, в исходном порядке, с ключами 0, 1, 2….",
+    "entry": "affordable",
+    "code": "<?php\n// цены, которые укладываются в бюджет\nfunction affordable(array $prices, int $budget): array {\n    return [];\n}\n\nprint_r(affordable([500, 1500, 999, 2000], 1000));",
+    "correct_answer": "<?php\n// цены, которые укладываются в бюджет\nfunction affordable(array $prices, int $budget): array {\n    $result = [];\n    foreach ($prices as $price) {\n        if ($price <= $budget) {\n            $result[] = $price;\n        }\n    }\n    return $result;\n}\n\nprint_r(affordable([500, 1500, 999, 2000], 1000));",
+    "tests_code": "<?php\ncheck::eq('бюджет 1000', fn() => affordable([500, 1500, 999, 2000], 1000), [500, 999]);\ncheck::eq('ровно бюджет', fn() => affordable([1000, 1001], 1000), [1000]);\ncheck::eq('всё дорого', fn() => affordable([3000, 4000], 100), []);\ncheck::eq('пустой список', fn() => affordable([], 500), []);",
+    "requirements": [
+     {
+      "input": "сравнивает цену с бюджетом",
+      "expected": {
+       "regex": "<=\\s*\\$budget|\\$budget\\s*>="
+      }
+     },
+     {
+      "input": "собирает подходящие цены",
+      "expected": {
+       "regex": "\\[\\]\\s*=|array_filter|array_values"
+      }
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "$result[] = $price добавляет в конец с ключами по порядку. Ловушка array_filter: он сохраняет исходные ключи — из [500, 1500, 999] получится [0 => 500, 2 => 999], и это уже не тот список. Если фильтровать им, оберни в array_values.",
+   "hints": [
+    "foreach и if ($price <= $budget).",
+    "$result[] = $price;"
+   ]
+  },
+  {
+   "task_id": "php-arrays-05",
+   "topic_id": "php-arrays",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Стол не попадает в корзину",
+   "story": "Ира: «Функция добавляет стол в корзину, а в корзине всё равно одна лампа. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "<?php\nfunction addItem(array $cart, string $item): void {\n    $cart[] = $item;\n}\n\n$cart = ['лампа'];\naddItem($cart, 'стол');\necho count($cart), \"\\n\";",
+    "bug_line": 2,
+    "options": [
+     "Массив передаётся в функцию копией — стол добавляется в копию; нужен параметр array &$cart или вернуть новый массив",
+     "Функция с void не может менять данные",
+     "[] не добавляет элементы в массив",
+     "count считает только ключи-строки"
+    ],
+    "correct_answer": 0,
+    "language": "php"
+   },
+   "explanation": "В отличие от объектов, массивы в PHP передаются копией. addItem добавила стол в свою копию, и та исчезла при выходе. Исправить: function addItem(array &$cart, string $item) — или возвращать массив: $cart = addItem($cart, 'стол').",
+   "hints": [
+    "Что получает функция: сам массив или копию?",
+    "Добавь & перед параметром."
+   ]
+  },
+  {
+   "task_id": "php-functions-01",
+   "topic_id": "php-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Инициалы в карточке",
+   "story": "Гена: «В карточке сотрудника нужны инициалы: из „Гена Петров“ — „Г. П.“. Имена по-русски и приходят как попало.»",
+   "content": {
+    "question": "Напиши initials(string $fullName): string — первые буквы имени и фамилии заглавными, через точку и пробел: «Г. П.». Лишние пробелы бывают.",
+    "entry": "initials",
+    "code": "<?php\n// \"Гена Петров\" -> \"Г. П.\"\nfunction initials(string $fullName): string {\n    return '';\n}\n\necho initials('Гена Петров'), \"\\n\";",
+    "correct_answer": "<?php\n// \"Гена Петров\" -> \"Г. П.\"\nfunction initials(string $fullName): string {\n    $parts = preg_split('/\\s+/', trim($fullName));\n    $first = mb_strtoupper(mb_substr($parts[0], 0, 1));\n    $last = mb_strtoupper(mb_substr($parts[1], 0, 1));\n    return \"$first. $last.\";\n}\n\necho initials('Гена Петров'), \"\\n\";",
+    "tests_code": "<?php\ncheck::eq('Гена Петров', fn() => initials('Гена Петров'), 'Г. П.');\ncheck::eq('строчные буквы', fn() => initials('ира смирнова'), 'И. С.');\ncheck::eq('лишние пробелы', fn() => initials('  Стас   Волков '), 'С. В.');",
+    "requirements": [
+     {
+      "input": "берёт первую букву функцией mb_",
+      "expected": {
+       "regex": "mb_substr|mb_str_split"
+      }
+     },
+     {
+      "input": "делает букву заглавной функцией mb_",
+      "expected": {
+       "regex": "mb_strtoupper|mb_convert_case"
+      }
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "Русская буква в UTF-8 — два байта. substr($s, 0, 1) отрежет половину буквы, а strtoupper не знает кириллицы. mb_substr и mb_strtoupper работают с буквами. preg_split('/\\s+/', …) делит по любому количеству пробелов, trim убирает пробелы по краям.",
+   "hints": [
+    "mb_substr($parts[0], 0, 1) — первая буква.",
+    "mb_strtoupper — заглавная кириллица."
+   ]
+  },
+  {
+   "task_id": "php-functions-02",
+   "topic_id": "php-functions",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Копия, ссылка и байты",
+   "story": "Гена: «Одни функции меняют переменные, другие нет, а длина строки врёт. Проверь себя.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "<?php\nfunction bump(int $x): void { $x += 10; }\nfunction bumpRef(int &$x): void { $x += 10; }\nfunction price(int $rub, string $cur = '₽'): string { return \"$rub $cur\"; }\nfunction total(int ...$nums): int { return array_sum($nums); }\n\n$a = 1;\n$b = 1;\nbump($a);\nbumpRef($b);\necho \"$a $b\\n\";\necho price(500), ' | ', price(7, '$'), \"\\n\";\necho total(1, 2, 3), \"\\n\";\n$k = 3;\n$addK = fn($n) => $n + $k;\n$k = 100;\necho $addK(1), \"\\n\";\necho strlen('Лампа'), ' ', mb_strlen('Лампа'), \"\\n\";",
+    "language": "php",
+    "output": "1 11\n500 ₽ | 7 $\n6\n4\n10 5"
+   },
+   "explanation": "bump получает копию — $a остаётся 1, bumpRef с & меняет саму $b. Параметр $cur по умолчанию «₽». ...$nums собирает аргументы в массив. Стрелочная функция запоминает $k в момент создания — 1 + 3 = 4. strlen считает байты (10), mb_strlen — буквы (5).",
+   "hints": [
+    "Без & функция меняет свою копию.",
+    "fn запоминает внешние переменные при создании."
+   ]
+  },
+  {
+   "task_id": "php-functions-03",
+   "topic_id": "php-functions",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма корзины",
+   "story": "Гена: «Собери функцию суммы корзины — пригодится в чекауте.»",
+   "content": {
+    "question": "Собери total(array $prices): int — сумму всех цен.",
+    "lines": [
+     "function total(array $prices): int {",
+     "    $sum = 0;",
+     "    foreach ($prices as $p) {",
+     "        $sum += $p;",
+     "    }",
+     "    return $sum;",
+     "}"
+    ],
+    "distractors": [
+     "    foreach ($p as $prices) {",
+     "    return $prices;"
+    ],
+    "language": "php"
+   },
+   "explanation": "Сначала сумма обнуляется, потом foreach перебирает цены. В foreach сначала массив, потом имя для элемента: foreach ($prices as $p). return $prices вернул бы массив, а функция обещает int.",
+   "hints": [
+    "foreach ($массив as $элемент).",
+    "Верни сумму, а не массив."
+   ]
+  },
+  {
+   "task_id": "php-functions-04",
+   "topic_id": "php-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Сумма цифр артикула",
+   "story": "Стас: «Контрольная цифра артикула — сумма его цифр. Минус в начале бывает у возвратов, его не считаем.»",
+   "content": {
+    "question": "Напиши digitSum(int $n): int — сумму цифр числа. Знак не учитывается: digitSum(-1990) === 19. Можно рекурсией.",
+    "entry": "digitSum",
+    "code": "<?php\n// сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\nfunction digitSum(int $n): int {\n    return 0;\n}\n\necho digitSum(1990), \"\\n\";",
+    "correct_answer": "<?php\n// сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\nfunction digitSum(int $n): int {\n    $n = abs($n);\n    if ($n < 10) {\n        return $n;\n    }\n    return $n % 10 + digitSum(intdiv($n, 10));\n}\n\necho digitSum(1990), \"\\n\";",
+    "tests_code": "<?php\ncheck::eq('0', fn() => digitSum(0), 0);\ncheck::eq('7', fn() => digitSum(7), 7);\ncheck::eq('1990', fn() => digitSum(1990), 19);\ncheck::eq('123456789', fn() => digitSum(123456789), 45);\ncheck::eq('возврат -1990', fn() => digitSum(-1990), 19);\ncheck::eq('длинный 9999999999', fn() => digitSum(9999999999), 90);",
+    "requirements": [
+     {
+      "input": "берёт последнюю цифру остатком от деления на 10",
+      "expected": {
+       "regex": "%\\s*10"
+      }
+     },
+     {
+      "input": "отбрасывает последнюю цифру целым делением",
+      "expected": {
+       "regex": "intdiv\\s*\\("
+      }
+     },
+     {
+      "input": "убирает знак",
+      "expected": {
+       "regex": "abs\\s*\\(|<\\s*0|-\\s*\\$n\\b"
+      }
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "Последняя цифра — $n % 10, остальное число — intdiv($n, 10). Обычное / здесь ловушка: 199 / 10 == 19.9, и функция с параметром int получит дробь — PHP предупредит о потере точности, а тесты игры посчитают это ошибкой. abs() убирает знак.",
+   "hints": [
+    "$n % 10 — последняя цифра.",
+    "Отбросить её — intdiv($n, 10), а не /."
+   ]
+  },
+  {
+   "task_id": "php-functions-05",
+   "topic_id": "php-functions",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Короткое имя не проходит",
+   "story": "Ира: «Проверка „название не длиннее 5 символов“ отклоняет „Лампа“. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "<?php\nfunction isShortName(string $name): bool {\n    return strlen($name) <= 5;\n}\n\nvar_dump(isShortName('Лампа'));",
+    "bug_line": 3,
+    "options": [
+     "strlen считает байты: у «Лампа» их 10; буквы считает mb_strlen",
+     "<= нельзя использовать со строками",
+     "Функция должна возвращать int",
+     "var_dump не печатает bool"
+    ],
+    "correct_answer": 0,
+    "language": "php"
+   },
+   "explanation": "В UTF-8 каждая русская буква — два байта, и strlen('Лампа') == 10. Для длины текста в буквах — mb_strlen($name) <= 5.",
+   "hints": [
+    "Что именно считает strlen?",
+    "Для букв — функция с приставкой mb_."
+   ]
+  },
+  {
+   "task_id": "php-oop-01",
+   "topic_id": "php-oop",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Корзина-объект",
+   "story": "Гена: «Хватит считать корзину отдельными функциями — пусть объект Cart сам копит сумму.»",
+   "content": {
+    "question": "Допиши метод add(int $price, int $qty) класса Cart — он добавляет позицию; total() возвращает сумму всех позиций.",
+    "entry": "Cart",
+    "code": "<?php\nclass Cart {\n    private int $total = 0;\n\n    // добавить позицию: цена × количество\n    public function add(int $price, int $qty): void {\n    }\n\n    public function total(): int {\n        return $this->total;\n    }\n}\n\n$cart = new Cart();\n$cart->add(1990, 2);\n$cart->add(500, 1);\necho $cart->total(), \"\\n\";",
+    "correct_answer": "<?php\nclass Cart {\n    private int $total = 0;\n\n    // добавить позицию: цена × количество\n    public function add(int $price, int $qty): void {\n        $this->total += $price * $qty;\n    }\n\n    public function total(): int {\n        return $this->total;\n    }\n}\n\n$cart = new Cart();\n$cart->add(1990, 2);\n$cart->add(500, 1);\necho $cart->total(), \"\\n\";",
+    "tests_code": "<?php\ncheck::eq('пустая корзина', fn() => (new Cart())->total(), 0);\ncheck::eq('1990 × 2 + 500', function () {\n    $c = new Cart();\n    $c->add(1990, 2);\n    $c->add(500, 1);\n    return $c->total();\n}, 4480);\ncheck::eq('позиция с количеством 0', function () {\n    $c = new Cart();\n    $c->add(700, 0);\n    $c->add(100, 3);\n    return $c->total();\n}, 300);\ncheck::eq('у каждой корзины своя сумма', function () {\n    $a = new Cart();\n    $b = new Cart();\n    $a->add(100, 1);\n    $b->add(5, 2);\n    return $a->total() . '/' . $b->total();\n}, '100/10');",
+    "requirements": [
+     {
+      "input": "накапливает сумму в свойстве",
+      "expected": {
+       "regex": "\\$this->total\\s*\\+="
+      }
+     },
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "\\$price\\s*\\*\\s*\\$qty|\\$qty\\s*\\*\\s*\\$price"
+      }
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "Внутри метода к свойствам объекта обращаются только через $this->. Просто $total в методе — это новая локальная переменная, и корзина останется пустой. Свойство private — снаружи сумму не испортить.",
+   "hints": [
+    "$this->total += $price * $qty;",
+    "Без $this-> получится локальная переменная."
+   ]
+  },
+  {
+   "task_id": "php-oop-02",
+   "topic_id": "php-oop",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Объекты, массивы и clone",
+   "story": "Гена: «Объект поменял в одном месте — изменилось в другом. А с массивами почему-то нет. Что напечатает код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "<?php\nclass Counter {\n    public static int $created = 0;\n    public int $value = 0;\n\n    public function __construct() {\n        self::$created++;\n    }\n}\n\n$a = new Counter();\n$b = $a;\n$b->value = 5;\n$c = clone $a;\n$c->value = 7;\necho \"$a->value $b->value $c->value\\n\";\necho Counter::$created, \"\\n\";\nvar_dump($a === $b, $a == $c);\n\n$arr1 = [1, 2];\n$arr2 = $arr1;\n$arr2[] = 3;\necho count($arr1), ' ', count($arr2), \"\\n\";",
+    "language": "php",
+    "output": "5 5 7\n1\nbool(true)\nbool(false)\n2 3"
+   },
+   "explanation": "$b = $a — тот же объект, поэтому у обоих 5. clone делает копию, и её значение 7 не трогает оригинал; конструктор при clone не вызывается — созданий было одно. === у объектов — «тот же объект», == — «одинаковые свойства» (5 и 7 — нет). Массивы, наоборот, копируются при присваивании.",
+   "hints": [
+    "Объекты не копируются при присваивании, массивы — копируются.",
+    "clone не вызывает конструктор."
+   ]
+  },
+  {
+   "task_id": "php-oop-03",
+   "topic_id": "php-oop",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Фигуры для конструктора витрины",
+   "story": "Гена: «Прямоугольник должен выполнять договор Shape и красиво печататься.»",
+   "content": {
+    "question": "Заполни пропуски: реализация интерфейса, видимость свойства и метод превращения в строку.",
+    "code": "<?php\ninterface Shape {\n    public function area(): float;\n}\n\nclass Rect [[1]] Shape {\n    public function __construct(\n        [[2]] readonly float $w,\n        private readonly float $h,\n    ) {}\n\n    public function area(): float {\n        return $this->w * $this->h;\n    }\n\n    public function [[3]](): string {\n        return \"Прямоугольник {$this->w}×{$this->h}\";\n    }\n}\n\n$r = new Rect(2, 3);\necho $r, ': ', $r->area(), \"\\n\";",
+    "blanks": [
+     {
+      "answer": [
+       "implements"
+      ]
+     },
+     {
+      "answer": [
+       "private",
+       "public",
+       "protected"
+      ]
+     },
+     {
+      "answer": [
+       "__toString"
+      ]
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "Интерфейс реализуют через implements (extends — для наследования от класса). В конструкторе с видимостью private/public параметр сразу становится свойством — это продвижение свойств. __toString учит объект превращаться в строку для echo.",
+   "hints": [
+    "Интерфейсы реализуют, классы наследуют.",
+    "Магический метод строки начинается с двух подчёркиваний."
+   ]
+  },
+  {
+   "task_id": "php-oop-04",
+   "topic_id": "php-oop",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товар печатает себя сам",
+   "story": "Стас: «При выводе товара падает ошибка „could not be converted to string“. Пусть товар печатается по-человечески.»",
+   "content": {
+    "question": "Добавь в Product метод __toString(): «Лампа — 1990 ₽» (название, пробел, длинное тире, пробел, цена, пробел, ₽).",
+    "entry": "Product",
+    "code": "<?php\nclass Product {\n    public function __construct(\n        private string $name,\n        private int $price,\n    ) {}\n}\n\necho new Product('Лампа', 1990), \"\\n\";",
+    "correct_answer": "<?php\nclass Product {\n    public function __construct(\n        private string $name,\n        private int $price,\n    ) {}\n\n    public function __toString(): string {\n        return \"{$this->name} — {$this->price} ₽\";\n    }\n}\n\necho new Product('Лампа', 1990), \"\\n\";",
+    "tests_code": "<?php\ncheck::eq('Лампа', fn() => (string)new Product('Лампа', 1990), 'Лампа — 1990 ₽');\ncheck::eq('бесплатный товар', fn() => 'x' . new Product('Стол', 0), 'xСтол — 0 ₽');\ncheck::eq('подстановка в строку', function () {\n    $p = new Product('Кресло', 12500);\n    return \"Хит: $p\";\n}, 'Хит: Кресло — 12500 ₽');",
+    "requirements": [
+     {
+      "input": "объявляет __toString(): string",
+      "expected": {
+       "regex": "function\\s+__toString\\s*\\(\\s*\\)\\s*:\\s*string"
+      }
+     },
+     {
+      "input": "добавляет знак ₽",
+      "expected": {
+       "regex": "₽"
+      }
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "echo, склейка точкой и подстановка в строку превращают объект в строку через __toString. Без него PHP бросает Error «could not be converted to string». Внутри строки свойства подставляются в фигурных скобках: {$this->name}.",
+   "hints": [
+    "public function __toString(): string",
+    "\"{$this->name} — {$this->price} ₽\""
+   ]
+  },
+  {
+   "task_id": "php-oop-05",
+   "topic_id": "php-oop",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Баланс всегда ноль",
+   "story": "Ира: «Открываем счёт с 500 ₽, а баланс показывает 0. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "<?php\nclass Account {\n    private int $balance = 0;\n\n    public function __construct(int $balance) {\n        $balance = $balance;\n    }\n\n    public function balance(): int {\n        return $this->balance;\n    }\n}\n\n$acc = new Account(500);\necho $acc->balance(), \"\\n\";",
+    "bug_line": 6,
+    "options": [
+     "Параметр присваивается сам себе — свойству нужно $this->balance = $balance",
+     "private-свойство нельзя задать в конструкторе",
+     "Конструктор должен возвращать Account",
+     "Свойство должно быть static"
+    ],
+    "correct_answer": 0,
+    "language": "php"
+   },
+   "explanation": "$balance внутри конструктора — это параметр, а свойство объекта — $this->balance. Строка $balance = $balance ничего не меняет. Исправить: $this->balance = $balance, а ещё проще — продвижение свойства: public function __construct(private int $balance) {}.",
+   "hints": [
+    "Где здесь свойство объекта?",
+    "Свойство — через $this->."
+   ]
+  },
+  {
+   "task_id": "php-errors-01",
+   "topic_id": "php-errors",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Списание со счёта",
+   "story": "Гена: «Списание должно явно отказывать, а не уводить счёт в минус.»",
+   "content": {
+    "question": "Напиши withdraw(int $balance, int $amount): int — сумма ≤ 0: InvalidArgumentException; сумма больше баланса: RuntimeException; иначе верни новый баланс.",
+    "entry": "withdraw",
+    "code": "<?php\n// списание со счёта: новый баланс или исключение\nfunction withdraw(int $balance, int $amount): int {\n    return $balance - $amount;\n}\n\necho withdraw(1000, 300), \"\\n\";",
+    "correct_answer": "<?php\n// списание со счёта: новый баланс или исключение\nfunction withdraw(int $balance, int $amount): int {\n    if ($amount <= 0) {\n        throw new InvalidArgumentException('сумма должна быть больше нуля');\n    }\n    if ($amount > $balance) {\n        throw new RuntimeException(\"недостаточно средств: $balance < $amount\");\n    }\n    return $balance - $amount;\n}\n\necho withdraw(1000, 300), \"\\n\";",
+    "tests_code": "<?php\ncheck::eq('1000 - 300', fn() => withdraw(1000, 300), 700);\ncheck::eq('списать всё', fn() => withdraw(500, 500), 0);\ncheck::throws('не хватает денег', fn() => withdraw(100, 500), RuntimeException::class);\ncheck::throws('сумма 0', fn() => withdraw(100, 0), InvalidArgumentException::class);\ncheck::throws('сумма -5', fn() => withdraw(100, -5), InvalidArgumentException::class);",
+    "requirements": [
+     {
+      "input": "бросает InvalidArgumentException",
+      "expected": {
+       "regex": "throw\\s+new\\s+InvalidArgumentException"
+      }
+     },
+     {
+      "input": "бросает RuntimeException",
+      "expected": {
+       "regex": "throw\\s+new\\s+RuntimeException"
+      }
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "Неверный аргумент — InvalidArgumentException, невозможная сейчас операция — RuntimeException. Проверки ставят в начало функции. Порядок важен: InvalidArgumentException наследует LogicException, а не RuntimeException, поэтому тест на «сумму 0» отличит одно от другого.",
+   "hints": [
+    "throw new InvalidArgumentException('…');",
+    "Сначала проверь $amount <= 0, потом $amount > $balance."
+   ]
+  },
+  {
+   "task_id": "php-errors-02",
+   "topic_id": "php-errors",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "finally и хитрый (int)",
+   "story": "Гена: «В разборе порта срабатывает finally, а (int) ведёт себя странно. Что напечатается?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "<?php\nfunction parsePort(string $s): int {\n    try {\n        echo \"разбираю $s\\n\";\n        if (!ctype_digit($s)) {\n            throw new InvalidArgumentException(\"не число: $s\");\n        }\n        return (int)$s;\n    } catch (InvalidArgumentException $e) {\n        echo $e->getMessage(), \"\\n\";\n        return -1;\n    } finally {\n        echo \"готово\\n\";\n    }\n}\n\necho parsePort('8080'), \"\\n\";\necho parsePort('80a'), \"\\n\";\necho (int)'80a', \"\\n\";",
+    "language": "php",
+    "output": "разбираю 8080\nготово\n8080\nразбираю 80a\nне число: 80a\nготово\n-1\n80"
+   },
+   "explanation": "finally выполняется всегда — даже после return в try или catch, и значение отдаётся уже после «готово». «80a» не проходит ctype_digit — бросается исключение, catch печатает сообщение и возвращает -1. А вот (int)'80a' молча отдаёт 80: приведение берёт цифры в начале строки. Поэтому строки из конфига проверяют явно.",
+   "hints": [
+    "finally срабатывает и после return.",
+    "(int) берёт цифры с начала строки."
+   ]
+  },
+  {
+   "task_id": "php-errors-03",
+   "topic_id": "php-errors",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Порт с понятной ошибкой",
+   "story": "Гена: «Если в конфиге порт „80a“, сервис должен сказать, что именно не так, и сохранить причину.»",
+   "content": {
+    "question": "Заполни пропуски: попытка, перехват и новое исключение с причиной.",
+    "code": "<?php\nfunction port(string $s): int {\n    [[1]] {\n        if (!ctype_digit($s)) {\n            throw new InvalidArgumentException('не число');\n        }\n        return (int)$s;\n    } [[2]] (InvalidArgumentException $e) {\n        [[3]] new RuntimeException(\"порт \\\"$s\\\" в конфиге кривой\", 0, $e);\n    }\n}\n\necho port('8080'), \"\\n\";",
+    "blanks": [
+     {
+      "answer": [
+       "try"
+      ]
+     },
+     {
+      "answer": [
+       "catch"
+      ]
+     },
+     {
+      "answer": [
+       "throw"
+      ]
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "try пробует, catch ловит конкретное исключение, throw бросает новое. Третий аргумент конструктора — предыдущее исключение: в логах будет видна и исходная причина.",
+   "hints": [
+    "try — попытка, catch — перехват.",
+    "Бросают исключение словом throw."
+   ]
+  },
+  {
+   "task_id": "php-errors-04",
+   "topic_id": "php-errors",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Своё исключение для склада",
+   "story": "Гена: «Фронту нужно знать, сколько товара не хватает. Собери класс исключения с данными.»",
+   "content": {
+    "question": "Собери класс StockException: наследник RuntimeException со свойствами $want и $have и понятным сообщением.",
+    "lines": [
+     "class StockException extends RuntimeException {",
+     "    public function __construct(",
+     "        public readonly int $want,",
+     "        public readonly int $have,",
+     "    ) {",
+     "        parent::__construct(\"не хватает товара: нужно $want, есть $have\");",
+     "    }",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "class StockException extends RuntimeException {",
+      "    public function __construct(",
+      "        public readonly int $have,",
+      "        public readonly int $want,",
+      "    ) {",
+      "        parent::__construct(\"не хватает товара: нужно $want, есть $have\");",
+      "    }",
+      "}"
+     ]
+    ],
+    "distractors": [
+     "        super(\"не хватает товара\");",
+     "class StockException implements RuntimeException {"
+    ],
+    "language": "php"
+   },
+   "explanation": "От класса наследуются через extends (implements — только для интерфейсов). Продвижение свойств объявляет $want и $have прямо в конструкторе, readonly не даст их изменить. Сообщение передают конструктору родителя через parent::__construct — super из Java в PHP нет.",
+   "hints": [
+    "Наследование — extends.",
+    "Конструктор родителя — parent::__construct."
+   ]
+  },
+  {
+   "task_id": "php-errors-05",
+   "topic_id": "php-errors",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Резерв на складе",
+   "story": "Стас: «Если товара не хватает, фронт должен показать, сколько есть. Исключение с данными уже готово — осталось им воспользоваться.»",
+   "content": {
+    "question": "Допиши reserve(int $have, int $want): int — $want ≤ 0: InvalidArgumentException; $want > $have: брось new StockException($want, $have); иначе верни остаток.",
+    "entry": "reserve",
+    "code": "<?php\nclass StockException extends RuntimeException {\n    public function __construct(\n        public readonly int $want,\n        public readonly int $have,\n    ) {\n        parent::__construct(\"не хватает товара: нужно $want, есть $have\");\n    }\n}\n\n// резерв товара: остаток или исключение\nfunction reserve(int $have, int $want): int {\n    return $have - $want;\n}\n\necho reserve(10, 3), \"\\n\";",
+    "correct_answer": "<?php\nclass StockException extends RuntimeException {\n    public function __construct(\n        public readonly int $want,\n        public readonly int $have,\n    ) {\n        parent::__construct(\"не хватает товара: нужно $want, есть $have\");\n    }\n}\n\n// резерв товара: остаток или исключение\nfunction reserve(int $have, int $want): int {\n    if ($want <= 0) {\n        throw new InvalidArgumentException('количество должно быть больше нуля');\n    }\n    if ($want > $have) {\n        throw new StockException($want, $have);\n    }\n    return $have - $want;\n}\n\necho reserve(10, 3), \"\\n\";",
+    "tests_code": "<?php\n// ловим StockException, чтобы тест увидел его данные\nfunction call(int $have, int $want): string {\n    try {\n        return (string)reserve($have, $want);\n    } catch (StockException $e) {\n        return \"StockException(want={$e->want}, have={$e->have})\";\n    }\n}\n\ncheck::eq('резерв 3 из 10', fn() => call(10, 3), '7');\ncheck::eq('забрать всё', fn() => call(4, 4), '0');\ncheck::eq('не хватает: нужно 5, есть 2', fn() => call(2, 5), 'StockException(want=5, have=2)');\ncheck::throws('количество 0', fn() => call(10, 0), InvalidArgumentException::class);",
+    "requirements": [
+     {
+      "input": "проверяет количество ≤ 0",
+      "expected": {
+       "regex": "\\$want\\s*<=\\s*0|\\$want\\s*<\\s*1"
+      }
+     },
+     {
+      "input": "бросает StockException с данными",
+      "expected": {
+       "regex": "throw\\s+new\\s+StockException\\s*\\("
+      }
+     }
+    ],
+    "language": "php"
+   },
+   "explanation": "Своё исключение несёт данные: фронт ловит StockException и показывает «есть только 2» из $e->have. Оно наследует RuntimeException, так что общий обработчик ошибок сервиса его тоже поймает. Неверное количество — ошибка вызывающего кода, для неё хватает InvalidArgumentException.",
+   "hints": [
+    "throw new StockException($want, $have);",
+    "Проверку $want <= 0 поставь первой."
+   ]
+  }
+ ]
+}

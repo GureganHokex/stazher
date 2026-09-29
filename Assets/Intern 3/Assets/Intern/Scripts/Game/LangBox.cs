@@ -136,7 +136,7 @@ namespace Intern.Game
         public static readonly LangSpec Php = new LangSpec
         {
             id = "php", name = "PHP", image = "php:8.4-cli-alpine", container = "stazher-php",
-            src = "main.php", test = "tests.php", parser = "check", size = "около 100 МБ",
+            src = "main.php", test = "tests.php", parser = "check", size = "около 160 МБ",
             runCmd = "sh stazher-php.sh run", testCmd = "sh stazher-php.sh test",
             testShow = "php tests.php", runShow = "php main.php", testMarker = "check::",
             env = new[] { "LANG=C.UTF-8" },

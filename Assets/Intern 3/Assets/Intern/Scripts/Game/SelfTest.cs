@@ -570,6 +570,15 @@ namespace Intern.Game
                 T(re3.results.Count == 2 && re3.results[1].Note.Contains("рекурси"), "rust: переполнение стека");
                 var rust = LangBox.For("rust");
                 T(rust != null && rust.extraFiles["check.rs"].Contains("##TEST|") && rust.extraFiles["stazher-rs.sh"].Contains("rustc"), "rust: раннер и check.rs");
+                // PHP (спринт 16): php -l, непойманные исключения, предупреждения
+                var pp = LangBox.ParseCheck("", "Parse error: syntax error, unexpected token \"}\", expecting \";\" in main.php on line 4\nErrors parsing main.php\n", "main.php", 1);
+                T(pp.buildFailed && pp.errLine == 4 && pp.errText.Contains("не хватает «;»"), "php: синтаксис " + pp.errLine + " " + pp.errText);
+                var pt = LangBox.ParseCheck("##TEST|1990 × 2|FAIL|исключение ErrorException: Undefined variable $prce (main.php:3)\n", "", "main.php", 0);
+                T(pt.errLine == 3 && !pt.results[0].Passed, "php: исключение в тесте " + pt.errLine);
+                string pm; T(LangBox.ErrorLine("PHP Fatal error:  Uncaught DivisionByZeroError: Division by zero in /work/.stazher/run/x/main.php:7\nStack trace:\n#0 /work/.stazher/run/x/main.php(7): intdiv()\n", "main.php", out pm) == 7 && pm.Contains("деление на ноль"), "php: необработанное исключение " + pm);
+                T(LangBox.ErrorLine("Warning: Undefined variable $prce in /work/.stazher/run/x/main.php on line 3\n", "main.php", out pm) == 3 && pm.Contains("$prce"), "php: предупреждение " + pm);
+                var php = LangBox.For("php");
+                T(php != null && php.extraFiles["check.php"].Contains("##TEST|") && php.extraFiles.ContainsKey("stazher-tests.php") && php.src == "main.php", "php: раннер и check.php");
                 var java = LangBox.For("java");
                 T(java != null && java.extraFiles.ContainsKey("Check.java") && java.extraFiles["Check.java"].Contains("##TEST|") && java.testMarker == "Check.", "java: раннер и Check.java");
             }

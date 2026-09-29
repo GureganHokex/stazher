@@ -74,6 +74,7 @@ namespace Intern.Game
                 case "lang-csharp": return "CS";
                 case "lang-cpp": return "CPP";
                 case "lang-rust": return "RS";
+                case "lang-php": return "PHP";
                 case "warmup": return "WU";
                 default: return "KOD";
             }

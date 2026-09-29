@@ -137,7 +137,7 @@ namespace Intern.Game
                 case "hcl": return "main.tf";
                 case "promql": return "query.promql";
                 case "java": return "Main.java"; case "go": return "main.go"; case "csharp": return "Program.cs"; case "cpp": return "main.cpp";
-                case "rust": return "main.rs"; case "kotlin": return "Main.kt"; case "swift": return "main.swift"; case "php": return "index.php";
+                case "rust": return "main.rs"; case "kotlin": return "Main.kt"; case "swift": return "main.swift"; case "php": return "main.php";
                 default: return t.type == "incident" ? "incident.log" : t.type == "find_bug" ? "debug.log" : "notes.txt";
             }
         }
