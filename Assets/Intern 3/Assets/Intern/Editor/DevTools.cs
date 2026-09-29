@@ -102,9 +102,17 @@ namespace Intern.EditorTools
                 }
             }
             catch (Exception e) { log.AppendLine("ошибка чтения задач: " + e.Message); File.WriteAllText(outFile, log.ToString(), new UTF8Encoding(false)); return; }
+            // Temp/langcheck.only — проверить только задачи с этими префиксами id (через запятую), например «rs-»
+            string only = Path.Combine(Root, "Temp", "langcheck.only");
+            if (File.Exists(only))
+            {
+                var pref = File.ReadAllText(only).Split(new[] { ',', '\n', '\r', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                if (pref.Length > 0) { tasks = tasks.Where(t => pref.Any(p => t.id.StartsWith(p))).ToList(); log.AppendLine("фильтр: " + string.Join(", ", pref)); }
+            }
             log.AppendLine("задач с запуском в Docker: " + tasks.Count);
             File.WriteAllText(Out, "langcheck " + DateTime.Now.ToString("HH:mm:ss") + ": запущено, " + tasks.Count + " задач, итог — в Temp/langcheck.txt\n", new UTF8Encoding(false));
             if (File.Exists(outFile)) File.Delete(outFile);
+            if (File.Exists(outFile + ".partial")) File.Delete(outFile + ".partial");
             new System.Threading.Thread(() =>
             {
                 int ok = 0, bad = 0; var sw = Stopwatch.StartNew();

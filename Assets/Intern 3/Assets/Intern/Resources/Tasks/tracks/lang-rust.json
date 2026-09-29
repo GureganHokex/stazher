@@ -1,0 +1,1163 @@
+{
+ "track": "lang-rust",
+ "roadmap": [
+  {
+   "topic_id": "rs-basics",
+   "lang": "rust",
+   "replaces": [
+    "be-py-basics"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Rust: переменные и типы",
+   "grade": "junior",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "fn main и println!, let и let mut, i32/i64/u32/f64/bool/char, String и &str, as, затенение, переполнение в отладочной сборке.",
+   "theory": "Rust — компилируемый язык без сборщика мусора, но с гарантиями безопасности: компилятор не даст обратиться к освобождённой памяти или изменить данные из двух мест сразу. На Rust пишут высоконагруженные сервисы, базы данных и инструменты.\n\nПрограмма начинается с функции main:\n\n    fn main() {\n        println!(\"Привет, Кодзилла!\");\n        let price = 1990;\n        println!(\"Цена: {} ₽\", price);\n        println!(\"Цена: {price} ₽\");   // имя переменной прямо в строке\n    }\n\n• println! с восклицательным знаком — это макрос, {} подставляет значение.\n• Инструкции заканчиваются точкой с запятой.\n\nПеременные по умолчанию неизменяемые:\n\n    let qty = 2;            // тип выводится сам: i32\n    let mut total = 0;      // mut — можно менять\n    total += qty * 1990;\n    let views: u64 = 5_000_000_000;\n    let price: f64 = 19.99;\n    let title: &str = \"Лампа\";                // строковый литерал\n    let owned: String = String::from(\"Лампа\"); // строка, которой владеешь\n\n• Целые: i32, i64 (со знаком), u32, u64 (без знака). Дробные: f64. Ещё bool и char.\n• Типы не смешиваются сами: i32 + f64 — ошибка. Приведение — через as: price as f64.\n• 7 / 2 == 3 — целое деление. 7.0 / 2.0 == 3.5.\n• Можно объявить переменную с тем же именем ещё раз — затенение: let price = price * 2;\n• В отладочной сборке переполнение не молчит: u32::MAX + 1 — паника «attempt to add with overflow» со строкой.\n• len() у строки — байты, у «Лампа» их 10; буквы считает .chars().count().\n\nФункция возвращает значение последнего выражения — без точки с запятой:\n\n    fn cart_total(price: i32, qty: i32) -> i32 {\n        price * qty\n    }\n\nВ настоящем проекте код собирают через cargo (cargo run, cargo test); игра для скорости вызывает компилятор rustc напрямую."
+  },
+  {
+   "topic_id": "rs-control",
+   "lang": "rust",
+   "replaces": [
+    "be-py-control"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Rust: условия, циклы и match",
+   "grade": "junior",
+   "requires": [
+    "rs-basics"
+   ],
+   "description": "if как выражение, loop/while/for и диапазоны, break со значением, match с диапазонами и кортежами.",
+   "theory": "Условие пишут без скобок, тело — в фигурных скобках. if — это выражение, у него есть значение:\n\n    let kind = if total > 10 { \"много\" } else { \"мало\" };\n\nmatch сравнивает значение с шаблонами сверху вниз и обязан разобрать все варианты:\n\n    let title = match score {\n        90.. => \"отлично\",          // 90 и больше\n        75..=89 => \"хорошо\",        // от 75 до 89 включительно\n        50..=74 => \"зачёт\",\n        _ => \"на доработку\",        // _ — всё остальное\n    };\n\n• Несколько вариантов через |: 2 | 3 => …\n• Можно сравнивать кортеж: match (n % 3, n % 5) { (0, 0) => …, (0, _) => …, … }\n\nЦиклы:\n\n    for i in 0..10 { … }        // 0, 1, …, 9 — правая граница не входит\n    for i in 1..=10 { … }       // 1, …, 10 — с =\n    for price in &prices { … }  // по элементам без забирания вектора\n    while total < 100 { … }\n    let found = loop {          // бесконечный цикл, break может вернуть значение\n        if … { break 42; }\n    };\n\n• break выходит из цикла, continue переходит к следующему шагу.\n• Индексы — от 0 до len() - 1. Выход за границы — паника «index out of bounds».\n• Сумма, которая не влезет в i32, считается в i64: иначе отладочная сборка запаникует на переполнении."
+  },
+  {
+   "topic_id": "rs-collections",
+   "lang": "rust",
+   "replaces": [
+    "be-py-collections"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Rust: Vec и HashMap",
+   "grade": "junior",
+   "requires": [
+    "rs-control"
+   ],
+   "description": "Vec, push и len, [] и get, Option в ответ на get, итераторы iter/sum/filter/map/collect, HashMap и entry.",
+   "theory": "Vec — массив, который растёт сам:\n\n    let mut prices = vec![1990, 500, 7500];\n    prices.push(100);\n    prices.len();           // 4\n    prices[0];              // 1990; prices[10] — паника\n    prices.get(10);         // None — безопасно, без паники\n    prices.last();          // Some(100)\n\n• get возвращает Option: Some(значение) или None. Так Rust заставляет подумать о случае «ничего нет».\n\nИтераторы — цепочки обработки коллекции:\n\n    let total: u32 = prices.iter().sum();\n    let cheap: Vec<u32> = prices.iter().filter(|p| **p <= 1000).cloned().collect();\n    let doubled: Vec<u32> = prices.iter().map(|p| p * 2).collect();\n\nHashMap — словарь ключ → значение:\n\n    use std::collections::HashMap;\n\n    let mut stock = HashMap::new();\n    stock.insert(\"лампа\", 3);\n    stock.insert(\"лампа\", 5);             // тот же ключ — значение заменится\n    stock.get(\"шкаф\");                    // None\n    stock.get(\"шкаф\").unwrap_or(&0);      // запасное значение\n    *stock.entry(\"стол\").or_insert(0) += 1;   // взять значение или вставить 0 — и прибавить\n\n• unwrap() достаёт значение из Some, а на None паникует. В коде сервиса его избегают.\n• HashMap не хранит порядок ключей."
+  },
+  {
+   "topic_id": "rs-ownership",
+   "lang": "rust",
+   "replaces": [
+    "be-py-functions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Rust: владение и заимствование",
+   "grade": "junior",
+   "requires": [
+    "rs-collections"
+   ],
+   "description": "Функции, владение и перемещение, clone, ссылки & и &mut, String и &str, срезы, рекурсия.",
+   "theory": "Главная идея Rust: у каждого значения один владелец. Когда владелец уходит из области видимости, значение удаляется — без сборщика мусора.\n\n    let a = String::from(\"Гена\");\n    let b = a;              // строка ПЕРЕМЕЩЕНА в b, a больше пользоваться нельзя\n    let c = b.clone();      // явная копия — теперь две строки\n\n• Числа, bool и char копируются сами (у них есть Copy), строки и векторы — перемещаются.\n• Передача в функцию по значению тоже перемещает: fn take(s: String) забирает строку насовсем.\n\nЧтобы не забирать, одалживают — берут ссылку:\n\n    fn shout(s: &str) -> String { s.to_uppercase() }   // только читает\n    fn add_bonus(x: &mut i32) { *x += 10; }             // меняет; * — доступ к значению по ссылке\n\n    let mut salary = 100;\n    add_bonus(&mut salary);   // 110\n\nПравила заимствования проверяет компилятор:\n• сколько угодно ссылок &T на чтение — или одна &mut T на изменение, но не одновременно;\n• ссылка не может жить дольше того, на что ссылается.\n\n• &str — «кусок строки», его принимают функции, которым надо только читать; &[u32] — кусок массива или вектора.\n• Изменить каждый элемент вектора: for p in prices.iter_mut() { *p += 1; }\n• Рекурсия работает как везде, но без базового случая — переполнение стека."
+  },
+  {
+   "topic_id": "rs-structs",
+   "lang": "rust",
+   "replaces": [
+    "be-py-oop"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Rust: структуры, enum и трейты",
+   "grade": "junior",
+   "requires": [
+    "rs-ownership"
+   ],
+   "description": "struct и impl, методы &self и &mut self, derive(Debug, Clone, PartialEq), enum с данными, трейты и Display.",
+   "theory": "Структура хранит данные, методы описывают в блоке impl:\n\n    struct Cart {\n        total: u32,\n    }\n\n    impl Cart {\n        fn new() -> Self { Cart { total: 0 } }               // «конструктор» — обычная функция\n        fn add(&mut self, price: u32, qty: u32) { self.total += price * qty; }\n        fn total(&self) -> u32 { self.total }\n    }\n\n    let mut cart = Cart::new();\n    cart.add(1990, 2);\n\n• &self — метод читает объект, &mut self — меняет его.\n• Классов и наследования в Rust нет: данные — в struct, поведение — в impl и трейтах.\n• #[derive(Debug, Clone, PartialEq)] над структурой сам пишет печать через {:?}, .clone() и сравнение ==.\n\nenum в Rust может нести данные — удобно для состояний:\n\n    enum Status {\n        New,\n        Paid(u32),\n        Shipped { track: String },\n    }\n\n    match status {\n        Status::New => …,\n        Status::Paid(sum) => …,\n        Status::Shipped { track } => …,\n    }\n\nТрейт — договор, какие методы есть у типа (как интерфейс):\n\n    trait Shape { fn area(&self) -> f64; }\n    impl Shape for Rect { fn area(&self) -> f64 { self.w * self.h } }\n\nЧтобы значение печаталось через {}, реализуют трейт Display:\n\n    impl fmt::Display for Product {\n        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n            write!(f, \"{} — {} ₽\", self.name, self.price)\n        }\n    }"
+  },
+  {
+   "topic_id": "rs-errors",
+   "lang": "rust",
+   "replaces": [
+    "be-py-exceptions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Rust: Option и Result",
+   "grade": "junior",
+   "requires": [
+    "rs-ownership"
+   ],
+   "description": "Исключений нет: Option и Result, match и if let, оператор ?, parse, map_err, свой enum ошибок, паника и unwrap.",
+   "theory": "В Rust нет исключений. Ошибка — это обычное значение, которое функция возвращает:\n\n    enum Result<T, E> { Ok(T), Err(E) }   // успех со значением или ошибка\n    enum Option<T> { Some(T), None }       // значение есть или его нет\n\n    fn withdraw(balance: u32, amount: u32) -> Result<u32, String> {\n        if amount > balance {\n            return Err(format!(\"недостаточно средств: {balance} < {amount}\"));\n        }\n        Ok(balance - amount)\n    }\n\nВызывающий обязан разобрать результат — компилятор не даст забыть:\n\n    match withdraw(100, 500) {\n        Ok(left) => println!(\"осталось {left}\"),\n        Err(e) => println!(\"ошибка: {e}\"),\n    }\n    if let Some(price) = prices.get(\"шкаф\") { … }\n\nОператор ? пробрасывает ошибку наверх одной буквой:\n\n    fn port(s: &str) -> Result<u16, std::num::ParseIntError> {\n        let n: u16 = s.trim().parse()?;   // при ошибке функция сразу вернёт Err\n        Ok(n)\n    }\n\n• ? работает только в функции, которая сама возвращает Result (или Option).\n• map_err превращает одну ошибку в другую: .parse().map_err(|_| OrderError::BadQty)?\n• unwrap_or(запасное) — значение или запасное; unwrap() на Err или None — паника.\n• Свои ошибки удобно описывать enum: enum BankError { ZeroAmount, NotEnough { balance: u32, amount: u32 } }.\n• Паника (panic!) — для багов, которые «не должны случаться»; ожидаемые ошибки — через Result."
+  }
+ ],
+ "tasks": [
+  {
+   "task_id": "rs-basics-01",
+   "topic_id": "rs-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Итог корзины на Rust",
+   "story": "Гена: «Сервис цен переписываем на Rust. Начнём с простого: стоимость позиции.»",
+   "content": {
+    "question": "Допиши функцию cart_total(price: i32, qty: i32) -> i32 — стоимость позиции: цена × количество.",
+    "entry": "cart_total",
+    "code": "// стоимость позиции: цена × количество\nfn cart_total(price: i32, qty: i32) -> i32 {\n    0\n}\n\nfn main() {\n    println!(\"{}\", cart_total(1990, 2));\n}",
+    "correct_answer": "// стоимость позиции: цена × количество\nfn cart_total(price: i32, qty: i32) -> i32 {\n    price * qty\n}\n\nfn main() {\n    println!(\"{}\", cart_total(1990, 2));\n}",
+    "tests_code": "pub fn tests() {\n    check::eq(\"1990 × 2\", || cart_total(1990, 2), 3980);\n    check::eq(\"250 × 0\", || cart_total(250, 0), 0);\n    check::eq(\"99 × 3\", || cart_total(99, 3), 297);\n}",
+    "requirements": [
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "Функция объявляется через fn, типы параметров — после двоеточия, тип результата — после ->. Последнее выражение без точки с запятой и есть результат: price * qty. С точкой с запятой функция вернула бы (), и компилятор бы возразил.",
+   "hints": [
+    "Последняя строка без ; — это возвращаемое значение.",
+    "Умножение — звёздочка: price * qty."
+   ]
+  },
+  {
+   "task_id": "rs-basics-02",
+   "topic_id": "rs-basics",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Байты, буквы и затенение",
+   "story": "Ира: «В логах длина названия то 5, то 10, а цена вдруг удвоилась. Что напечатает этот код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "fn main() {\n    let price = 7;\n    println!(\"{}\", price / 2);\n    println!(\"{}\", price as f64 / 2.0);\n    println!(\"{}\", price % 4);\n    let title = \"Лампа\";\n    println!(\"{} за {} ₽\", title, price);\n    println!(\"{}\", title.len());\n    println!(\"{}\", title.chars().count());\n    let price = price * 2;\n    println!(\"{price}\");\n}",
+    "language": "rust",
+    "output": "3\n3.5\n3\nЛампа за 7 ₽\n10\n5\n14"
+   },
+   "explanation": "7 / 2 — деление целых, результат 3. После as f64 деление дробное — 3.5. 7 % 4 — остаток 3. len() считает байты: русская буква в UTF-8 — 2 байта, у «Лампа» их 10, а букв (chars) — 5. let price = price * 2 объявляет новую переменную с тем же именем — это затенение, старая price остаётся 7, новая — 14.",
+   "hints": [
+    "Деление целых отбрасывает дробную часть.",
+    "len() — байты, chars().count() — буквы."
+   ]
+  },
+  {
+   "task_id": "rs-basics-03",
+   "topic_id": "rs-basics",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма корзины",
+   "story": "Гена: «Допиши пропуски — без них rustc программу не соберёт.»",
+   "content": {
+    "question": "Заполни пропуски: изменяемая переменная, тип строкового литерала и макрос печати.",
+    "code": "fn main() {\n    let [[1]] total = 0;\n    for price in [1990, 500, 250] {\n        total += price;\n    }\n    let title: [[2]] = \"Корзина\";\n    [[3]](\"{}: {} ₽\", title, total);\n}",
+    "blanks": [
+     {
+      "answer": [
+       "mut"
+      ]
+     },
+     {
+      "answer": [
+       "&str",
+       "&'static str"
+      ]
+     },
+     {
+      "answer": [
+       "println!"
+      ]
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "Переменные в Rust по умолчанию неизменяемые — чтобы копить сумму, нужен let mut. Строковый литерал имеет тип &str — ссылка на текст, зашитый в программу. Печать — макрос println!, восклицательный знак обязателен.",
+   "hints": [
+    "Без этого слова total += не скомпилируется.",
+    "Макросы в Rust заканчиваются на !."
+   ]
+  },
+  {
+   "task_id": "rs-basics-04",
+   "topic_id": "rs-basics",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Средний чек без копеек",
+   "story": "Ира: «Средний чек всегда круглый: 2 вместо 2.5. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "fn average(sum: i32, count: i32) -> f64 {\n    (sum / count) as f64\n}\n\nfn main() {\n    println!(\"{}\", average(5, 2));\n}",
+    "bug_line": 2,
+    "options": [
+     "Деление двух i32 целое — дробная часть теряется ещё до превращения в f64",
+     "Функция не может возвращать f64",
+     "as нельзя применять к выражению в скобках",
+     "println! не печатает дробные числа"
+    ],
+    "correct_answer": 0,
+    "language": "rust"
+   },
+   "explanation": "sum / count — деление целых, результат 2, и только потом он превращается в 2.0. Приводить нужно до деления: sum as f64 / count as f64.",
+   "hints": [
+    "Что происходит раньше: деление или as f64?",
+    "Приведи оба числа к f64 перед делением."
+   ]
+  },
+  {
+   "task_id": "rs-basics-05",
+   "topic_id": "rs-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Просмотры за месяц",
+   "story": "Стас: «Отчёт по просмотрам падает с паникой на популярных товарах. Посчитай так, чтобы не падало.»",
+   "content": {
+    "question": "Напиши total_views(daily: u32, days: u32) -> u64 — просмотры за период: в день × дней. Произведение может не влезть в u32.",
+    "entry": "total_views",
+    "code": "// просмотры за период: в день × дней\nfn total_views(daily: u32, days: u32) -> u64 {\n    (daily * days) as u64\n}\n\nfn main() {\n    println!(\"{}\", total_views(1000, 30));\n}",
+    "correct_answer": "// просмотры за период: в день × дней\nfn total_views(daily: u32, days: u32) -> u64 {\n    daily as u64 * days as u64\n}\n\nfn main() {\n    println!(\"{}\", total_views(1000, 30));\n}",
+    "tests_code": "pub fn tests() {\n    check::eq(\"1000 в день × 30\", || total_views(1000, 30), 30000u64);\n    check::eq(\"ноль просмотров\", || total_views(0, 5), 0u64);\n    check::eq(\"хит: 3 млн × 2000 дней\", || total_views(3_000_000, 2000), 6_000_000_000u64);\n}",
+    "requirements": [
+     {
+      "input": "приводит к u64 до умножения",
+      "expected": {
+       "regex": "as\\s+u64\\s*\\*|\\*\\s*\\w+\\s+as\\s+u64|u64::from"
+      }
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "u32 вмещает до 4 294 967 295, а 3 000 000 × 2000 = 6 000 000 000. В отладочной сборке Rust не молчит, а паникует: attempt to multiply with overflow. Привести к u64 после умножения поздно — переполнение уже случилось. Приводим каждый множитель до умножения.",
+   "hints": [
+    "as u64 после умножения — поздно.",
+    "daily as u64 * days as u64"
+   ]
+  },
+  {
+   "task_id": "rs-control-01",
+   "topic_id": "rs-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Оценка за код-ревью",
+   "story": "Гена: «Бот код-ревью ставит оценку по баллам. На Rust это просится в match.»",
+   "content": {
+    "question": "Напиши review_grade(score: u32) -> &'static str: от 90 — «отлично», от 75 — «хорошо», от 50 — «зачёт», иначе «на доработку».",
+    "entry": "review_grade",
+    "code": "// оценка за код-ревью по баллам\nfn review_grade(score: u32) -> &'static str {\n    \"\"\n}\n\nfn main() {\n    println!(\"{}\", review_grade(80));\n}",
+    "correct_answer": "// оценка за код-ревью по баллам\nfn review_grade(score: u32) -> &'static str {\n    match score {\n        90.. => \"отлично\",\n        75..=89 => \"хорошо\",\n        50..=74 => \"зачёт\",\n        _ => \"на доработку\",\n    }\n}\n\nfn main() {\n    println!(\"{}\", review_grade(80));\n}",
+    "tests_code": "pub fn tests() {\n    check::eq(\"95\", || review_grade(95), \"отлично\");\n    check::eq(\"ровно 90\", || review_grade(90), \"отлично\");\n    check::eq(\"80\", || review_grade(80), \"хорошо\");\n    check::eq(\"ровно 75\", || review_grade(75), \"хорошо\");\n    check::eq(\"50\", || review_grade(50), \"зачёт\");\n    check::eq(\"12\", || review_grade(12), \"на доработку\");\n}",
+    "requirements": [
+     {
+      "input": "порог 90",
+      "expected": {
+       "regex": "\\b(90|89)\\b"
+      }
+     },
+     {
+      "input": "порог 75",
+      "expected": {
+       "regex": "\\b(75|74)\\b"
+      }
+     },
+     {
+      "input": "порог 50",
+      "expected": {
+       "regex": "\\b(50|49)\\b"
+      }
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "match с диапазонами читается как таблица: 90.. — от 90 и выше, 75..=89 — включительно. match обязан покрыть все значения, поэтому в конце _ — «всё остальное». &'static str — строковый литерал, который живёт всю программу. Можно и цепочкой if / else if.",
+   "hints": [
+    "90.. => \"отлично\",",
+    "Последний вариант — _ => \"на доработку\"."
+   ]
+  },
+  {
+   "task_id": "rs-control-02",
+   "topic_id": "rs-control",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Цикл, match и break со значением",
+   "story": "Ира: «Тут и цикл обрывается, и match, и loop что-то возвращает. Что напечатается?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "fn main() {\n    let mut total = 0;\n    for i in 1..=10 {\n        if i % 2 == 0 { continue; }\n        if i > 7 { break; }\n        total += i;\n    }\n    println!(\"total = {total}\");\n\n    let level = 2;\n    let title = match level {\n        1 => \"junior\",\n        2 | 3 => \"middle\",\n        _ => \"senior\",\n    };\n    println!(\"{title}\");\n\n    let mut n = 1;\n    let first_big = loop {\n        n *= 3;\n        if n > 50 { break n; }\n    };\n    println!(\"{first_big}\");\n    let kind = if total > 10 { \"много\" } else { \"мало\" };\n    println!(\"{kind}\");\n}",
+    "language": "rust",
+    "output": "total = 16\nmiddle\n81\nмного"
+   },
+   "explanation": "В сумму попадают нечётные 1, 3, 5, 7 — это 16, на 9 срабатывает break. match выбирает вариант «2 | 3» — middle, и провала в следующие ветки, как в C++, не бывает. loop умножает n на 3: 3, 9, 27, 81 — первое больше 50, break n возвращает 81. if — выражение: total = 16 > 10, значит «много».",
+   "hints": [
+    "1..=10 включает 10.",
+    "break n выходит из loop и отдаёт n."
+   ]
+  },
+  {
+   "task_id": "rs-control-03",
+   "topic_id": "rs-control",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "FizzBuzz одним match",
+   "story": "Гена: «Классика собеседований, по-растовски — match по кортежу. Собери функцию.»",
+   "content": {
+    "question": "Собери label(n: u32) -> String: кратно 15 — FizzBuzz, кратно 3 — Fizz, кратно 5 — Buzz, иначе само число строкой.",
+    "lines": [
+     "fn label(n: u32) -> String {",
+     "    match (n % 3, n % 5) {",
+     "        (0, 0) => \"FizzBuzz\".to_string(),",
+     "        (0, _) => \"Fizz\".to_string(),",
+     "        (_, 0) => \"Buzz\".to_string(),",
+     "        _ => n.to_string(),",
+     "    }",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "fn label(n: u32) -> String {",
+      "    match (n % 3, n % 5) {",
+      "        (0, 0) => \"FizzBuzz\".to_string(),",
+      "        (_, 0) => \"Buzz\".to_string(),",
+      "        (0, _) => \"Fizz\".to_string(),",
+      "        _ => n.to_string(),",
+      "    }",
+      "}"
+     ]
+    ],
+    "distractors": [
+     "        _ => n,",
+     "        default => n.to_string(),"
+    ],
+    "language": "rust"
+   },
+   "explanation": "Кортеж (n % 3, n % 5) сравнивается с шаблонами сверху вниз, _ внутри — «что угодно». (0, 0) — кратно обоим, поэтому первым. «_ => n» не соберётся: у всех веток match один тип, а здесь String и u32. default в Rust нет — его роль играет _.",
+   "hints": [
+    "Самый частный случай — первым.",
+    "Все ветки должны вернуть String."
+   ]
+  },
+  {
+   "task_id": "rs-control-04",
+   "topic_id": "rs-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма до n",
+   "story": "Гена: «Для отчёта нужна сумма 1 + 2 + … + n. Осторожно: n бывает большим.»",
+   "content": {
+    "question": "Напиши sum_to(n: i32) -> i64 — сумму чисел от 1 до n включительно. Для n ≤ 0 — 0. Сумма может не влезть в i32.",
+    "entry": "sum_to",
+    "code": "// сумма 1 + 2 + ... + n\nfn sum_to(n: i32) -> i64 {\n    0\n}\n\nfn main() {\n    println!(\"{}\", sum_to(10));\n}",
+    "correct_answer": "// сумма 1 + 2 + ... + n\nfn sum_to(n: i32) -> i64 {\n    let mut total: i64 = 0;\n    for i in 1..=n {\n        total += i as i64;\n    }\n    total\n}\n\nfn main() {\n    println!(\"{}\", sum_to(10));\n}",
+    "tests_code": "pub fn tests() {\n    check::eq(\"n = 1\", || sum_to(1), 1i64);\n    check::eq(\"n = 10\", || sum_to(10), 55i64);\n    check::eq(\"n = 0\", || sum_to(0), 0i64);\n    check::eq(\"n = -5\", || sum_to(-5), 0i64);\n    check::eq(\"n = 100000 (не влезает в i32)\", || sum_to(100000), 5_000_050_000i64);\n}",
+    "requirements": [
+     {
+      "input": "копит сумму в i64",
+      "expected": {
+       "regex": "let\\s+mut\\s+\\w+\\s*:\\s*i64|as\\s+i64|0i64|i64::from"
+      }
+     },
+     {
+      "input": "обходит числа циклом или итератором",
+      "expected": {
+       "regex": "\\bfor\\b|\\bwhile\\b|\\.sum\\s*(::<\\w+>)?\\("
+      }
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "Сумма до 100 000 — 5 000 050 000, больше максимума i32. Если копить в i32, отладочная сборка запаникует: attempt to add with overflow. Копим в i64 и приводим каждое i через as i64. Диапазон 1..=n при n ≤ 0 пуст — цикл не выполнится. Короче: (1..=n as i64).sum().",
+   "hints": [
+    "let mut total: i64 = 0;",
+    "total += i as i64;"
+   ]
+  },
+  {
+   "task_id": "rs-control-05",
+   "topic_id": "rs-control",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Сумма заказа паникует",
+   "story": "Ира: «Подсчёт суммы заказа падает: index out of bounds. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "fn order_sum(prices: &[u32]) -> u32 {\n    let mut sum = 0;\n    for i in 0..=prices.len() {\n        sum += prices[i];\n    }\n    sum\n}\n\nfn main() {\n    println!(\"{}\", order_sum(&[100, 250, 40]));\n}",
+    "bug_line": 3,
+    "options": [
+     "Диапазон 0..=len включает len — это индекс за последним элементом",
+     "Счётчик должен начинаться с 1",
+     "sum должна быть u64",
+     "len() нужно писать без скобок"
+    ],
+    "correct_answer": 0,
+    "language": "rust"
+   },
+   "explanation": "У трёх элементов индексы 0, 1 и 2, а 0..=3 включает и 3 — prices[3] паникует. Нужен 0..prices.len() без =, а ещё лучше без индексов: for p in prices { sum += p; } или prices.iter().sum().",
+   "hints": [
+    "Что значит = в диапазоне?",
+    "Поменяй ..= на .."
+   ]
+  },
+  {
+   "task_id": "rs-collections-01",
+   "topic_id": "rs-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Частота тегов",
+   "story": "Стас: «Хочу видеть, какие теги у товаров встречаются чаще. Посчитай их.»",
+   "content": {
+    "question": "Напиши tag_counts(tags: &[&str]) -> HashMap<String, usize> — сколько раз встретился каждый тег.",
+    "entry": "tag_counts",
+    "code": "use std::collections::HashMap;\n\n// сколько раз встретился каждый тег\nfn tag_counts(tags: &[&str]) -> HashMap<String, usize> {\n    let mut counts = HashMap::new();\n    counts\n}\n\nfn main() {\n    println!(\"{:?}\", tag_counts(&[\"sale\", \"new\", \"sale\"]));\n}",
+    "correct_answer": "use std::collections::HashMap;\n\n// сколько раз встретился каждый тег\nfn tag_counts(tags: &[&str]) -> HashMap<String, usize> {\n    let mut counts = HashMap::new();\n    for tag in tags {\n        *counts.entry(tag.to_string()).or_insert(0) += 1;\n    }\n    counts\n}\n\nfn main() {\n    println!(\"{:?}\", tag_counts(&[\"sale\", \"new\", \"sale\"]));\n}",
+    "tests_code": "fn map(pairs: &[(&str, usize)]) -> HashMap<String, usize> {\n    pairs.iter().map(|(k, v)| (k.to_string(), *v)).collect()\n}\n\npub fn tests() {\n    check::eq(\"sale, new, sale\", || tag_counts(&[\"sale\", \"new\", \"sale\"]), map(&[(\"sale\", 2), (\"new\", 1)]));\n    check::eq(\"один тег\", || tag_counts(&[\"hit\"]), map(&[(\"hit\", 1)]));\n    check::eq(\"пустой список\", || tag_counts(&[]), map(&[]));\n    check::eq(\"регистр важен\", || tag_counts(&[\"New\", \"new\", \"new\"]), map(&[(\"New\", 1), (\"new\", 2)]));\n}",
+    "requirements": [
+     {
+      "input": "обходит теги циклом",
+      "expected": {
+       "regex": "\\bfor\\b|\\.iter\\(\\)"
+      }
+     },
+     {
+      "input": "увеличивает счётчик тега",
+      "expected": {
+       "regex": "entry\\s*\\(|\\+=\\s*1"
+      }
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "entry(ключ).or_insert(0) возвращает ссылку на значение — существующее или только что вставленный 0; * даёт доступ к нему, и += 1 увеличивает счётчик. to_string() превращает &str в String — ключ словаря должен владеть своей строкой.",
+   "hints": [
+    "for tag in tags — обход среза.",
+    "*counts.entry(tag.to_string()).or_insert(0) += 1;"
+   ]
+  },
+  {
+   "task_id": "rs-collections-02",
+   "topic_id": "rs-collections",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Vec, get и HashMap",
+   "story": "Гена: «Прежде чем писать склад, проверь, как ведут себя Vec и HashMap и что такое Some.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "use std::collections::HashMap;\n\nfn main() {\n    let mut prices = vec![500, 1500];\n    prices.push(999);\n    prices.insert(0, 100);\n    println!(\"{} {} {:?}\", prices.len(), prices[1], prices.last());\n    println!(\"{:?} {:?}\", prices.get(1), prices.get(10));\n\n    let mut stock = HashMap::new();\n    stock.insert(\"лампа\", 3);\n    stock.insert(\"лампа\", 5);\n    println!(\"{:?} {:?}\", stock.get(\"лампа\"), stock.get(\"шкаф\"));\n    println!(\"{}\", stock.get(\"шкаф\").unwrap_or(&0));\n    let total: i32 = prices.iter().sum();\n    println!(\"{total}\");\n}",
+    "language": "rust",
+    "output": "4 500 Some(999)\nSome(500) None\nSome(5) None\n0\n3099"
+   },
+   "explanation": "push добавляет в конец, insert(0, …) — в начало: [100, 500, 1500, 999]. last() и get() возвращают Option: Some(значение) или None — за границами паники нет. Второй insert с тем же ключом заменяет значение. unwrap_or отдаёт запасное значение для None. Сумма: 100 + 500 + 1500 + 999 = 3099.",
+   "hints": [
+    "get возвращает Some или None.",
+    "Вставка по тому же ключу заменяет значение."
+   ]
+  },
+  {
+   "task_id": "rs-collections-03",
+   "topic_id": "rs-collections",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Цены из справочника",
+   "story": "Гена: «Справочник цен почти готов. Заполни пропуски.»",
+   "content": {
+    "question": "Заполни пропуски: тип словаря, разбор найденного значения и сумма всех цен.",
+    "code": "use std::collections::HashMap;\n\nfn main() {\n    let mut prices: [[1]]<&str, u32> = HashMap::new();\n    prices.insert(\"лампа\", 1990);\n    prices.insert(\"стол\", 7500);\n    if let [[2]](price) = prices.get(\"шкаф\") {\n        println!(\"{price}\");\n    }\n    let total: u32 = prices.[[3]]().sum();\n    println!(\"{total}\");\n}",
+    "blanks": [
+     {
+      "answer": [
+       "HashMap"
+      ]
+     },
+     {
+      "answer": [
+       "Some"
+      ]
+     },
+     {
+      "answer": [
+       "values"
+      ]
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "Тип словаря — HashMap<ключ, значение>. get возвращает Option, и if let Some(price) = … выполнит блок, только если значение есть. values() перебирает значения, sum() складывает их: 1990 + 7500 = 9490.",
+   "hints": [
+    "Найденное значение приходит в обёртке Some.",
+    "Перебор значений словаря — values()."
+   ]
+  },
+  {
+   "task_id": "rs-collections-04",
+   "topic_id": "rs-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товары по бюджету",
+   "story": "Стас: «Покупатель ввёл бюджет. Оставь цены, которые в него укладываются, в том же порядке.»",
+   "content": {
+    "question": "Напиши affordable(prices: &[u32], budget: u32) -> Vec<u32> — новый вектор цен не дороже бюджета, в исходном порядке.",
+    "entry": "affordable",
+    "code": "// цены, которые укладываются в бюджет\nfn affordable(prices: &[u32], budget: u32) -> Vec<u32> {\n    Vec::new()\n}\n\nfn main() {\n    println!(\"{:?}\", affordable(&[500, 1500, 999, 2000], 1000));\n}",
+    "correct_answer": "// цены, которые укладываются в бюджет\nfn affordable(prices: &[u32], budget: u32) -> Vec<u32> {\n    let mut result = Vec::new();\n    for &price in prices {\n        if price <= budget {\n            result.push(price);\n        }\n    }\n    result\n}\n\nfn main() {\n    println!(\"{:?}\", affordable(&[500, 1500, 999, 2000], 1000));\n}",
+    "tests_code": "pub fn tests() {\n    check::eq(\"бюджет 1000\", || affordable(&[500, 1500, 999, 2000], 1000), vec![500, 999]);\n    check::eq(\"ровно бюджет\", || affordable(&[1000, 1001], 1000), vec![1000]);\n    check::eq(\"всё дорого\", || affordable(&[3000, 4000], 100), Vec::<u32>::new());\n    check::eq(\"пустой список\", || affordable(&[], 500), Vec::<u32>::new());\n}",
+    "requirements": [
+     {
+      "input": "сравнивает цену с бюджетом",
+      "expected": {
+       "regex": "<=\\s*budget|budget\\s*>="
+      }
+     },
+     {
+      "input": "собирает подходящие цены",
+      "expected": {
+       "regex": "\\.push\\s*\\(|\\.filter\\s*\\("
+      }
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "for &price in prices перебирает срез и сразу копирует число из ссылки. Подходящие цены кладём в новый вектор через push. На итераторах то же самое: prices.iter().filter(|p| **p <= budget).cloned().collect().",
+   "hints": [
+    "for &price in prices и if price <= budget.",
+    "Подходящие — в result.push(price)."
+   ]
+  },
+  {
+   "task_id": "rs-collections-05",
+   "topic_id": "rs-collections",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Остаток на складе паникует",
+   "story": "Ира: «Запрос остатка по товару, которого нет, роняет сервис: called `Option::unwrap()` on a `None` value. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "use std::collections::HashMap;\n\nfn stock_of(stock: &HashMap<&str, u32>, item: &str) -> u32 {\n    let n = *stock.get(item).unwrap();\n    n\n}\n\nfn main() {\n    let stock = HashMap::from([(\"лампа\", 3)]);\n    println!(\"{}\", stock_of(&stock, \"шкаф\"));\n}",
+    "bug_line": 4,
+    "options": [
+     "get вернёт None для отсутствующего ключа, а unwrap на None паникует",
+     "HashMap::from нельзя передавать по ссылке",
+     "Ключи HashMap не могут быть &str",
+     "* нельзя применять к результату get"
+    ],
+    "correct_answer": 0,
+    "language": "rust"
+   },
+   "explanation": "get честно говорит «нет такого товара», возвращая None, а unwrap превращает это в панику. Для отсутствующего товара нужен запасной ответ: *stock.get(item).unwrap_or(&0) или stock.get(item).copied().unwrap_or(0).",
+   "hints": [
+    "Что вернёт get для «шкафа»?",
+    "Замени unwrap на unwrap_or."
+   ]
+  },
+  {
+   "task_id": "rs-ownership-01",
+   "topic_id": "rs-ownership",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Скидка на месте",
+   "story": "Гена: «Функция скидки должна менять цены в самом векторе — копия никому не нужна.»",
+   "content": {
+    "question": "Допиши apply_discount(prices: &mut Vec<u32>, percent: u32): уменьши каждую цену на percent процентов (целочисленно: цена - цена * percent / 100) прямо в векторе.",
+    "entry": "apply_discount",
+    "code": "// уменьшить каждую цену на percent процентов — в самом векторе\nfn apply_discount(prices: &mut Vec<u32>, percent: u32) {\n}\n\nfn main() {\n    let mut prices = vec![1000, 250];\n    apply_discount(&mut prices, 10);\n    println!(\"{:?}\", prices);\n}",
+    "correct_answer": "// уменьшить каждую цену на percent процентов — в самом векторе\nfn apply_discount(prices: &mut Vec<u32>, percent: u32) {\n    for p in prices.iter_mut() {\n        *p -= *p * percent / 100;\n    }\n}\n\nfn main() {\n    let mut prices = vec![1000, 250];\n    apply_discount(&mut prices, 10);\n    println!(\"{:?}\", prices);\n}",
+    "tests_code": "pub fn tests() {\n    check::eq(\"скидка 10%\", || { let mut p = vec![1000, 250]; apply_discount(&mut p, 10); p }, vec![900, 225]);\n    check::eq(\"скидка 0%\", || { let mut p = vec![500]; apply_discount(&mut p, 0); p }, vec![500]);\n    check::eq(\"99 со скидкой 50%\", || { let mut p = vec![99]; apply_discount(&mut p, 50); p }, vec![50]);\n    check::eq(\"пустой вектор\", || { let mut p: Vec<u32> = vec![]; apply_discount(&mut p, 30); p }, Vec::<u32>::new());\n}",
+    "requirements": [
+     {
+      "input": "меняет каждую цену (iter_mut или индекс)",
+      "expected": {
+       "regex": "iter_mut\\s*\\(\\)|prices\\s*\\[\\s*\\w+\\s*\\]\\s*[-*]?=|in\\s+prices\\s*\\{|in\\s+&mut\\s+\\*?prices"
+      }
+     },
+     {
+      "input": "считает процент от цены",
+      "expected": {
+       "regex": "/\\s*100"
+      }
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "Вектор пришёл по изменяемой ссылке &mut, и менять его элементы нужно тоже через изменяемые ссылки: iter_mut() выдаёт &mut u32, а * даёт доступ к самому числу. 99 × 50 / 100 = 49 в целых числах, остаётся 50.",
+   "hints": [
+    "for p in prices.iter_mut()",
+    "*p -= *p * percent / 100;"
+   ]
+  },
+  {
+   "task_id": "rs-ownership-02",
+   "topic_id": "rs-ownership",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Кто владеет строкой",
+   "story": "Гена: «Одни функции берут строку насовсем, другие только смотрят. Проверь себя.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "fn shout(s: &str) -> String {\n    s.to_uppercase()\n}\n\nfn take(s: String) -> usize {\n    s.len()\n}\n\nfn add_bonus(x: &mut i32) {\n    *x += 10;\n}\n\nfn main() {\n    let name = String::from(\"гена\");\n    let loud = shout(&name);\n    println!(\"{name} {loud}\");\n    let copy = name.clone();\n    let n = take(name);\n    println!(\"{copy} {n}\");\n    let mut salary = 100;\n    add_bonus(&mut salary);\n    let a = 5;\n    let b = a;\n    println!(\"{salary} {a} {b}\");\n}",
+    "language": "rust",
+    "output": "гена ГЕНА\nгена 8\n110 5 5"
+   },
+   "explanation": "shout только одалживает строку (&name) — name остаётся нашей. take забирает строку насовсем, поэтому заранее сделали clone(); после take(name) имя name использовать уже нельзя. len() — байты: 4 русские буквы × 2 = 8. add_bonus меняет salary через &mut — 110. Числа копируются сами, поэтому после let b = a живы обе переменные.",
+   "hints": [
+    "&name — одолжить, name — отдать насовсем.",
+    "len() считает байты."
+   ]
+  },
+  {
+   "task_id": "rs-ownership-03",
+   "topic_id": "rs-ownership",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма по срезу",
+   "story": "Гена: «Функция суммы должна работать и с вектором, и с массивом и ничего не забирать. Собери её.»",
+   "content": {
+    "question": "Собери total(prices: &[u32]) -> u32 — сумму всех цен.",
+    "lines": [
+     "fn total(prices: &[u32]) -> u32 {",
+     "    let mut sum = 0;",
+     "    for p in prices {",
+     "        sum += p;",
+     "    }",
+     "    sum",
+     "}"
+    ],
+    "distractors": [
+     "    sum;",
+     "    let sum = 0;"
+    ],
+    "language": "rust"
+   },
+   "explanation": "&[u32] — срез: его можно получить и из вектора, и из массива, и функция ничего не забирает. sum нужна изменяемая — let mut. Последняя строка sum без точки с запятой — это возвращаемое значение; «sum;» вернула бы (), и компилятор бы возразил.",
+   "hints": [
+    "Копить можно только в let mut.",
+    "Результат — последнее выражение без ;."
+   ]
+  },
+  {
+   "task_id": "rs-ownership-04",
+   "topic_id": "rs-ownership",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Сумма цифр артикула",
+   "story": "Стас: «Контрольная цифра артикула — сумма его цифр. Минус в начале бывает у возвратов, его не считаем.»",
+   "content": {
+    "question": "Напиши digit_sum(n: i64) -> u32 — сумму цифр числа. Знак не учитывается: digit_sum(-1990) == 19. Можно рекурсией.",
+    "entry": "digit_sum",
+    "code": "// сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\nfn digit_sum(n: i64) -> u32 {\n    0\n}\n\nfn main() {\n    println!(\"{}\", digit_sum(1990));\n}",
+    "correct_answer": "// сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\nfn digit_sum(n: i64) -> u32 {\n    let n = n.unsigned_abs();\n    if n < 10 {\n        return n as u32;\n    }\n    (n % 10) as u32 + digit_sum((n / 10) as i64)\n}\n\nfn main() {\n    println!(\"{}\", digit_sum(1990));\n}",
+    "tests_code": "pub fn tests() {\n    check::eq(\"0\", || digit_sum(0), 0);\n    check::eq(\"7\", || digit_sum(7), 7);\n    check::eq(\"1990\", || digit_sum(1990), 19);\n    check::eq(\"123456789\", || digit_sum(123456789), 45);\n    check::eq(\"возврат -1990\", || digit_sum(-1990), 19);\n    check::eq(\"длинный 9999999999\", || digit_sum(9999999999), 90);\n}",
+    "requirements": [
+     {
+      "input": "берёт последнюю цифру остатком от деления на 10",
+      "expected": {
+       "regex": "%\\s*10"
+      }
+     },
+     {
+      "input": "отбрасывает последнюю цифру делением на 10",
+      "expected": {
+       "regex": "/\\s*10"
+      }
+     },
+     {
+      "input": "убирает знак",
+      "expected": {
+       "regex": "abs\\s*\\(|<\\s*0|-\\s*n\\b"
+      }
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "Последняя цифра — n % 10, остальное число — n / 10. Рекурсия: последняя цифра + сумма цифр остального, базовый случай — однозначное число. unsigned_abs() убирает знак и сразу даёт u64 — без риска переполнения, в отличие от abs() у самого маленького i64. Затенение let n = … позволяет не придумывать новое имя.",
+   "hints": [
+    "n % 10 — последняя цифра, n / 10 — число без неё.",
+    "let n = n.unsigned_abs();"
+   ]
+  },
+  {
+   "task_id": "rs-ownership-05",
+   "topic_id": "rs-ownership",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Стол не попадает в корзину",
+   "story": "Ира: «Компилятор ругался на moved value, стажёр дописал .clone() — ошибка ушла, но стол в корзину больше не попадает. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "fn add_item(cart: Vec<String>, item: &str) {\n    let mut cart = cart;\n    cart.push(item.to_string());\n}\n\nfn main() {\n    let cart = vec![\"лампа\".to_string()];\n    add_item(cart.clone(), \"стол\");\n    println!(\"{:?}\", cart);\n}",
+    "bug_line": 8,
+    "options": [
+     "clone() отдаёт функции копию корзины: стол добавляется в копию, и она тут же удаляется",
+     "Строки нельзя класть в вектор",
+     "to_string() не работает с &str",
+     "println! не печатает векторы"
+    ],
+    "correct_answer": 0,
+    "language": "rust"
+   },
+   "explanation": "clone() заглушил ошибку компилятора, но смысл потерялся: функция получает копию, кладёт в неё стол и выбрасывает её при выходе. Правильно — одолжить саму корзину на изменение: fn add_item(cart: &mut Vec<String>, item: &str) и вызов add_item(&mut cart, \"стол\") с let mut cart.",
+   "hints": [
+    "Куда на самом деле попадает стол?",
+    "Нужна изменяемая ссылка &mut, а не копия."
+   ]
+  },
+  {
+   "task_id": "rs-structs-01",
+   "topic_id": "rs-structs",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Корзина-объект",
+   "story": "Гена: «Хватит считать корзину отдельными функциями — пусть структура Cart сама копит сумму.»",
+   "content": {
+    "question": "Допиши метод add(&mut self, price: u32, qty: u32) у Cart — он добавляет позицию; total() возвращает сумму всех позиций.",
+    "entry": "Cart",
+    "code": "struct Cart {\n    total: u32,\n}\n\nimpl Cart {\n    fn new() -> Self {\n        Cart { total: 0 }\n    }\n\n    // добавить позицию: цена × количество\n    fn add(&mut self, price: u32, qty: u32) {\n    }\n\n    fn total(&self) -> u32 {\n        self.total\n    }\n}\n\nfn main() {\n    let mut cart = Cart::new();\n    cart.add(1990, 2);\n    cart.add(500, 1);\n    println!(\"{}\", cart.total());\n}",
+    "correct_answer": "struct Cart {\n    total: u32,\n}\n\nimpl Cart {\n    fn new() -> Self {\n        Cart { total: 0 }\n    }\n\n    // добавить позицию: цена × количество\n    fn add(&mut self, price: u32, qty: u32) {\n        self.total += price * qty;\n    }\n\n    fn total(&self) -> u32 {\n        self.total\n    }\n}\n\nfn main() {\n    let mut cart = Cart::new();\n    cart.add(1990, 2);\n    cart.add(500, 1);\n    println!(\"{}\", cart.total());\n}",
+    "tests_code": "pub fn tests() {\n    check::eq(\"пустая корзина\", || Cart::new().total(), 0);\n    check::eq(\"1990 × 2 + 500\", || {\n        let mut c = Cart::new();\n        c.add(1990, 2);\n        c.add(500, 1);\n        c.total()\n    }, 4480);\n    check::eq(\"позиция с количеством 0\", || {\n        let mut c = Cart::new();\n        c.add(700, 0);\n        c.add(100, 3);\n        c.total()\n    }, 300);\n    check::eq(\"у каждой корзины своя сумма\", || {\n        let mut a = Cart::new();\n        let mut b = Cart::new();\n        a.add(100, 1);\n        b.add(5, 2);\n        format!(\"{}/{}\", a.total(), b.total())\n    }, \"100/10\");\n}",
+    "requirements": [
+     {
+      "input": "накапливает сумму в поле total",
+      "expected": {
+       "regex": "self\\.total\\s*\\+="
+      }
+     },
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "add меняет корзину, поэтому принимает &mut self, а total только читает — &self. Поле доступно через self.total. Чтобы вызвать add, сама переменная тоже должна быть изменяемой: let mut cart.",
+   "hints": [
+    "В add: self.total += price * qty;",
+    "&mut self — метод меняет объект."
+   ]
+  },
+  {
+   "task_id": "rs-structs-02",
+   "topic_id": "rs-structs",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "derive, Display и enum",
+   "story": "Гена: «Разберёмся, что даёт derive, как печатается структура и как match разбирает enum с данными.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "use std::fmt;\n\n#[derive(Debug, Clone, PartialEq)]\nstruct Point {\n    x: i32,\n    y: i32,\n}\n\nimpl fmt::Display for Point {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"({}, {})\", self.x, self.y)\n    }\n}\n\nenum Status {\n    New,\n    Paid(u32),\n    Shipped { track: String },\n}\n\nfn describe(s: &Status) -> String {\n    match s {\n        Status::New => \"новый\".to_string(),\n        Status::Paid(sum) => format!(\"оплачен: {sum} ₽\"),\n        Status::Shipped { track } => format!(\"в пути: {track}\"),\n    }\n}\n\nfn main() {\n    let a = Point { x: 1, y: 2 };\n    let mut b = a.clone();\n    b.x = 10;\n    println!(\"{a} {b} {}\", a == b);\n    println!(\"{:?}\", a);\n    for s in [Status::New, Status::Paid(1990), Status::Shipped { track: \"RU42\".to_string() }] {\n        println!(\"{}\", describe(&s));\n    }\n}",
+    "language": "rust",
+    "output": "(1, 2) (10, 2) false\nPoint { x: 1, y: 2 }\nновый\nоплачен: 1990 ₽\nв пути: RU42"
+   },
+   "explanation": "clone() делает независимую копию: b.x = 10 не трогает a, и сравнение == (от derive PartialEq) даёт false. {} печатает через наш Display — «(1, 2)», а {:?} — через Debug из derive, с именами полей. match достаёт данные прямо из вариантов enum: сумму из Paid и трек из Shipped.",
+   "hints": [
+    "{} — Display, {:?} — Debug.",
+    "clone() — отдельная копия."
+   ]
+  },
+  {
+   "task_id": "rs-structs-03",
+   "topic_id": "rs-structs",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Фигуры для конструктора витрины",
+   "story": "Гена: «Конструктор витрины считает площадь блоков. Прямоугольник должен выполнять трейт Shape.»",
+   "content": {
+    "question": "Заполни пропуски: реализация трейта для структуры, параметр метода и вызов.",
+    "code": "trait Shape {\n    fn area(&self) -> f64;\n}\n\nstruct Rect {\n    w: f64,\n    h: f64,\n}\n\n[[1]] Shape for Rect {\n    fn area(&[[2]]) -> f64 {\n        self.w * self.h\n    }\n}\n\nfn main() {\n    let shapes: Vec<Box<dyn Shape>> = vec![Box::new(Rect { w: 2.0, h: 3.0 })];\n    for s in &shapes {\n        println!(\"{}\", s.[[3]]());\n    }\n}",
+    "blanks": [
+     {
+      "answer": [
+       "impl"
+      ]
+     },
+     {
+      "answer": [
+       "self"
+      ]
+     },
+     {
+      "answer": [
+       "area"
+      ]
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "Трейт реализуют блоком impl Трейт for Тип. Метод, который только читает объект, принимает &self. Vec<Box<dyn Shape>> хранит любые фигуры, выполняющие трейт, — у каждой можно вызвать area().",
+   "hints": [
+    "Реализация — impl … for ….",
+    "Метод читает объект через &self."
+   ]
+  },
+  {
+   "task_id": "rs-structs-04",
+   "topic_id": "rs-structs",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товар печатает себя сам",
+   "story": "Стас: «В логах вместо товаров пишется просто Product. Пусть товар печатается по-человечески.»",
+   "content": {
+    "question": "Допиши реализацию Display для Product: «Лампа — 1990 ₽» (название, пробел, длинное тире, пробел, цена, пробел, ₽).",
+    "entry": "Product",
+    "code": "use std::fmt;\n\nstruct Product {\n    name: String,\n    price: u32,\n}\n\nimpl Product {\n    fn new(name: &str, price: u32) -> Self {\n        Product { name: name.to_string(), price }\n    }\n}\n\n// как товар печатается через {}\nimpl fmt::Display for Product {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"Product\")\n    }\n}\n\nfn main() {\n    println!(\"{}\", Product::new(\"Лампа\", 1990));\n}",
+    "correct_answer": "use std::fmt;\n\nstruct Product {\n    name: String,\n    price: u32,\n}\n\nimpl Product {\n    fn new(name: &str, price: u32) -> Self {\n        Product { name: name.to_string(), price }\n    }\n}\n\n// как товар печатается через {}\nimpl fmt::Display for Product {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{} — {} ₽\", self.name, self.price)\n    }\n}\n\nfn main() {\n    println!(\"{}\", Product::new(\"Лампа\", 1990));\n}",
+    "tests_code": "pub fn tests() {\n    check::eq(\"Лампа\", || format!(\"{}\", Product::new(\"Лампа\", 1990)), \"Лампа — 1990 ₽\");\n    check::eq(\"бесплатный товар\", || Product::new(\"Стол\", 0).to_string(), \"Стол — 0 ₽\");\n    check::eq(\"два товара подряд\", || format!(\"{}; {}\", Product::new(\"Кресло\", 12500), Product::new(\"Полка\", 700)), \"Кресло — 12500 ₽; Полка — 700 ₽\");\n}",
+    "requirements": [
+     {
+      "input": "выводит название и цену товара",
+      "expected": {
+       "regex": "self\\.name[\\s\\S]*self\\.price"
+      }
+     },
+     {
+      "input": "добавляет знак ₽",
+      "expected": {
+       "regex": "₽"
+      }
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "Display описывает, как значение печатается через {}; write! пишет в форматтер по шаблону, как format!. Реализовав Display, бесплатно получаешь и to_string(). Результат write! — fmt::Result, поэтому его и возвращаем последним выражением.",
+   "hints": [
+    "write!(f, \"{} — {} ₽\", …)",
+    "Поля — через self.name и self.price."
+   ]
+  },
+  {
+   "task_id": "rs-structs-05",
+   "topic_id": "rs-structs",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Пополнение не работает",
+   "story": "Ира: «Пополняем счёт на 500, а баланс остаётся нулевым. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "#[derive(Clone)]\nstruct Account {\n    balance: u32,\n}\n\nimpl Account {\n    fn deposit(&self, amount: u32) -> Account {\n        let mut copy = self.clone();\n        copy.balance += amount;\n        copy\n    }\n}\n\nfn main() {\n    let acc = Account { balance: 0 };\n    acc.deposit(500);\n    println!(\"{}\", acc.balance);\n}",
+    "bug_line": 16,
+    "options": [
+     "deposit возвращает новый счёт, а результат выброшен — acc остался прежним",
+     "Поле balance должно быть pub",
+     "derive(Clone) нельзя ставить на структуры",
+     "+= не работает с полями"
+    ],
+    "correct_answer": 0,
+    "language": "rust"
+   },
+   "explanation": "deposit не меняет счёт, а возвращает изменённую копию — и её здесь никто не сохранил. Либо let acc = acc.deposit(500);, либо метод, который меняет сам объект: fn deposit(&mut self, amount: u32) { self.balance += amount; }.",
+   "hints": [
+    "Что возвращает deposit и куда это девается?",
+    "Сохрани результат или сделай метод с &mut self."
+   ]
+  },
+  {
+   "task_id": "rs-errors-01",
+   "topic_id": "rs-errors",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Списание со счёта",
+   "story": "Гена: «Списание должно явно отказывать, а не паниковать и не уводить счёт в минус.»",
+   "content": {
+    "question": "Напиши withdraw(balance: u32, amount: u32) -> Result<u32, BankError>: сумма 0 — Err(BankError::ZeroAmount); сумма больше баланса — Err(BankError::NotEnough { balance, amount }); иначе Ok(новый баланс).",
+    "entry": "withdraw",
+    "code": "#[derive(Debug, PartialEq)]\nenum BankError {\n    ZeroAmount,\n    NotEnough { balance: u32, amount: u32 },\n}\n\n// списание со счёта: новый баланс или ошибка\nfn withdraw(balance: u32, amount: u32) -> Result<u32, BankError> {\n    Ok(balance - amount)\n}\n\nfn main() {\n    println!(\"{:?}\", withdraw(1000, 300));\n}",
+    "correct_answer": "#[derive(Debug, PartialEq)]\nenum BankError {\n    ZeroAmount,\n    NotEnough { balance: u32, amount: u32 },\n}\n\n// списание со счёта: новый баланс или ошибка\nfn withdraw(balance: u32, amount: u32) -> Result<u32, BankError> {\n    if amount == 0 {\n        return Err(BankError::ZeroAmount);\n    }\n    if amount > balance {\n        return Err(BankError::NotEnough { balance, amount });\n    }\n    Ok(balance - amount)\n}\n\nfn main() {\n    println!(\"{:?}\", withdraw(1000, 300));\n}",
+    "tests_code": "pub fn tests() {\n    check::eq(\"1000 - 300\", || withdraw(1000, 300), Ok(700));\n    check::eq(\"списать всё\", || withdraw(500, 500), Ok(0));\n    check::eq(\"не хватает денег\", || withdraw(100, 500), Err(BankError::NotEnough { balance: 100, amount: 500 }));\n    check::eq(\"сумма 0\", || withdraw(100, 0), Err(BankError::ZeroAmount));\n}",
+    "requirements": [
+     {
+      "input": "возвращает ошибку ZeroAmount",
+      "expected": {
+       "regex": "Err\\s*\\(\\s*BankError::ZeroAmount"
+      }
+     },
+     {
+      "input": "возвращает ошибку NotEnough с данными",
+      "expected": {
+       "regex": "BankError::NotEnough\\s*\\{"
+      }
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "Ошибка — обычное значение: Err(BankError::…). Заготовка вычитала 500 из 100 в u32, и отладочная сборка паниковала на переполнении — проверки должны стоять до вычисления. Вариант NotEnough несёт данные, и запись { balance, amount } — сокращение от { balance: balance, amount: amount }.",
+   "hints": [
+    "return Err(BankError::ZeroAmount);",
+    "Проверки — до вычитания."
+   ]
+  },
+  {
+   "task_id": "rs-errors-02",
+   "topic_id": "rs-errors",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Ok, Err, Some и None",
+   "story": "Гена: «Разбор порта из конфига и пара Option. Что напечатает программа?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "fn parse_port(s: &str) -> Result<u16, String> {\n    let n: u16 = s.trim().parse().map_err(|_| format!(\"не число: {s}\"))?;\n    if n == 0 {\n        return Err(\"порт 0 запрещён\".to_string());\n    }\n    Ok(n)\n}\n\nfn main() {\n    println!(\"{:?}\", parse_port(\" 8080 \"));\n    println!(\"{:?}\", parse_port(\"80a\"));\n    println!(\"{:?}\", parse_port(\"0\"));\n    println!(\"{:?}\", parse_port(\"70000\"));\n    println!(\"{}\", parse_port(\"x\").unwrap_or(3000));\n    let names = vec![\"Гена\", \"Ира\"];\n    println!(\"{:?} {:?}\", names.first(), names.get(5));\n    println!(\"{}\", names.get(5).map(|n| n.len()).unwrap_or(0));\n}",
+    "language": "rust",
+    "output": "Ok(8080)\nErr(\"не число: 80a\")\nErr(\"порт 0 запрещён\")\nErr(\"не число: 70000\")\n3000\nSome(\"Гена\") None\n0"
+   },
+   "explanation": "trim убирает пробелы, и « 8080 » разбирается — Ok(8080). «80a» не число: parse вернул ошибку, map_err заменил её нашим текстом, и ? сразу вернул Err. «0» разобрался, но отсечён проверкой. 70000 не помещается в u16 (максимум 65535) — это тоже ошибка разбора. unwrap_or даёт запасное 3000. get(5) у вектора из двух — None, map над None ничего не делает.",
+   "hints": [
+    "? сразу возвращает ошибку из функции.",
+    "u16 — не больше 65535."
+   ]
+  },
+  {
+   "task_id": "rs-errors-03",
+   "topic_id": "rs-errors",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Порт с оператором ?",
+   "story": "Гена: «Разбери порт и пробрось ошибку наверх одним символом.»",
+   "content": {
+    "question": "Заполни пропуски: проброс ошибки, успешный результат и ветка ошибки в match.",
+    "code": "fn port(s: &str) -> Result<u16, std::num::ParseIntError> {\n    let n: u16 = s.parse()[[1]];\n    [[2]](n)\n}\n\nfn main() {\n    match port(\"8080\") {\n        Ok(p) => println!(\"порт {p}\"),\n        [[3]](e) => println!(\"ошибка: {e}\"),\n    }\n}",
+    "blanks": [
+     {
+      "answer": [
+       "?"
+      ]
+     },
+     {
+      "answer": [
+       "Ok"
+      ]
+     },
+     {
+      "answer": [
+       "Err"
+      ]
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "? после parse(): если разбор не удался, функция сразу возвращает эту ошибку, иначе отдаёт число. Успешный результат заворачивают в Ok. В match разбирают оба варианта — Ok и Err, иначе компилятор не соберёт.",
+   "hints": [
+    "Проброс ошибки — один символ.",
+    "Варианты Result — Ok и Err."
+   ]
+  },
+  {
+   "task_id": "rs-errors-04",
+   "topic_id": "rs-errors",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Порт по умолчанию",
+   "story": "Гена: «Если порт в конфиге кривой или ноль, запускаемся на 8080. Собери функцию.»",
+   "content": {
+    "question": "Собери port_or_default(s: &str) -> u16: разбери число; ноль или ошибка разбора — 8080.",
+    "lines": [
+     "fn port_or_default(s: &str) -> u16 {",
+     "    match s.trim().parse::<u16>() {",
+     "        Ok(0) => 8080,",
+     "        Ok(p) => p,",
+     "        Err(_) => 8080,",
+     "    }",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "fn port_or_default(s: &str) -> u16 {",
+      "    match s.trim().parse::<u16>() {",
+      "        Err(_) => 8080,",
+      "        Ok(0) => 8080,",
+      "        Ok(p) => p,",
+      "    }",
+      "}"
+     ],
+     [
+      "fn port_or_default(s: &str) -> u16 {",
+      "    match s.trim().parse::<u16>() {",
+      "        Ok(0) => 8080,",
+      "        Err(_) => 8080,",
+      "        Ok(p) => p,",
+      "    }",
+      "}"
+     ]
+    ],
+    "distractors": [
+     "        None => 8080,",
+     "    match s.parse() {"
+    ],
+    "language": "rust"
+   },
+   "explanation": "Шаблоны проверяются сверху вниз, поэтому Ok(0) должен стоять раньше Ok(p) — иначе Ok(p) заберёт и ноль. Err можно поставить где угодно. None — вариант Option, а parse возвращает Result, так что он не соберётся. Без ::<u16> компилятор не поймёт, во что разбирать.",
+   "hints": [
+    "Частный случай Ok(0) — раньше общего Ok(p).",
+    "У Result варианты Ok и Err."
+   ]
+  },
+  {
+   "task_id": "rs-errors-05",
+   "topic_id": "rs-errors",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Разбор строки заказа",
+   "story": "Стас: «Менеджеры вбивают заказы строкой „лампа x3“. Разбери её и понятно откажи, если что-то не так.»",
+   "content": {
+    "question": "Напиши parse_order(line: &str) -> Result<(String, u32), OrderError>: «название xКоличество». Нет « x» — OrderError::Format; количество не число — OrderError::BadQty(то, что написано); ноль — OrderError::ZeroQty. Пробелы по краям частей убери.",
+    "entry": "parse_order",
+    "code": "#[derive(Debug, PartialEq)]\nenum OrderError {\n    Format,\n    BadQty(String),\n    ZeroQty,\n}\n\n// \"лампа x3\" -> (\"лампа\", 3)\nfn parse_order(line: &str) -> Result<(String, u32), OrderError> {\n    Err(OrderError::Format)\n}\n\nfn main() {\n    println!(\"{:?}\", parse_order(\"лампа x3\"));\n}",
+    "correct_answer": "#[derive(Debug, PartialEq)]\nenum OrderError {\n    Format,\n    BadQty(String),\n    ZeroQty,\n}\n\n// \"лампа x3\" -> (\"лампа\", 3)\nfn parse_order(line: &str) -> Result<(String, u32), OrderError> {\n    let (name, qty) = line.split_once(\" x\").ok_or(OrderError::Format)?;\n    let qty = qty.trim();\n    let n: u32 = qty.parse().map_err(|_| OrderError::BadQty(qty.to_string()))?;\n    if n == 0 {\n        return Err(OrderError::ZeroQty);\n    }\n    Ok((name.trim().to_string(), n))\n}\n\nfn main() {\n    println!(\"{:?}\", parse_order(\"лампа x3\"));\n}",
+    "tests_code": "pub fn tests() {\n    check::eq(\"лампа x3\", || parse_order(\"лампа x3\"), Ok((\"лампа\".to_string(), 3)));\n    check::eq(\"пробелы вокруг\", || parse_order(\"  стол x 12 \"), Ok((\"стол\".to_string(), 12)));\n    check::eq(\"нет количества\", || parse_order(\"лампа\"), Err(OrderError::Format));\n    check::eq(\"количество словами\", || parse_order(\"лампа xтри\"), Err(OrderError::BadQty(\"три\".to_string())));\n    check::eq(\"ноль\", || parse_order(\"лампа x0\"), Err(OrderError::ZeroQty));\n}",
+    "requirements": [
+     {
+      "input": "пробрасывает ошибки оператором ?",
+      "expected": {
+       "regex": "\\?\\s*;"
+      }
+     },
+     {
+      "input": "возвращает ZeroQty",
+      "expected": {
+       "regex": "OrderError::ZeroQty"
+      }
+     },
+     {
+      "input": "делит строку на части",
+      "expected": {
+       "regex": "split_once|split\\s*\\(|find\\s*\\("
+      }
+     }
+    ],
+    "language": "rust"
+   },
+   "explanation": "split_once(\" x\") делит строку на две части или возвращает None; ok_or превращает None в нашу ошибку, а ? сразу её возвращает. parse с map_err заменяет стандартную ошибку разбора на BadQty с тем, что написал менеджер. В итоге функция читается сверху вниз без вложенных match.",
+   "hints": [
+    "line.split_once(\" x\").ok_or(OrderError::Format)?",
+    "qty.parse().map_err(|_| OrderError::BadQty(qty.to_string()))?"
+   ]
+  }
+ ]
+}

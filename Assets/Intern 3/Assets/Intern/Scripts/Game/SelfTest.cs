@@ -560,6 +560,16 @@ namespace Intern.Game
                 T(LangBox.ErrorLine("terminate called after throwing an instance of 'std::invalid_argument'\n  what():  stoi\n", "main.cpp", out gm) == -1 && gm.Contains("std::invalid_argument: stoi"), "c++: исключение " + gm);
                 var cpp = LangBox.For("cpp");
                 T(cpp != null && cpp.dockerfile != null && cpp.dockerfile.Contains("g++") && cpp.extraFiles["check.hpp"].Contains("##TEST|") && cpp.extraFiles["stazher-cpp.sh"].Contains("LC_ALL=C g++"), "c++: раннер, check.hpp и Dockerfile");
+                // Rust (спринт 15): блоки ошибок rustc с подсказками, паники
+                var re1 = LangBox.ParseCheck("", "error[E0425]: cannot find value `prce` in this scope\n --> main.rs:2:5\n  |\n2 |     prce * qty\n  |     ^^^^\n  |\nhelp: a local variable with a similar name exists\n\nerror[E0308]: mismatched types\n  --> main.rs:5:32\n   |\n 5 | fn total(prices: &Vec<i32>) -> i32 {\n   |    -----                       ^^^ expected `i32`, found `()`\n...\n10 |     sum;\n   |        - help: remove this semicolon to return this value\n\nerror: aborting due to 2 previous errors\n", "main.rs", 1);
+                T(re1.buildFailed && re1.errLine == 2 && re1.errText.Contains("E0425") && re1.results[0].Note.Contains("убери ;"), "rust: ошибки rustc " + re1.errLine + " " + (re1.results.Count > 0 ? re1.results[0].Note : "-"));
+                var re2 = LangBox.ParseCheck("##TEST|1990 × 2|FAIL|паника: attempt to divide by zero (main.rs:2)\n", "", "main.rs", 0);
+                T(re2.errLine == 2 && !re2.results[0].Passed, "rust: паника в тесте " + re2.errLine);
+                string rsm; T(LangBox.ErrorLine("thread 'main' (546) panicked at main.rs:7:5:\nattempt to divide by zero\nnote: run with `RUST_BACKTRACE=1`\n", "main.rs", out rsm) == 7 && rsm.Contains("деление на ноль"), "rust: паника при запуске " + rsm);
+                var re3 = LangBox.ParseCheck("##TEST|ok|PASS\n", "\nthread 'main' (583) has overflowed its stack\nfatal runtime error: stack overflow, aborting\n", "main.rs", 134);
+                T(re3.results.Count == 2 && re3.results[1].Note.Contains("рекурси"), "rust: переполнение стека");
+                var rust = LangBox.For("rust");
+                T(rust != null && rust.extraFiles["check.rs"].Contains("##TEST|") && rust.extraFiles["stazher-rs.sh"].Contains("rustc"), "rust: раннер и check.rs");
                 var java = LangBox.For("java");
                 T(java != null && java.extraFiles.ContainsKey("Check.java") && java.extraFiles["Check.java"].Contains("##TEST|") && java.testMarker == "Check.", "java: раннер и Check.java");
             }

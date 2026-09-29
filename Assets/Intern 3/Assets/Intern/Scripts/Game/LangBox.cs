@@ -119,8 +119,209 @@ namespace Intern.Game
             extraFiles = new Dictionary<string, string> { { "check.hpp", CheckHpp }, { "stazher-cpp.sh", CppScript } },
         };
 
-        public static LangSpec For(string lang) { return lang == "go" ? Go : lang == "java" ? Java : lang == "csharp" ? CSharp : lang == "cpp" ? Cpp : null; }
-        public static IEnumerable<LangSpec> All { get { yield return Go; yield return Java; yield return CSharp; yield return Cpp; } }
+        // Спринт 15: Rust. Официальный образ rust:1-alpine, сборка rustc без cargo (зависимостей в задачах нет, сети в контейнере тоже).
+        // Отладочная сборка: переполнение, выход за границы и деление на ноль — паника со строкой
+        public static readonly LangSpec Rust = new LangSpec
+        {
+            id = "rust", name = "Rust", image = "rust:1-alpine", container = "stazher-rust",
+            src = "main.rs", test = "tests.rs", parser = "check", size = "около 1,4 ГБ",
+            runCmd = "sh stazher-rs.sh run", testCmd = "sh stazher-rs.sh test",
+            testShow = "rustc --edition 2021 tests.rs && ./tests", runShow = "rustc --edition 2021 main.rs && ./main", testMarker = "check::",
+            env = new[] { "LANG=C.UTF-8" },
+            extraFiles = new Dictionary<string, string> { { "check.rs", CheckRs }, { "stazher-rs.sh", RsScript } },
+        };
+
+        // Спринт 16: PHP. Официальный php:8.4-cli-alpine. Сборки нет — сначала php -l (синтаксис), потом запуск;
+        // в тестах предупреждения (неизвестная переменная, нет ключа в массиве) становятся ошибками со строкой
+        public static readonly LangSpec Php = new LangSpec
+        {
+            id = "php", name = "PHP", image = "php:8.4-cli-alpine", container = "stazher-php",
+            src = "main.php", test = "tests.php", parser = "check", size = "около 100 МБ",
+            runCmd = "sh stazher-php.sh run", testCmd = "sh stazher-php.sh test",
+            testShow = "php tests.php", runShow = "php main.php", testMarker = "check::",
+            env = new[] { "LANG=C.UTF-8" },
+            extraFiles = new Dictionary<string, string> { { "check.php", CheckPhp }, { "stazher-tests.php", PhpTestsRunner }, { "stazher-php.sh", PhpScript } },
+        };
+
+        public static LangSpec For(string lang) { return lang == "go" ? Go : lang == "java" ? Java : lang == "csharp" ? CSharp : lang == "cpp" ? Cpp : lang == "rust" ? Rust : lang == "php" ? Php : null; }
+        public static IEnumerable<LangSpec> All { get { yield return Go; yield return Java; yield return CSharp; yield return Cpp; yield return Rust; yield return Php; } }
+
+        // Tools/s16/check.php — набор проверок для tests.php
+        public const string CheckPhp =
+            "<?php\n" +
+            "// Проверки «Стажёра» для задач на PHP: каждая проверка печатает строку ##TEST|имя|PASS или ##TEST|имя|FAIL|почему.\n" +
+            "// Исключение в проверяемом коде ловится внутри проверки — остальные тесты всё равно выполнятся.\n" +
+            "// Предупреждения PHP (например, неизвестная переменная) превращаются в ошибки, чтобы не проходить молча.\n" +
+            "final class check\n" +
+            "{\n" +
+            "    // С этого момента предупреждения PHP становятся исключениями\n" +
+            "    public static function strict(): void\n" +
+            "    {\n" +
+            "        set_error_handler(function (int $no, string $msg, string $file, int $line): bool {\n" +
+            "            throw new ErrorException($msg, 0, $no, $file, $line);\n" +
+            "        });\n" +
+            "    }\n" +
+            "\n" +
+            "    public static function eq(string $name, callable $got, mixed $want): void\n" +
+            "    {\n" +
+            "        try { $g = $got(); } catch (Throwable $e) { self::fail($name, 'исключение ' . self::what($e)); return; }\n" +
+            "        if (self::same($g, $want)) self::pass($name);\n" +
+            "        else self::fail($name, 'получено ' . self::show($g) . ', ожидалось ' . self::show($want));\n" +
+            "    }\n" +
+            "\n" +
+            "    public static function near(string $name, callable $got, float $want): void\n" +
+            "    {\n" +
+            "        try { $g = $got(); } catch (Throwable $e) { self::fail($name, 'исключение ' . self::what($e)); return; }\n" +
+            "        if (is_numeric($g) && abs($g - $want) < 1e-9) self::pass($name);\n" +
+            "        else self::fail($name, 'получено ' . self::show($g) . ', ожидалось ' . self::show($want));\n" +
+            "    }\n" +
+            "\n" +
+            "    public static function throws(string $name, callable $f, string $class): void\n" +
+            "    {\n" +
+            "        try { $f(); self::fail($name, 'исключения не было, ожидалось ' . $class); }\n" +
+            "        catch (Throwable $e) {\n" +
+            "            if ($e instanceof $class) self::pass($name);\n" +
+            "            else self::fail($name, 'исключение ' . self::what($e) . ', ожидалось ' . $class);\n" +
+            "        }\n" +
+            "    }\n" +
+            "\n" +
+            "    private static function same(mixed $g, mixed $w): bool\n" +
+            "    {\n" +
+            "        if ((is_int($g) || is_float($g)) && (is_int($w) || is_float($w)) && (is_float($g) || is_float($w))) return abs($g - $w) < 1e-9;\n" +
+            "        if (is_array($g) && is_array($w)) {\n" +
+            "            if (count($g) !== count($w) || array_keys($g) !== array_keys($w)) return false;\n" +
+            "            foreach ($g as $k => $v) if (!self::same($v, $w[$k])) return false;\n" +
+            "            return true;\n" +
+            "        }\n" +
+            "        return $g === $w;\n" +
+            "    }\n" +
+            "\n" +
+            "    private static function show(mixed $v): string\n" +
+            "    {\n" +
+            "        if (is_string($v)) return '\"' . $v . '\"';\n" +
+            "        if (is_bool($v)) return $v ? 'true' : 'false';\n" +
+            "        if ($v === null) return 'null';\n" +
+            "        if (is_float($v)) return var_export($v, true);\n" +
+            "        if (is_array($v)) {\n" +
+            "            $list = array_is_list($v);\n" +
+            "            $parts = [];\n" +
+            "            foreach ($v as $k => $x) $parts[] = ($list ? '' : self::show($k) . ' => ') . self::show($x);\n" +
+            "            return '[' . implode(', ', $parts) . ']';\n" +
+            "        }\n" +
+            "        if (is_object($v)) return method_exists($v, '__toString') ? (string)$v : get_class($v);\n" +
+            "        return (string)$v;\n" +
+            "    }\n" +
+            "\n" +
+            "    private static function what(Throwable $e): string\n" +
+            "    {\n" +
+            "        $where = '';\n" +
+            "        if (basename($e->getFile()) === 'main.php') $where = ' (main.php:' . $e->getLine() . ')';\n" +
+            "        else foreach ($e->getTrace() as $f) if (isset($f['file']) && basename($f['file']) === 'main.php') { $where = ' (main.php:' . $f['line'] . ')'; break; }\n" +
+            "        return get_class($e) . ': ' . $e->getMessage() . $where;\n" +
+            "    }\n" +
+            "\n" +
+            "    private static function clean(string $s): string { return str_replace(['|', \"\\r\", \"\\n\"], ['/', '', ' ⏎ '], $s); }\n" +
+            "    private static function pass(string $n): void { echo '##TEST|' . self::clean($n) . \"|PASS\\n\"; }\n" +
+            "    private static function fail(string $n, string $m): void { echo '##TEST|' . self::clean($n) . '|FAIL|' . self::clean($m) . \"\\n\"; }\n" +
+            "}\n";
+
+        // Tools/s16/stazher-tests.php — подключает main.php без вывода и запускает tests.php
+        public const string PhpTestsRunner =
+            "<?php\n" +
+            "// «Стажёр»: main.php подключается целиком — его вывод и предупреждения скрыты, а ошибка в коде верхнего уровня\n" +
+            "// не мешает тестам (функции PHP объявляет до выполнения файла). Затем выполняются тесты из tests.php\n" +
+            "require __DIR__ . '/check.php';\n" +
+            "set_error_handler(fn() => true);\n" +
+            "ob_start();\n" +
+            "try {\n" +
+            "    require __DIR__ . '/main.php';\n" +
+            "} catch (Throwable $e) {\n" +
+            "} finally {\n" +
+            "    ob_end_clean();\n" +
+            "    restore_error_handler();\n" +
+            "}\n" +
+            "check::strict();\n" +
+            "require __DIR__ . '/tests.php';\n";
+
+        // Tools/s16/stazher-php.sh — php -l, затем запуск
+        public const string PhpScript =
+            "#!/bin/sh\n" +
+            "# «Стажёр»: запуск PHP. Сначала проверка синтаксиса (php -l), затем запуск.\n" +
+            "# sh stazher-php.sh run — main.php;  sh stazher-php.sh test — main.php + tests.php + check.php (предупреждения становятся ошибками)\n" +
+            "OPTS=\"-d display_errors=stderr -d log_errors=0 -d html_errors=0 -d error_reporting=-1 -d memory_limit=256M\"\n" +
+            "php $OPTS -l main.php >/dev/null || exit 1\n" +
+            "if [ \"$1\" = test ]; then\n" +
+            "  php $OPTS -l tests.php >/dev/null || exit 1\n" +
+            "  exec php $OPTS stazher-tests.php\n" +
+            "fi\n" +
+            "exec php $OPTS main.php\n";
+
+        // Tools/s15/check.rs — набор проверок для tests.rs, паники перехватываются
+        public const string CheckRs =
+            "// Проверки «Стажёра» для задач на Rust: каждая проверка печатает строку ##TEST|имя|PASS или ##TEST|имя|FAIL|почему.\n" +
+            "// Паника в проверяемом коде перехватывается — остальные тесты всё равно выполнятся.\n" +
+            "use std::cell::RefCell;\n" +
+            "use std::fmt::Debug;\n" +
+            "use std::panic::{self, AssertUnwindSafe};\n" +
+            "\n" +
+            "thread_local! { static LAST: RefCell<String> = RefCell::new(String::new()); }\n" +
+            "\n" +
+            "// Запоминать текст и место паники вместо печати в stderr\n" +
+            "pub fn install() {\n" +
+            "    panic::set_hook(Box::new(|info| {\n" +
+            "        let p = info.payload();\n" +
+            "        let msg = if let Some(s) = p.downcast_ref::<&str>() { s.to_string() } else if let Some(s) = p.downcast_ref::<String>() { s.clone() } else { \"паника\".to_string() };\n" +
+            "        let at = info.location().map(|l| format!(\" ({}:{})\", l.file().rsplit('/').next().unwrap_or(\"\"), l.line())).unwrap_or_default();\n" +
+            "        LAST.with(|x| *x.borrow_mut() = format!(\"{}{}\", msg, at));\n" +
+            "    }));\n" +
+            "}\n" +
+            "\n" +
+            "fn last_panic() -> String { LAST.with(|x| x.borrow().clone()) }\n" +
+            "fn clean(s: &str) -> String { s.replace('|', \"/\").replace('\\r', \"\").replace('\\n', \" ⏎ \") }\n" +
+            "fn pass(name: &str) { println!(\"##TEST|{}|PASS\", clean(name)); }\n" +
+            "fn fail(name: &str, why: &str) { println!(\"##TEST|{}|FAIL|{}\", clean(name), clean(why)); }\n" +
+            "\n" +
+            "// eq(\"имя\", || f(1), ожидаемое)\n" +
+            "pub fn eq<T, W, F>(name: &str, got: F, want: W) where T: PartialEq<W> + Debug, W: Debug, F: FnOnce() -> T {\n" +
+            "    match panic::catch_unwind(AssertUnwindSafe(got)) {\n" +
+            "        Ok(g) => if g == want { pass(name) } else { fail(name, &format!(\"получено {:?}, ожидалось {:?}\", g, want)) },\n" +
+            "        Err(_) => fail(name, &format!(\"паника: {}\", last_panic())),\n" +
+            "    }\n" +
+            "}\n" +
+            "\n" +
+            "// near(\"имя\", || f(1.5), 2.25) — дробные сравниваются с допуском\n" +
+            "pub fn near<F: FnOnce() -> f64>(name: &str, got: F, want: f64) {\n" +
+            "    match panic::catch_unwind(AssertUnwindSafe(got)) {\n" +
+            "        Ok(g) => if (g - want).abs() < 1e-9 { pass(name) } else { fail(name, &format!(\"получено {:?}, ожидалось {:?}\", g, want)) },\n" +
+            "        Err(_) => fail(name, &format!(\"паника: {}\", last_panic())),\n" +
+            "    }\n" +
+            "}\n" +
+            "\n" +
+            "// panics(\"имя\", || f(-1)) — код обязан запаниковать\n" +
+            "pub fn panics<T, F: FnOnce() -> T>(name: &str, f: F) {\n" +
+            "    match panic::catch_unwind(AssertUnwindSafe(f)) {\n" +
+            "        Ok(_) => fail(name, \"паники не было, а она ожидалась\"),\n" +
+            "        Err(_) => pass(name),\n" +
+            "    }\n" +
+            "}\n";
+
+        // Tools/s15/stazher-rs.sh — сборка rustc без cargo; тесты живут внутри модуля с main.rs
+        public const string RsScript =
+            "#!/bin/sh\n" +
+            "# «Стажёр»: сборка и запуск Rust без cargo (rustc, отладочная сборка: переполнение, выход за границы\n" +
+            "# и деление на ноль — паника со строкой кода).\n" +
+            "# sh stazher-rs.sh run  — main.rs;  sh stazher-rs.sh test — main.rs + tests.rs + check.rs\n" +
+            "rm -rf out && mkdir out || exit 2\n" +
+            "if [ \"$1\" = test ]; then\n" +
+            "  # main.rs подключается целиком в модуль program и не меняется; тесты лежат внутри него и видят его функции\n" +
+            "  printf 'mod check { include!(\"check.rs\"); }\\n#[allow(dead_code, unused)]\\nmod program {\\n    include!(\"main.rs\");\\n    pub mod stazher_tests { use super::*; use crate::check; include!(\"tests.rs\"); }\\n}\\nfn main() { check::install(); program::stazher_tests::tests(); }\\n' > stazher-tests.rs\n" +
+            "  SRC=stazher-tests.rs; BIN=out/tests\n" +
+            "else\n" +
+            "  SRC=main.rs; BIN=out/main\n" +
+            "fi\n" +
+            "rustc --edition 2021 -A warnings -C debug-assertions=on -C overflow-checks=on -C opt-level=0 -o $BIN $SRC 2>out/rustc.txt\n" +
+            "if [ $? -ne 0 ]; then cat out/rustc.txt >&2; exit 1; fi\n" +
+            "RUST_BACKTRACE=0 exec ./$BIN\n";
 
         // Tools/s14/check.hpp — набор проверок для tests.cpp
         public const string CheckHpp =
@@ -674,10 +875,18 @@ namespace Intern.Game
         // ---------- разбор ##TEST (Java, C# и дальше) ----------
         static readonly Regex JavacErr = new Regex(@"^(\w+\.java):(\d+): error: (.*)$");
         static readonly Regex CscErr = new Regex(@"^(\w+\.cs)\((\d+),(\d+)\): error (CS\d+): (.*)$");
-        static readonly Regex SrcAt = new Regex(@"\((\w+\.(?:java|cs)):(\d+)\)");   // (Main.java:4), (Program.cs:5) — из Check и трассировок Java
+        static readonly Regex SrcAt = new Regex(@"\((\w+\.(?:java|cs|rs|php)):(\d+)\)");   // (Main.java:4), (Program.cs:5) — из Check и трассировок Java
         static readonly Regex CsAt = new Regex(@"(\w+\.cs):line (\d+)");            // трассировка .NET: in /work/…/Program.cs:line 5
         static readonly Regex GppErr = new Regex(@"^(\w+\.(?:cpp|hpp|h)):(\d+):(\d+): (?:fatal )?error: (.*?)(?: \[-(?:Werror=[\w-]+|fpermissive)\])?$");
         static readonly Regex CppAt = new Regex(@"(?:^|[/\s])(\w+\.cpp):(\d+)");          // кадр трассировки санитайзера: …/main.cpp:6
+        static readonly Regex PhpParse = new Regex(@"^(?:PHP )?Parse error:\s+(.*) in (?:.*/)?(\w+\.php) on line (\d+)$");
+        static readonly Regex PhpUncaught = new Regex(@"(?:PHP )?Fatal error:\s+Uncaught (\S+?): (.*?) in (?:.*/)?(\w+\.php):(\d+)");
+        static readonly Regex PhpFatal = new Regex(@"(?:PHP )?Fatal error:\s+(.*) in (?:.*/)?(\w+\.php) on line (\d+)");
+        static readonly Regex PhpWarn = new Regex(@"(?:PHP )?(?:Warning|Notice|Deprecated):\s+(.*) in (?:.*/)?(\w+\.php) on line (\d+)");
+        static readonly Regex PhpFrame = new Regex(@"(\w+\.php)\((\d+)\)");
+        static readonly Regex RustErr = new Regex(@"^error(?:\[(E\d+)\])?: (.*)$");
+        static readonly Regex RustAt = new Regex(@"^\s*--> (?:.*/)?(\w+\.rs):(\d+):(\d+)");
+        static readonly Regex RustPanic = new Regex(@"panicked at (?:.*/)?(\w+\.rs):(\d+):\d+:\s*\r?\n\s*(.*)");
         static readonly Regex UbsanErr = new Regex(@"^(\w+\.cpp):(\d+):\d+: runtime error: (.*)$", RegexOptions.Multiline);
 
         public class CompileError { public string file, text; public int line; }
@@ -690,6 +899,29 @@ namespace Intern.Game
             for (int i = 0; i < lines.Length; i++)
             {
                 string l = lines[i].Trim();
+                var pm = PhpParse.Match(l);
+                if (pm.Success) { list.Add(new CompileError { file = pm.Groups[2].Value, line = int.Parse(pm.Groups[3].Value), text = Explain(pm.Groups[1].Value) }); continue; }
+                var rm = RustErr.Match(lines[i]);
+                if (rm.Success && !rm.Groups[2].Value.StartsWith("aborting due to") && !rm.Groups[2].Value.StartsWith("could not compile"))
+                {
+                    // блок ошибки rustc: место (-->), ожидаемый и полученный тип, подсказки help — до следующего error/warning
+                    int end = i + 1;
+                    while (end < lines.Length && !lines[end].StartsWith("error") && !lines[end].StartsWith("warning") && !lines[end].StartsWith("Some errors") && !lines[end].StartsWith("For more information")) end++;
+                    Match at = null;
+                    for (int j = i + 1; j < end && at == null; j++) { var am = RustAt.Match(lines[j]); if (am.Success) at = am; }
+                    string block = string.Join("\n", lines, i + 1, end - i - 1), msg = rm.Groups[2].Value;
+                    string text = Explain(msg);
+                    if (rm.Groups[1].Success) text = text == msg ? rm.Groups[1].Value + ": " + msg : text.Replace("(" + msg + ")", "(" + rm.Groups[1].Value + ": " + msg + ")");
+                    var ef = Regex.Match(block, @"expected `([^`]+)`, found `([^`]+)`");
+                    if (ef.Success && !msg.Contains("expected `")) text += ": ожидался " + ef.Groups[1].Value + ", а получен " + ef.Groups[2].Value;
+                    if (block.Contains("remove this semicolon")) text += " — убери ; в конце последней строки, чтобы вернуть значение";
+                    else if (block.Contains("a local variable with a similar name exists") || block.Contains("similar name exists")) text += " — есть похожее имя, опечатка?";
+                    if (block.Contains("consider changing this to be mutable") || block.Contains("consider making this binding mutable")) text += " — объяви переменную как let mut";
+                    if (block.Contains("consider cloning the value") || block.Contains("consider borrowing")) text += " — возьми ссылку & или сделай .clone()";
+                    if (at != null) list.Add(new CompileError { file = at.Groups[1].Value, line = int.Parse(at.Groups[2].Value), text = text });
+                    i = end - 1;
+                    continue;
+                }
                 var m = JavacErr.Match(l);
                 if (m.Success)
                 {
@@ -785,6 +1017,21 @@ namespace Intern.Game
         {
             ex = null; err = err ?? "";
             Func<int, string> lineAt = i => { int end = err.IndexOf('\n', i); return (end > 0 ? err.Substring(i, end - i) : err.Substring(i)).Trim(); };
+            // PHP: необработанное исключение или фатальная ошибка
+            var pu = PhpUncaught.Match(err);
+            if (pu.Success)
+            {
+                ex = ExplainRuntime("php:" + pu.Groups[1].Value + ": " + pu.Groups[2].Value);
+                if (pu.Groups[3].Value == srcName) return int.Parse(pu.Groups[4].Value);
+                var fr = PhpFrame.Matches(err).Cast<Match>().FirstOrDefault(x => x.Groups[1].Value == srcName);
+                return fr != null ? int.Parse(fr.Groups[2].Value) : -1;
+            }
+            var pf = PhpFatal.Match(err);
+            if (pf.Success) { ex = ExplainRuntime("php:" + pf.Groups[1].Value); return pf.Groups[2].Value == srcName ? int.Parse(pf.Groups[3].Value) : -1; }
+            // Rust: паника и переполнение стека
+            var rp = RustPanic.Match(err);
+            if (rp.Success) { ex = ExplainRuntime("rust:" + rp.Groups[3].Value.Trim()); return rp.Groups[1].Value == srcName ? int.Parse(rp.Groups[2].Value) : -1; }
+            if (err.Contains("has overflowed its stack")) { ex = "переполнение стека — похоже на бесконечную рекурсию (stack overflow)"; return -1; }
             // C++: санитайзеры и необработанное исключение
             var ub = UbsanErr.Match(err);
             if (ub.Success) { ex = ExplainRuntime(ub.Groups[3].Value); return ub.Groups[1].Value == srcName ? int.Parse(ub.Groups[2].Value) : CppFrame(err, srcName); }
@@ -838,6 +1085,31 @@ namespace Intern.Game
                 case "asan:stack-use-after-return": case "asan:stack-use-after-scope": return "обращение к переменной, которой уже нет — ссылка на локальную переменную? (AddressSanitizer: " + e.Substring(5) + ")";
                 case "asan:attempting": case "asan:double-free": return "память освобождена дважды (AddressSanitizer: double-free)";
             }
+            if (e.StartsWith("php:"))
+            {
+                e = e.Substring(4);
+                string core = Regex.Replace(e, @"^(?:ErrorException|Error|\w+Error): ", "");
+                if (e.StartsWith("DivisionByZeroError") || core.StartsWith("Division by zero") || core.StartsWith("Modulo by zero")) return "деление на ноль (" + e + ")";
+                if ((m = Regex.Match(core, @"^Undefined variable (\$\w+)")).Success) return "переменная " + m.Groups[1].Value + " не объявлена — опечатка? (" + e + ")";
+                if ((m = Regex.Match(core, @"^Undefined array key (.+)$")).Success) return "в массиве нет ключа " + m.Groups[1].Value + " (" + e + ")";
+                if ((m = Regex.Match(core, @"^Call to undefined function (\w+)\(\)")).Success) return "функция " + m.Groups[1].Value + "() не найдена (" + e + ")";
+                if ((m = Regex.Match(core, @"must be of type (\S+), (\S+) given")).Success) return "не тот тип: нужен " + m.Groups[1].Value + ", а передан " + m.Groups[2].Value + " (" + e + ")";
+                if (core.StartsWith("Too few arguments")) return "передано меньше аргументов, чем ждёт функция (" + e + ")";
+                if ((m = Regex.Match(core, @"^Unsupported operand types: (.+)$")).Success) return "оператор не работает с такими типами: " + m.Groups[1].Value + " (" + e + ")";
+                if (core.StartsWith("Allowed memory size")) return "кончилась память — похоже на бесконечную рекурсию или цикл (" + e + ")";
+                if (core.StartsWith("Maximum execution time")) return "программа работает слишком долго (" + e + ")";
+                return e;
+            }
+            if (e.StartsWith("rust:"))
+            {
+                e = e.Substring(5);
+                if (e == "attempt to divide by zero" || e.StartsWith("attempt to calculate the remainder with a divisor of zero")) return "деление на ноль (" + e + ")";
+                if ((m = Regex.Match(e, @"^attempt to (add|subtract|multiply|negate|shift left|shift right) with overflow$")).Success) return "переполнение числа: результат не помещается в тип (" + e + ")";
+                if ((m = Regex.Match(e, @"^index out of bounds: the len is (\d+) but the index is (\d+)")).Success) return "индекс " + m.Groups[2].Value + " за границами: длина всего " + m.Groups[1].Value + " (" + e + ")";
+                if (e.StartsWith("called `Option::unwrap()` on a `None` value")) return "unwrap() у None — значения нет (" + e + ")";
+                if (e.StartsWith("called `Result::unwrap()` on an `Err` value")) return "unwrap() у Err — операция не удалась (" + e + ")";
+                return "паника: " + e;
+            }
             if (e.StartsWith("asan:")) return "ошибка работы с памятью (AddressSanitizer: " + e.Substring(5) + ")";
             if (e.StartsWith("division by zero")) return "деление на ноль (" + e + ")";
             if ((m = Regex.Match(e, @"^signed integer overflow: (.+) cannot be represented in type '(.+)'$")).Success) return "переполнение: " + m.Groups[1].Value + " не помещается в " + m.Groups[2].Value + " (" + e + ")";
@@ -850,12 +1122,14 @@ namespace Intern.Game
         public static int ErrorLine(string stderr, string srcName, out string msg)
         {
             msg = null;
-            if (srcName.EndsWith(".java") || srcName.EndsWith(".cs") || srcName.EndsWith(".cpp"))
+            if (srcName.EndsWith(".java") || srcName.EndsWith(".cs") || srcName.EndsWith(".cpp") || srcName.EndsWith(".rs") || srcName.EndsWith(".php"))
             {
                 var ce = CompileErrors(stderr).FirstOrDefault(e => e.file == srcName);
                 if (ce != null) { msg = "Ошибка компиляции в строке " + ce.line + ": " + ce.text; return ce.line; }
                 string ex; int ln = RuntimeError(stderr, srcName, out ex);
                 if (ex != null) { msg = "Программа упала: " + ex; return ln; }
+                var pw = PhpWarn.Match(stderr ?? "");   // PHP продолжает работу после предупреждения, но строку стоит подсветить
+                if (pw.Success && pw.Groups[2].Value == srcName) { msg = "Предупреждение в строке " + pw.Groups[3].Value + ": " + ExplainRuntime("php:" + pw.Groups[1].Value); return int.Parse(pw.Groups[3].Value); }
                 return 0;
             }
             foreach (var raw in (stderr ?? "").Split('\n'))
@@ -883,8 +1157,14 @@ namespace Intern.Game
             if ((m = Regex.Match(e, "^\"([^\"]+)\" imported and not used$")).Success) return "пакет " + m.Groups[1].Value + " импортирован, но не используется (" + e + ")";
             if ((m = Regex.Match(e, @"^undefined: (\S+)$")).Success) return m.Groups[1].Value + " не объявлено (" + e + ")";
             if (e == "missing return") return "функция должна вернуть значение: не хватает return (" + e + ")";
+            // php -l (PHP)
+            if ((m = Regex.Match(e, "^syntax error, unexpected (?:token )?\"(.+?)\", expecting \"(.+?)\"$")).Success) return "синтаксическая ошибка: перед «" + m.Groups[1].Value + "» не хватает «" + m.Groups[2].Value + "» (" + e + ")";
+            if (e.StartsWith("syntax error, unexpected end of file")) return "файл закончился раньше времени — не закрыта скобка } или кавычка (" + e + ")";
+            if ((m = Regex.Match(e, "^syntax error, unexpected identifier \"(\\w+)\"")).Success) return "неожиданное имя " + m.Groups[1].Value + " — пропущена ; на прошлой строке или $ перед переменной? (" + e + ")";
+            if ((m = Regex.Match(e, "^syntax error, unexpected variable \"(\\$\\w+)\"")).Success) return "неожиданная переменная " + m.Groups[1].Value + " — пропущена ; на прошлой строке? (" + e + ")";
             if (e.StartsWith("syntax error")) return "синтаксическая ошибка (" + e + ")";
             if (e.StartsWith("cannot use ")) return "не тот тип значения (" + e + ")";
+            if (e == "mismatched types") return "не тот тип (" + e + ")";   // rustc: подробности — в строке «ожидался…»
             if (e.Contains("mismatched types")) return "разные типы в одном выражении (" + e + ")";
             // javac
             if (e == "cannot find symbol") return "имя не найдено: опечатка или не объявлено (" + e + ")";
@@ -896,6 +1176,22 @@ namespace Intern.Game
             if (e == "unreachable statement") return "до этой строки выполнение никогда не дойдёт (" + e + ")";
             if (e.StartsWith("class ") && e.Contains("is public, should be declared in a file named")) return "публичный класс должен называться как файл — Main (" + e + ")";
             if (e.Contains("unreported exception")) return "проверяемое исключение нужно поймать или объявить в throws (" + e + ")";
+            // rustc (Rust)
+            if ((m = Regex.Match(e, @"^cannot find (?:value|function|type|macro) `(\w+)` in this scope$")).Success) return "имя " + m.Groups[1].Value + " не найдено: опечатка или не объявлено (" + e + ")";
+            if (e == "mismatched types") return "не тот тип (" + e + ")";
+            if ((m = Regex.Match(e, @"^cannot assign twice to immutable variable `(\w+)`$")).Success) return m.Groups[1].Value + " объявлена без mut — менять её нельзя (" + e + ")";
+            if ((m = Regex.Match(e, @"^cannot borrow `(.+?)` as mutable, as it is not declared as mutable$")).Success) return m.Groups[1].Value + " не объявлена как mut (" + e + ")";
+            if ((m = Regex.Match(e, @"^(?:borrow|use) of moved value: `(.+?)`$")).Success) return m.Groups[1].Value + " уже перемещена в другое место и больше не твоя (" + e + ")";
+            if ((m = Regex.Match(e, @"^cannot borrow `(.+?)` as mutable more than once at a time$")).Success) return m.Groups[1].Value + " нельзя изменять из двух мест сразу (" + e + ")";
+            if ((m = Regex.Match(e, @"^cannot borrow `(.+?)` as (?:im)?mutable because it is also borrowed as")).Success) return m.Groups[1].Value + " уже занята другой ссылкой (" + e + ")";
+            if ((m = Regex.Match(e, @"^`(.+?)` does not live long enough$")).Success) return m.Groups[1].Value + " живёт меньше, чем ссылка на неё (" + e + ")";
+            if ((m = Regex.Match(e, @"^expected `(.+?)`, found (.+)$")).Success) return "здесь ожидался «" + m.Groups[1].Value + "» (" + e + ")";
+            if ((m = Regex.Match(e, @"^this function takes (\d+) arguments? but (\d+) arguments? (?:was|were) supplied$")).Success) return "функция принимает " + m.Groups[1].Value + " аргумент(а), а передано " + m.Groups[2].Value + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^no method named `(\w+)` found for (.+)$")).Success) return "у " + m.Groups[2].Value + " нет метода " + m.Groups[1].Value + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^no field `(\w+)` on type `(.+?)`$")).Success) return "у " + m.Groups[2].Value + " нет поля " + m.Groups[1].Value + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^cannot (add|subtract|multiply|divide) `(.+?)` (?:to|from|by) `(.+?)`$")).Success) return "нельзя смешивать " + m.Groups[2].Value + " и " + m.Groups[3].Value + " — приведи типы через as (" + e + ")";
+            if ((m = Regex.Match(e, @"^non-exhaustive patterns: (.+) not covered$")).Success) return "match разбирает не все варианты: не покрыт " + m.Groups[1].Value + " (" + e + ")";
+            if (e.StartsWith("the `?` operator can only be used")) return "? можно писать только в функции, которая сама возвращает Result или Option (" + e + ")";
             // g++ (C++)
             if ((m = Regex.Match(e, @"^'(\w+)' was not declared in this scope(?:; did you mean '(\w+)'\?)?$")).Success) return "имя " + m.Groups[1].Value + " не объявлено" + (m.Groups[2].Success ? " — может, " + m.Groups[2].Value + "?" : ": опечатка или нет #include") + " (" + e + ")";
             if ((m = Regex.Match(e, @"^expected '(.+?)' before (.+)$")).Success) return "не хватает «" + m.Groups[1].Value + "» (" + e + ")";
