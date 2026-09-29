@@ -1,6 +1,7 @@
 // Инструменты разработки в редакторе (меню «Стажёр»), чтобы работать с проектом без отдельной консоли:
 //  • «Git: коммит и пуш в GitLab» — берёт Temp/commit.txt: сначала пути файлов (по одному в строке), потом строка «---»,
 //    потом сообщение коммита. Добавляет только эти файлы, коммитит и пушит в origin (GitLab). На GitHub не пушит никогда.
+//  • «Проверить ветки языков в Docker» — эталоны задач с запуском (Go и дальше) проходят go test, заготовки — нет; итог в Temp/langcheck.txt.
 //  • «Selftest последней сборки» — запускает Builds/Stazher-*-win64/Stazher.exe -selftest в окне и, когда он закончит,
 //    копирует отчёт в Temp/selftest_build.txt.
 // Итог каждой команды — в Temp/devtools.txt.
@@ -81,6 +82,51 @@ namespace Intern.EditorTools
             }
             catch (Exception e) { log.AppendLine("ошибка: " + e.Message); }
             finally { File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false)); }
+        }
+
+        // Эталоны и заготовки задач с запуском в Docker (ветки lang-*.json): эталон проходит все тесты, заготовка — нет.
+        // Работает в фоне, итог — в Temp/langcheck.txt (первый запуск скачает образы компиляторов)
+        [MenuItem("Стажёр/Проверить ветки языков в Docker", false, 23)]
+        public static void CheckLangBranches()
+        {
+            string outFile = Path.Combine(Root, "Temp", "langcheck.txt");
+            var log = new StringBuilder("ветки языков " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\n");
+            var tasks = new List<Intern.Game.TaskData>();
+            try
+            {
+                var dir = Path.Combine(Application.dataPath, "Intern 3", "Assets", "Intern", "Resources", "Tasks", "tracks");
+                foreach (var f in Directory.GetFiles(dir, "lang-*.json").OrderBy(x => x))
+                {
+                    var d = Intern.Game.Tracks.Parse(File.ReadAllText(f), Path.GetFileNameWithoutExtension(f));
+                    foreach (var tp in d.topics) foreach (var t in tp.tasks) if (t.Mode == "box") tasks.Add(t);
+                }
+            }
+            catch (Exception e) { log.AppendLine("ошибка чтения задач: " + e.Message); File.WriteAllText(outFile, log.ToString(), new UTF8Encoding(false)); return; }
+            log.AppendLine("задач с запуском в Docker: " + tasks.Count);
+            File.WriteAllText(Out, "langcheck " + DateTime.Now.ToString("HH:mm:ss") + ": запущено, " + tasks.Count + " задач, итог — в Temp/langcheck.txt\n", new UTF8Encoding(false));
+            if (File.Exists(outFile)) File.Delete(outFile);
+            new System.Threading.Thread(() =>
+            {
+                int ok = 0, bad = 0; var sw = Stopwatch.StartNew();
+                try
+                {
+                    foreach (var t in tasks)
+                    {
+                        var spec = Intern.Game.LangBox.For(t.language);
+                        var r = Intern.Game.LangBox.Test(spec, "check-" + t.id, t.solution, t.testCode, n => log.AppendLine("  " + n));
+                        bool good = r.setupError == null && r.results.Count > 0 && r.results.All(x => x.Passed);
+                        var st = Intern.Game.LangBox.Test(spec, "check-" + t.id, t.starter, t.testCode, null);
+                        bool starterFails = st.setupError == null && st.results.Any(x => !x.Passed);
+                        if (good && starterFails) ok++; else bad++;
+                        log.AppendLine((good && starterFails ? "ок   " : "FAIL ") + t.id + ": эталон " + r.results.Count(x => x.Passed) + "/" + r.results.Count +
+                                       ", заготовка " + st.results.Count(x => x.Passed) + "/" + st.results.Count + ", " + (r.ms / 1000.0).ToString("0.0") + " с" +
+                                       (r.setupError != null ? " — " + r.setupError : "") + (!good && r.results.Count > 0 ? " — " + string.Join(" | ", r.results.Where(x => !x.Passed).Select(x => x.InputsText + ": " + x.Note).ToArray()) : ""));
+                    }
+                }
+                catch (Exception e) { log.AppendLine("ошибка: " + e); }
+                log.AppendLine("итог: " + ok + " ок, " + bad + " ошибок, " + sw.Elapsed.TotalSeconds.ToString("0") + " с");
+                try { File.WriteAllText(outFile, log.ToString(), new UTF8Encoding(false)); } catch (Exception) { }
+            }) { IsBackground = true }.Start();
         }
 
         [MenuItem("Стажёр/Selftest последней сборки", false, 21)]

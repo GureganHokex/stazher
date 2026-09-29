@@ -153,6 +153,7 @@ namespace Intern.Game
         [NonSerialized] public List<ClozeBlank> blanks;
         [NonSerialized] public int bugLine;
         [NonSerialized] public List<object> requirements;   // ts: регулярки по исходнику (типы), формат как у static
+        [NonSerialized] public string testCode;             // box: файл тестов языка (main_test.go), запуск в Docker (спринт 10)
         [NonSerialized] public bool warmup;                  // разминка: вне пути, всегда открыта
 
         public bool IsChoice { get { return options != null && options.Length > 0; } }
@@ -166,6 +167,7 @@ namespace Intern.Game
                 if (type == "predict") return "predict";
                 if (type == "cloze") return "cloze";
                 if (type == "parsons") return "parsons";
+                if (!string.IsNullOrEmpty(testCode) && LangBox.For(language) != null) return "box";   // компилируемый язык: тесты в контейнере
                 if (IsChoice) return "choice";
                 switch (language)
                 {

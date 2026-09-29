@@ -1,0 +1,1149 @@
+{
+ "track": "lang-go",
+ "roadmap": [
+  {
+   "topic_id": "go-basics",
+   "lang": "go",
+   "replaces": [
+    "be-py-basics"
+   ],
+   "professions": [
+    "backend",
+    "devops"
+   ],
+   "title": "Go: переменные и типы",
+   "grade": "junior",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "Программа на Go, fmt, var и :=, константы, базовые типы, нулевые значения, преобразования.",
+   "theory": "Go — компилируемый язык: перед запуском весь код проверяется и превращается в программу. Ошибки типов и опечатки видны сразу, до запуска.\n\nПрограмма начинается с пакета и функции main:\n\n    package main\n\n    import \"fmt\"\n\n    func main() {\n        fmt.Println(\"Привет, Кодзилла!\")\n    }\n\nПеременные:\n\n    var price int = 1990     // полная форма\n    title := \"Лампа\"         // короткая: тип выводится сам, только внутри функций\n    const vat = 20           // константа\n\n• Базовые типы: int, float64, string, bool. У каждой переменной есть нулевое значение: 0, 0.0, \"\" и false.\n• Типы не смешиваются сами: int и float64 нельзя сложить без явного преобразования — float64(price).\n• Целое деление отбрасывает дробную часть: 7 / 2 == 3, а float64(7) / 2 == 3.5.\n• fmt.Println печатает значения через пробел, fmt.Printf — по шаблону: %d число, %s строка, %v что угодно, %.2f дробь с двумя знаками.\n\nСтрогость Go: неиспользуемая переменная или лишний import — это ошибка компиляции, а не предупреждение.\n\nФункция с параметрами и результатом:\n\n    func CartTotal(price, qty int) int {\n        return price * qty\n    }\n\nТесты в Go лежат рядом, в файле main_test.go, и запускаются командой go test."
+  },
+  {
+   "topic_id": "go-control",
+   "lang": "go",
+   "replaces": [
+    "be-py-control"
+   ],
+   "professions": [
+    "backend",
+    "devops"
+   ],
+   "title": "Go: условия и циклы",
+   "grade": "junior",
+   "requires": [
+    "go-basics"
+   ],
+   "description": "if с инициализацией, единственный цикл for в трёх формах, switch без break.",
+   "theory": "Условие пишется без скобок, но фигурные скобки обязательны:\n\n    if score >= 90 {\n        return \"отлично\"\n    } else if score >= 75 {\n        return \"хорошо\"\n    }\n\nВ if можно объявить переменную, она видна только внутри условия: if n, err := strconv.Atoi(s); err == nil { … }.\n\nЦикл в Go один — for, зато в трёх формах:\n\n    for i := 0; i < 10; i++ { … }     // классический\n    for total < 100 { … }             // как while\n    for i, item := range items { … } // обход среза, строки или map\n\n• break выходит из цикла, continue переходит к следующему шагу.\n• Индекс не нужен — пиши for _, item := range items. Подчёркивание — «пустая» переменная.\n\nswitch проверяет варианты сверху вниз и сам останавливается на первом совпадении — break писать не нужно:\n\n    switch {\n    case n%15 == 0:\n        return \"FizzBuzz\"\n    case n%3 == 0:\n        return \"Fizz\"\n    default:\n        return strconv.Itoa(n)\n    }\n\nПорядок case важен: более частный случай ставят выше."
+  },
+  {
+   "topic_id": "go-collections",
+   "lang": "go",
+   "replaces": [
+    "be-py-collections"
+   ],
+   "professions": [
+    "backend",
+    "devops"
+   ],
+   "title": "Go: срезы и map",
+   "grade": "junior",
+   "requires": [
+    "go-control"
+   ],
+   "description": "Срезы и append, обход range, map и проверка наличия ключа, make и nil.",
+   "theory": "Срез (slice) — список значений одного типа, который умеет расти:\n\n    prices := []int{120, 80, 300}\n    prices = append(prices, 45)   // append возвращает новый срез — присвой его обратно\n    fmt.Println(len(prices), prices[0], prices[1:3])\n\n• Индексы с нуля, prices[1:3] — элементы 1 и 2 (правая граница не входит).\n• Выход за границы — не ошибка компиляции, а panic во время работы: index out of range.\n\nmap — словарь «ключ → значение»:\n\n    stock := map[string]int{\"лампа\": 3}\n    stock[\"стол\"] = 0\n    n, ok := stock[\"диван\"]   // ok == false: ключа нет, n — нулевое значение\n    delete(stock, \"стол\")\n\n• Идиома «запятая ok» отличает «ключа нет» от «значение равно нулю».\n• Порядок обхода map в Go специально случайный — не полагайся на него.\n• Пустая map, объявленная через var m map[string]int, равна nil: читать из неё можно, а запись вызовет panic. Создавай через make(map[string]int) или литерал {}.\n\nОбход: for key, value := range stock { … }."
+  },
+  {
+   "topic_id": "go-functions",
+   "lang": "go",
+   "replaces": [
+    "be-py-functions"
+   ],
+   "professions": [
+    "backend",
+    "devops"
+   ],
+   "title": "Go: функции и ошибки",
+   "grade": "junior",
+   "requires": [
+    "go-collections"
+   ],
+   "description": "Несколько результатов, error как значение, замыкания, defer, функции с переменным числом аргументов.",
+   "theory": "Функция может вернуть несколько значений. Так в Go сообщают об ошибках — исключений нет:\n\n    func Divide(a, b int) (int, error) {\n        if b == 0 {\n            return 0, errors.New(\"деление на ноль\")\n        }\n        return a / b, nil\n    }\n\n    res, err := Divide(10, 0)\n    if err != nil {\n        fmt.Println(\"ошибка:\", err)\n        return\n    }\n\n• error — последний результат. nil значит «ошибки нет».\n• Ошибку проверяют сразу после вызова. Выбросить её в _ — частый баг: программа молча продолжит с нулевым значением.\n• strconv.Atoi(\"42\") превращает строку в число и возвращает ошибку для «abc».\n\nФункции — обычные значения: их можно передавать и возвращать. Замыкание помнит переменные места, где его создали:\n\n    func counter() func() int {\n        n := 0\n        return func() int { n++; return n }\n    }\n\ndefer откладывает вызов до выхода из функции — так закрывают файлы и соединения.\n\nПеременное число аргументов: func Sum(nums ...int) int — внутри nums это []int."
+  },
+  {
+   "topic_id": "go-structs",
+   "lang": "go",
+   "replaces": [
+    "be-py-oop"
+   ],
+   "professions": [
+    "backend",
+    "devops"
+   ],
+   "title": "Go: структуры и интерфейсы",
+   "grade": "junior",
+   "requires": [
+    "go-functions"
+   ],
+   "description": "struct, методы, получатель по значению и по указателю, интерфейсы и fmt.Stringer.",
+   "theory": "Классов в Go нет — есть структуры и методы:\n\n    type Item struct {\n        Title string\n        Price int\n        Qty   int\n    }\n\n    func (it Item) Sum() int {       // метод: (it Item) — получатель\n        return it.Price * it.Qty\n    }\n\n• Поля с большой буквы видны из других пакетов, с маленькой — только внутри своего.\n• Литерал: Item{Title: \"Лампа\", Price: 1990, Qty: 2}.\n\nПолучатель по значению работает с копией. Чтобы метод менял объект, нужен указатель:\n\n    func (a *Account) Deposit(sum int) { a.Balance += sum }\n\nИнтерфейс — набор методов. Тип подходит интерфейсу сам, если у него есть эти методы — слово implements не нужно:\n\n    type Shape interface {\n        Area() float64\n    }\n\nСамый частый интерфейс — fmt.Stringer: метод String() string. Если он есть, fmt.Println печатает объект так, как ты решил.\n\nВстраивание (embedding) вместо наследования: структура может включить другую, и её поля и методы станут доступны напрямую."
+  },
+  {
+   "topic_id": "go-errors",
+   "lang": "go",
+   "replaces": [
+    "be-py-exceptions"
+   ],
+   "professions": [
+    "backend",
+    "devops"
+   ],
+   "title": "Go: ошибки, defer и panic",
+   "grade": "junior",
+   "requires": [
+    "go-functions"
+   ],
+   "description": "Свои ошибки, обёртка %w, errors.Is и errors.As, порядок defer, когда уместен panic.",
+   "theory": "Ошибка в Go — любое значение с методом Error() string.\n\n• Готовые: errors.New(\"текст\") и fmt.Errorf(\"шаблон %d\", x).\n• Ошибка-метка (sentinel) объявляется один раз: var ErrNotFound = errors.New(\"не найдено\").\n• Обёртка с контекстом: fmt.Errorf(\"товар %d: %w\", id, ErrNotFound). Глагол %w сохраняет исходную ошибку внутри.\n• errors.Is(err, ErrNotFound) находит метку даже внутри обёрток. Сравнение err == ErrNotFound обёртку не пробьёт.\n• Свой тип ошибки со своими полями: type StockError struct{ Want, Have int }. Достать его из цепочки — errors.As(err, &target).\n\ndefer выполняется при выходе из функции, в обратном порядке: последний отложенный — первым.\n\npanic — аварийная остановка: выход за границы среза, запись в nil map. Для обычных ошибок (неверный ввод, нет файла) panic не используют — возвращают error. recover внутри defer может перехватить panic, но это инструмент для библиотек и серверов, а не для логики.\n\nХорошая ошибка отвечает на вопросы «что делали» и «что пошло не так»: «порт \"80a\": strconv.Atoi: invalid syntax»."
+  }
+ ],
+ "tasks": [
+  {
+   "task_id": "go-basics-01",
+   "topic_id": "go-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Итог корзины на Go",
+   "story": "Гена: «Сервис корзины переписываем на Go. Начнём с простого: стоимость позиции.»",
+   "content": {
+    "question": "Допиши функцию CartTotal(price, qty int) int — стоимость позиции: цена × количество.",
+    "entry": "CartTotal",
+    "code": "package main\n\nimport \"fmt\"\n\n// CartTotal возвращает стоимость позиции: цена × количество\nfunc CartTotal(price, qty int) int {\n    return 0\n}\n\nfunc main() {\n    fmt.Println(CartTotal(1990, 2))\n}",
+    "correct_answer": "package main\n\nimport \"fmt\"\n\n// CartTotal возвращает стоимость позиции: цена × количество\nfunc CartTotal(price, qty int) int {\n    return price * qty\n}\n\nfunc main() {\n    fmt.Println(CartTotal(1990, 2))\n}",
+    "tests_code": "package main\n\nimport \"testing\"\n\nfunc TestCartTotal(t *testing.T) {\n    cases := []struct {\n        name       string\n        price, qty int\n        want       int\n    }{\n        {\"1990 × 2\", 1990, 2, 3980},\n        {\"250 × 0\", 250, 0, 0},\n        {\"99 × 3\", 99, 3, 297},\n    }\n    for _, c := range cases {\n        t.Run(c.name, func(t *testing.T) {\n            if got := CartTotal(c.price, c.qty); got != c.want {\n                t.Errorf(\"CartTotal(%d, %d) = %d, ожидалось %d\", c.price, c.qty, got, c.want)\n            }\n        })\n    }\n}",
+    "requirements": [
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "Функция в Go объявляется через func, типы параметров пишутся после имён, тип результата — после скобок. price, qty int — оба параметра int.",
+   "hints": [
+    "Результат функции возвращают через return.",
+    "Умножение — звёздочка: price * qty."
+   ]
+  },
+  {
+   "task_id": "go-basics-02",
+   "topic_id": "go-basics",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Нулевые значения",
+   "story": "Ира: «В отчёте в Go вместо пустых полей нули. Разберись, что печатает этот код.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    var count int\n    var name string\n    price := 7\n    fmt.Println(count, name == \"\", price/2, float64(price)/2)\n    fmt.Printf(\"скидка %d%%\\n\", 15)\n}",
+    "language": "go",
+    "output": "0 true 3 3.5\nскидка 15%"
+   },
+   "explanation": "Объявленная без значения переменная получает нулевое значение: 0 для int и пустую строку для string. 7 / 2 — целое деление, 3. После преобразования в float64 деление дробное — 3.5. %% в Printf печатает сам знак процента.",
+   "hints": [
+    "Нулевое значение int — 0, string — пустая строка.",
+    "Целое деление отбрасывает дробную часть."
+   ]
+  },
+  {
+   "task_id": "go-basics-03",
+   "topic_id": "go-basics",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Первая программа",
+   "story": "Гена: «Допиши пропуски в первой программе — без них Go её не соберёт.»",
+   "content": {
+    "question": "Заполни пропуски: подключи пакет, объяви переменную коротко и напечатай по шаблону.",
+    "code": "package main\n\nimport [[1]]\n\nfunc main() {\n    title [[2]] \"Лампа\"\n    var price int = 1990\n    fmt.[[3]](\"%s стоит %d ₽\\n\", title, price)\n}",
+    "blanks": [
+     {
+      "answer": [
+       "\"fmt\""
+      ]
+     },
+     {
+      "answer": [
+       ":="
+      ]
+     },
+     {
+      "answer": [
+       "Printf"
+      ]
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "Пакет подключают по имени в кавычках: import \"fmt\". := объявляет переменную и сразу выводит её тип. Печать по шаблону с %s и %d — fmt.Printf.",
+   "hints": [
+    "Имя пакета в import пишется в кавычках.",
+    "Короткое объявление — двоеточие и знак равно."
+   ]
+  },
+  {
+   "task_id": "go-basics-04",
+   "topic_id": "go-basics",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Средний чек без копеек",
+   "story": "Ира: «Средний чек всегда круглый: 2 вместо 2.5. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "package main\n\nimport \"fmt\"\n\nfunc Average(sum, count int) float64 {\n    return float64(sum / count)\n}\n\nfunc main() {\n    fmt.Println(Average(5, 2))\n}",
+    "bug_line": 6,
+    "options": [
+     "Целое деление выполняется до преобразования в float64",
+     "float64 нельзя возвращать из функции",
+     "Параметры sum и count должны быть float32",
+     "fmt.Println не печатает дроби"
+    ],
+    "correct_answer": 0,
+    "language": "go"
+   },
+   "explanation": "sum / count — деление двух int, оно целое: 5 / 2 == 2. Преобразование в float64 уже не вернёт потерянную половину. Нужно преобразовать до деления: float64(sum) / float64(count).",
+   "hints": [
+    "В каком порядке выполняются деление и преобразование?",
+    "Сначала сделай числа дробными, потом дели."
+   ]
+  },
+  {
+   "task_id": "go-basics-05",
+   "topic_id": "go-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Температура для витрины",
+   "story": "Стас: «Для американского магазина нужны градусы Фаренгейта. Напиши перевод из Цельсия.»",
+   "content": {
+    "question": "Напиши Fahrenheit(c float64) float64: F = C × 9 / 5 + 32.",
+    "entry": "Fahrenheit",
+    "code": "package main\n\nimport \"fmt\"\n\n// Fahrenheit переводит градусы Цельсия в Фаренгейт\nfunc Fahrenheit(c float64) float64 {\n    return 0\n}\n\nfunc main() {\n    fmt.Println(Fahrenheit(100))\n}",
+    "correct_answer": "package main\n\nimport \"fmt\"\n\n// Fahrenheit переводит градусы Цельсия в Фаренгейт\nfunc Fahrenheit(c float64) float64 {\n    return c*9/5 + 32\n}\n\nfunc main() {\n    fmt.Println(Fahrenheit(100))\n}",
+    "tests_code": "package main\n\nimport (\n    \"math\"\n    \"testing\"\n)\n\nfunc TestFahrenheit(t *testing.T) {\n    cases := []struct {\n        name string\n        c    float64\n        want float64\n    }{\n        {\"кипение\", 100, 212},\n        {\"замерзание\", 0, 32},\n        {\"минус 40\", -40, -40},\n        {\"36.6\", 36.6, 97.88},\n    }\n    for _, c := range cases {\n        t.Run(c.name, func(t *testing.T) {\n            if got := Fahrenheit(c.c); math.Abs(got-c.want) > 1e-9 {\n                t.Errorf(\"Fahrenheit(%v) = %v, ожидалось %v\", c.c, got, c.want)\n            }\n        })\n    }\n}",
+    "requirements": [
+     {
+      "input": "умножает на 9 и делит на 5 (или умножает на 1.8)",
+      "expected": {
+       "regex": "9\\s*/\\s*5|\\*\\s*9|1\\.8"
+      }
+     },
+     {
+      "input": "прибавляет 32",
+      "expected": {
+       "regex": "\\+\\s*32"
+      }
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "c — float64, поэтому c*9/5 считается в дробных числах. Дробные сравнивают с допуском: 36.6 × 9 / 5 + 32 даёт 97.88000000000001 — тесты это учитывают.",
+   "hints": [
+    "Формула: c*9/5 + 32.",
+    "Параметр уже float64 — преобразования не нужны."
+   ]
+  },
+  {
+   "task_id": "go-control-01",
+   "topic_id": "go-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Оценка за код-ревью",
+   "story": "Гена: «Для отчёта по ревью нужна словесная оценка по баллам.»",
+   "content": {
+    "question": "Напиши Grade(score int) string: 90 и выше — «отлично», 75 и выше — «хорошо», 50 и выше — «удовлетворительно», иначе — «неуд».",
+    "entry": "Grade",
+    "code": "package main\n\nimport \"fmt\"\n\n// Grade переводит баллы в оценку\nfunc Grade(score int) string {\n    return \"\"\n}\n\nfunc main() {\n    fmt.Println(Grade(80))\n}",
+    "correct_answer": "package main\n\nimport \"fmt\"\n\n// Grade переводит баллы в оценку\nfunc Grade(score int) string {\n    if score >= 90 {\n        return \"отлично\"\n    } else if score >= 75 {\n        return \"хорошо\"\n    } else if score >= 50 {\n        return \"удовлетворительно\"\n    }\n    return \"неуд\"\n}\n\nfunc main() {\n    fmt.Println(Grade(80))\n}",
+    "tests_code": "package main\n\nimport \"testing\"\n\nfunc TestGrade(t *testing.T) {\n    cases := []struct {\n        score int\n        want  string\n    }{\n        {100, \"отлично\"}, {90, \"отлично\"}, {89, \"хорошо\"}, {75, \"хорошо\"},\n        {74, \"удовлетворительно\"}, {50, \"удовлетворительно\"}, {49, \"неуд\"}, {0, \"неуд\"},\n    }\n    for _, c := range cases {\n        if got := Grade(c.score); got != c.want {\n            t.Errorf(\"Grade(%d) = %q, ожидалось %q\", c.score, got, c.want)\n        }\n    }\n}",
+    "requirements": [
+     {
+      "input": "сравнивает с 90",
+      "expected": {
+       "regex": ">=?\\s*90|90\\s*<=?"
+      }
+     },
+     {
+      "input": "сравнивает с 75",
+      "expected": {
+       "regex": ">=?\\s*75|75\\s*<=?"
+      }
+     },
+     {
+      "input": "сравнивает с 50",
+      "expected": {
+       "regex": ">=?\\s*50|50\\s*<=?"
+      }
+     },
+     {
+      "input": "возвращает «неуд»",
+      "expected": {
+       "regex": "\\\"неуд\\\""
+      }
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "Проверки идут сверху вниз от большей границы к меньшей, поэтому 89 не попадает в «отлично», а 90 — попадает (>=). Можно было написать и через switch без выражения.",
+   "hints": [
+    "Начни с самой высокой границы.",
+    "Граница входит в оценку: используй >=."
+   ]
+  },
+  {
+   "task_id": "go-control-02",
+   "topic_id": "go-control",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "continue и break",
+   "story": "Ира: «Цикл печатает не то, что ждали. Посчитай в уме.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    for i := 1; i <= 10; i++ {\n        if i%2 == 0 {\n            continue\n        }\n        if i > 7 {\n            break\n        }\n        fmt.Print(i, \" \")\n    }\n    fmt.Println()\n    n := 3\n    switch {\n    case n > 1:\n        fmt.Println(\"больше одного\")\n    case n > 2:\n        fmt.Println(\"больше двух\")\n    }\n}",
+    "language": "go",
+    "output": "1 3 5 7\nбольше одного"
+   },
+   "explanation": "continue пропускает чётные, break останавливает цикл на 9 — до печати. switch выполняет только первый подходящий case и сам останавливается: второй case тоже верен, но до него дело не доходит.",
+   "hints": [
+    "Чётные числа пропускаются.",
+    "switch в Go не проваливается в следующий case."
+   ]
+  },
+  {
+   "task_id": "go-control-03",
+   "topic_id": "go-control",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "FizzBuzz для ленты заказов",
+   "story": "Гена: «Классика собеседований. Собери функцию из строк.»",
+   "content": {
+    "question": "Собери Label(n int) string: кратно 15 — FizzBuzz, кратно 3 — Fizz, кратно 5 — Buzz, иначе само число строкой.",
+    "lines": [
+     "func Label(n int) string {",
+     "    switch {",
+     "    case n%15 == 0:",
+     "        return \"FizzBuzz\"",
+     "    case n%3 == 0:",
+     "        return \"Fizz\"",
+     "    case n%5 == 0:",
+     "        return \"Buzz\"",
+     "    }",
+     "    return strconv.Itoa(n)",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "func Label(n int) string {",
+      "    switch {",
+      "    case n%15 == 0:",
+      "        return \"FizzBuzz\"",
+      "    case n%5 == 0:",
+      "        return \"Buzz\"",
+      "    case n%3 == 0:",
+      "        return \"Fizz\"",
+      "    }",
+      "    return strconv.Itoa(n)",
+      "}"
+     ]
+    ],
+    "distractors": [
+     "        break",
+     "    return n"
+    ],
+    "language": "go"
+   },
+   "explanation": "Кратность 15 проверяют первой, иначе 15 успеет попасть в Fizz. Fizz и Buzz можно поменять местами. break в switch не нужен, а return n не соберётся: функция возвращает string, для числа нужен strconv.Itoa.",
+   "hints": [
+    "Самый частный случай — первым.",
+    "Число в строку превращает strconv.Itoa."
+   ]
+  },
+  {
+   "task_id": "go-control-04",
+   "topic_id": "go-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма до n",
+   "story": "Гена: «Для теста производительности нужна сумма чисел от 1 до n. Циклом, без формулы.»",
+   "content": {
+    "question": "Напиши SumTo(n int) int — сумма чисел от 1 до n циклом for. Для n меньше 1 — 0.",
+    "entry": "SumTo",
+    "code": "package main\n\nimport \"fmt\"\n\n// SumTo считает 1 + 2 + … + n\nfunc SumTo(n int) int {\n    total := 0\n    return total\n}\n\nfunc main() {\n    fmt.Println(SumTo(10))\n}",
+    "correct_answer": "package main\n\nimport \"fmt\"\n\n// SumTo считает 1 + 2 + … + n\nfunc SumTo(n int) int {\n    total := 0\n    for i := 1; i <= n; i++ {\n        total += i\n    }\n    return total\n}\n\nfunc main() {\n    fmt.Println(SumTo(10))\n}",
+    "tests_code": "package main\n\nimport \"testing\"\n\nfunc TestSumTo(t *testing.T) {\n    cases := []struct{ n, want int }{{0, 0}, {1, 1}, {10, 55}, {100, 5050}, {-5, 0}}\n    for _, c := range cases {\n        if got := SumTo(c.n); got != c.want {\n            t.Errorf(\"SumTo(%d) = %d, ожидалось %d\", c.n, got, c.want)\n        }\n    }\n}",
+    "requirements": [
+     {
+      "input": "есть цикл for",
+      "expected": {
+       "regex": "\\bfor\\b"
+      }
+     },
+     {
+      "input": "накапливает сумму",
+      "expected": {
+       "regex": "total\\s*\\+=|total\\s*=\\s*total\\s*\\+"
+      }
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "Классический for: объявление, условие, шаг. Для отрицательного n условие i <= n ложно сразу, и возвращается 0.",
+   "hints": [
+    "for i := 1; i <= n; i++ { … }",
+    "Внутри цикла прибавляй i к total."
+   ]
+  },
+  {
+   "task_id": "go-control-05",
+   "topic_id": "go-control",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Сумма заказа падает",
+   "story": "Ира: «Сервис падает с index out of range на любом заказе. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "package main\n\nimport \"fmt\"\n\nfunc Total(prices []int) int {\n    sum := 0\n    for i := 0; i <= len(prices); i++ {\n        sum += prices[i]\n    }\n    return sum\n}\n\nfunc main() {\n    fmt.Println(Total([]int{100, 200}))\n}",
+    "bug_line": 7,
+    "options": [
+     "Условие <= выходит за последний индекс: нужно <",
+     "sum нужно объявить через var",
+     "len не работает со срезами",
+     "i++ нужно заменить на i += 2"
+    ],
+    "correct_answer": 0,
+    "language": "go"
+   },
+   "explanation": "Индексы среза — от 0 до len-1. При i == len(prices) обращение prices[i] вызывает panic. Правильно i < len(prices), а ещё проще — for _, p := range prices.",
+   "hints": [
+    "Какой индекс у последнего элемента?",
+    "Сравни последний индекс с len(prices)."
+   ]
+  },
+  {
+   "task_id": "go-collections-01",
+   "topic_id": "go-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Частота тегов",
+   "story": "Стас: «Хочу видеть, какие теги у товаров встречаются чаще. Посчитай их.»",
+   "content": {
+    "question": "Напиши CountWords(words []string) map[string]int — сколько раз встречается каждое слово.",
+    "entry": "CountWords",
+    "code": "package main\n\nimport \"fmt\"\n\n// CountWords считает, сколько раз встречается каждое слово\nfunc CountWords(words []string) map[string]int {\n    return nil\n}\n\nfunc main() {\n    fmt.Println(CountWords([]string{\"лампа\", \"стол\", \"лампа\"}))\n}",
+    "correct_answer": "package main\n\nimport \"fmt\"\n\n// CountWords считает, сколько раз встречается каждое слово\nfunc CountWords(words []string) map[string]int {\n    counts := make(map[string]int)\n    for _, w := range words {\n        counts[w]++\n    }\n    return counts\n}\n\nfunc main() {\n    fmt.Println(CountWords([]string{\"лампа\", \"стол\", \"лампа\"}))\n}",
+    "tests_code": "package main\n\nimport (\n    \"reflect\"\n    \"testing\"\n)\n\nfunc TestCountWords(t *testing.T) {\n    cases := []struct {\n        name  string\n        words []string\n        want  map[string]int\n    }{\n        {\"повторы\", []string{\"лампа\", \"стол\", \"лампа\"}, map[string]int{\"лампа\": 2, \"стол\": 1}},\n        {\"одно слово\", []string{\"go\"}, map[string]int{\"go\": 1}},\n        {\"пусто\", []string{}, map[string]int{}},\n    }\n    for _, c := range cases {\n        t.Run(c.name, func(t *testing.T) {\n            got := CountWords(c.words)\n            if got == nil {\n                t.Fatalf(\"CountWords(%v) вернула nil — создай map через make\", c.words)\n            }\n            if !reflect.DeepEqual(got, c.want) {\n                t.Errorf(\"CountWords(%v) = %v, ожидалось %v\", c.words, got, c.want)\n            }\n        })\n    }\n}",
+    "requirements": [
+     {
+      "input": "создаёт map через make или литерал",
+      "expected": {
+       "regex": "make\\s*\\(\\s*map|map\\[string\\]int\\s*\\{"
+      }
+     },
+     {
+      "input": "обходит слова через range",
+      "expected": {
+       "regex": "range\\s+words"
+      }
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "map создают через make — в nil map писать нельзя. counts[w]++ работает и для нового ключа: чтение отсутствующего ключа даёт 0.",
+   "hints": [
+    "counts := make(map[string]int)",
+    "counts[w]++ увеличит счётчик слова."
+   ]
+  },
+  {
+   "task_id": "go-collections-02",
+   "topic_id": "go-collections",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "append и запятая ok",
+   "story": "Гена: «Срезы и map — каждый день. Что напечатает код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    nums := []int{1, 2, 3}\n    nums = append(nums, 4)\n    fmt.Println(len(nums), nums[len(nums)-1])\n    fmt.Println(nums[1:3])\n    stock := map[string]int{\"лампа\": 3}\n    n, ok := stock[\"стол\"]\n    fmt.Println(n, ok)\n}",
+    "language": "go",
+    "output": "4 4\n[2 3]\n0 false"
+   },
+   "explanation": "append добавил 4 — длина стала 4, последний элемент 4. Срез [1:3] — элементы с индексами 1 и 2. Ключа «стол» нет: n получает нулевое значение 0, а ok — false.",
+   "hints": [
+    "Правая граница среза не входит.",
+    "Отсутствующий ключ: нулевое значение и ok == false."
+   ]
+  },
+  {
+   "task_id": "go-collections-03",
+   "topic_id": "go-collections",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Цены из справочника",
+   "story": "Гена: «Справочник цен: допиши проверку наличия, создание map и обход.»",
+   "content": {
+    "question": "Заполни пропуски: запятая ok, создание map и обход.",
+    "code": "package main\n\nimport \"fmt\"\n\nfunc Price(prices map[string]int, name string) (int, bool) {\n    p, [[1]] := prices[name]\n    return p, ok\n}\n\nfunc main() {\n    prices := [[2]](map[string]int)\n    prices[\"лампа\"] = 1990\n    for name, p := [[3]] prices {\n        fmt.Println(name, p)\n    }\n    fmt.Println(Price(prices, \"стол\"))\n}",
+    "blanks": [
+     {
+      "answer": [
+       "ok"
+      ]
+     },
+     {
+      "answer": [
+       "make"
+      ]
+     },
+     {
+      "answer": [
+       "range"
+      ]
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "Второе значение при чтении из map говорит, был ли ключ. make создаёт пустую map, в которую можно писать. range обходит пары ключ–значение.",
+   "hints": [
+    "Имя второй переменной видно в return.",
+    "Пустую map создаёт встроенная функция make."
+   ]
+  },
+  {
+   "task_id": "go-collections-04",
+   "topic_id": "go-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товары по бюджету",
+   "story": "Стас: «Фильтр каталога: показать только цены не дороже бюджета, порядок сохранить.»",
+   "content": {
+    "question": "Напиши Filter(prices []int, max int) []int — цены не больше max, в том же порядке.",
+    "entry": "Filter",
+    "code": "package main\n\nimport \"fmt\"\n\n// Filter оставляет цены не больше max\nfunc Filter(prices []int, max int) []int {\n    var res []int\n    return res\n}\n\nfunc main() {\n    fmt.Println(Filter([]int{120, 80, 300, 45}, 100))\n}",
+    "correct_answer": "package main\n\nimport \"fmt\"\n\n// Filter оставляет цены не больше max\nfunc Filter(prices []int, max int) []int {\n    var res []int\n    for _, p := range prices {\n        if p <= max {\n            res = append(res, p)\n        }\n    }\n    return res\n}\n\nfunc main() {\n    fmt.Println(Filter([]int{120, 80, 300, 45}, 100))\n}",
+    "tests_code": "package main\n\nimport (\n    \"reflect\"\n    \"testing\"\n)\n\nfunc TestFilter(t *testing.T) {\n    cases := []struct {\n        name   string\n        prices []int\n        max    int\n        want   []int\n    }{\n        {\"бюджет 100\", []int{120, 80, 300, 45}, 100, []int{80, 45}},\n        {\"граница входит\", []int{100, 101}, 100, []int{100}},\n        {\"ничего не подошло\", []int{500}, 100, []int{}},\n    }\n    for _, c := range cases {\n        t.Run(c.name, func(t *testing.T) {\n            got := Filter(c.prices, c.max)\n            if len(got) != len(c.want) || (len(got) > 0 && !reflect.DeepEqual(got, c.want)) {\n                t.Errorf(\"Filter(%v, %d) = %v, ожидалось %v\", c.prices, c.max, got, c.want)\n            }\n        })\n    }\n}",
+    "requirements": [
+     {
+      "input": "обходит цены через range",
+      "expected": {
+       "regex": "range\\s+prices"
+      }
+     },
+     {
+      "input": "добавляет через append",
+      "expected": {
+       "regex": "append\\s*\\(\\s*res"
+      }
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "append возвращает новый срез — его обязательно присваивают обратно: res = append(res, p). Пустой результат может быть nil — у него тоже длина 0.",
+   "hints": [
+    "for _, p := range prices { … }",
+    "res = append(res, p)"
+   ]
+  },
+  {
+   "task_id": "go-collections-05",
+   "topic_id": "go-collections",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Индекс сотрудников падает",
+   "story": "Ира: «Функция индексации падает с panic: assignment to entry in nil map. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "package main\n\nimport \"fmt\"\n\nfunc Index(names []string) map[string]int {\n    var idx map[string]int\n    for i, n := range names {\n        idx[n] = i\n    }\n    return idx\n}\n\nfunc main() {\n    fmt.Println(Index([]string{\"Гена\", \"Ира\"}))\n}",
+    "bug_line": 6,
+    "options": [
+     "map объявлена, но не создана: запись в nil map вызывает panic",
+     "range нельзя использовать со срезом строк",
+     "Индекс i нужно преобразовать в string",
+     "map[string]int нельзя возвращать из функции"
+    ],
+    "correct_answer": 0,
+    "language": "go"
+   },
+   "explanation": "var idx map[string]int даёт nil map: читать из неё можно, писать — нет. Нужно idx := make(map[string]int, len(names)).",
+   "hints": [
+    "Чем отличается объявление от создания map?",
+    "Вспомни про make."
+   ]
+  },
+  {
+   "task_id": "go-functions-01",
+   "topic_id": "go-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Деление без паники",
+   "story": "Гена: «Калькулятор скидок падает на делении на ноль. В Go ошибки возвращают, а не бросают.»",
+   "content": {
+    "question": "Напиши Divide(a, b int) (int, error): для b == 0 верни 0 и ошибку, иначе a / b и nil.",
+    "entry": "Divide",
+    "code": "package main\n\nimport (\n    \"errors\"\n    \"fmt\"\n)\n\nvar errZero = errors.New(\"деление на ноль\")\n\n// Divide делит a на b и сообщает об ошибке для b == 0\nfunc Divide(a, b int) (int, error) {\n    return a / b, nil\n}\n\nfunc main() {\n    fmt.Println(Divide(10, 2))\n}",
+    "correct_answer": "package main\n\nimport (\n    \"errors\"\n    \"fmt\"\n)\n\nvar errZero = errors.New(\"деление на ноль\")\n\n// Divide делит a на b и сообщает об ошибке для b == 0\nfunc Divide(a, b int) (int, error) {\n    if b == 0 {\n        return 0, errZero\n    }\n    return a / b, nil\n}\n\nfunc main() {\n    fmt.Println(Divide(10, 2))\n}",
+    "tests_code": "package main\n\nimport \"testing\"\n\nfunc TestDivide(t *testing.T) {\n    t.Run(\"10 / 2\", func(t *testing.T) {\n        got, err := Divide(10, 2)\n        if err != nil || got != 5 {\n            t.Errorf(\"Divide(10, 2) = %d, %v; ожидалось 5, nil\", got, err)\n        }\n    })\n    t.Run(\"7 / 2\", func(t *testing.T) {\n        got, err := Divide(7, 2)\n        if err != nil || got != 3 {\n            t.Errorf(\"Divide(7, 2) = %d, %v; ожидалось 3, nil\", got, err)\n        }\n    })\n    t.Run(\"деление на ноль\", func(t *testing.T) {\n        defer func() {\n            if r := recover(); r != nil {\n                t.Errorf(\"Divide(1, 0) упала с panic: %v — проверь b до деления\", r)\n            }\n        }()\n        got, err := Divide(1, 0)\n        if err == nil || got != 0 {\n            t.Errorf(\"Divide(1, 0) = %d, %v; ожидалось 0 и ошибка\", got, err)\n        }\n    })\n}",
+    "requirements": [
+     {
+      "input": "проверяет b == 0",
+      "expected": {
+       "regex": "b\\s*==\\s*0|0\\s*==\\s*b"
+      }
+     },
+     {
+      "input": "возвращает ошибку",
+      "expected": {
+       "regex": "return\\s+0\\s*,\\s*(errZero|errors\\.New|fmt\\.Errorf)"
+      }
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "Проверка идёт до деления: деление целого на ноль в Go — panic. Ошибка возвращается последним значением, а nil во втором результате значит «всё хорошо».",
+   "hints": [
+    "if b == 0 { return 0, errZero }",
+    "Проверь делитель до деления."
+   ]
+  },
+  {
+   "task_id": "go-functions-02",
+   "topic_id": "go-functions",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Замыкания и defer",
+   "story": "Марина: «Замыкания и defer — любимое на собеседованиях по Go. Что напечатает код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "package main\n\nimport \"fmt\"\n\nfunc counter() func() int {\n    n := 0\n    return func() int {\n        n++\n        return n\n    }\n}\n\nfunc main() {\n    a := counter()\n    b := counter()\n    a()\n    a()\n    fmt.Println(a(), b())\n    defer fmt.Println(\"defer\")\n    fmt.Println(\"конец\")\n}",
+    "language": "go",
+    "output": "3 1\nконец\ndefer"
+   },
+   "explanation": "У каждого счётчика своя n: a дошёл до 3, b — до 1. defer откладывает печать до выхода из main, поэтому «defer» идёт после «конец».",
+   "hints": [
+    "a и b не делят одну переменную n.",
+    "defer выполняется при выходе из функции."
+   ]
+  },
+  {
+   "task_id": "go-functions-03",
+   "topic_id": "go-functions",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма любых чисел",
+   "story": "Гена: «Собери функцию, которая складывает сколько угодно чисел.»",
+   "content": {
+    "question": "Собери Sum(nums ...int) int — сумма всех аргументов.",
+    "lines": [
+     "func Sum(nums ...int) int {",
+     "    total := 0",
+     "    for _, n := range nums {",
+     "        total += n",
+     "    }",
+     "    return total",
+     "}"
+    ],
+    "distractors": [
+     "    for n := range nums {",
+     "    return nums"
+    ],
+    "language": "go"
+   },
+   "explanation": "...int — переменное число аргументов, внутри nums — обычный срез. range по срезу даёт индекс и значение; for n := range nums взял бы индексы, а не числа — это частый баг.",
+   "hints": [
+    "Внутри функции nums — это срез []int.",
+    "Индекс не нужен — замени его на _."
+   ]
+  },
+  {
+   "task_id": "go-functions-04",
+   "topic_id": "go-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Возраст из анкеты",
+   "story": "Стас: «Возраст в анкете приходит строкой. Нужна функция с нормальными ошибками.»",
+   "content": {
+    "question": "Напиши ParseAge(s string) (int, error): число через strconv.Atoi; ошибка, если это не число или возраст вне 0…150.",
+    "entry": "ParseAge",
+    "code": "package main\n\nimport (\n    \"fmt\"\n    \"strconv\"\n)\n\n// ParseAge разбирает возраст из строки\nfunc ParseAge(s string) (int, error) {\n    n, _ := strconv.Atoi(s)\n    return n, nil\n}\n\nfunc main() {\n    fmt.Println(ParseAge(\"42\"))\n}",
+    "correct_answer": "package main\n\nimport (\n    \"fmt\"\n    \"strconv\"\n)\n\n// ParseAge разбирает возраст из строки\nfunc ParseAge(s string) (int, error) {\n    n, err := strconv.Atoi(s)\n    if err != nil {\n        return 0, fmt.Errorf(\"возраст %q: %w\", s, err)\n    }\n    if n < 0 || n > 150 {\n        return 0, fmt.Errorf(\"возраст %d вне диапазона 0…150\", n)\n    }\n    return n, nil\n}\n\nfunc main() {\n    fmt.Println(ParseAge(\"42\"))\n}",
+    "tests_code": "package main\n\nimport \"testing\"\n\nfunc TestParseAge(t *testing.T) {\n    good := []struct {\n        s    string\n        want int\n    }{{\"42\", 42}, {\"0\", 0}, {\"150\", 150}}\n    for _, c := range good {\n        t.Run(\"верно \"+c.s, func(t *testing.T) {\n            got, err := ParseAge(c.s)\n            if err != nil || got != c.want {\n                t.Errorf(\"ParseAge(%q) = %d, %v; ожидалось %d, nil\", c.s, got, err, c.want)\n            }\n        })\n    }\n    for _, s := range []string{\"abc\", \"\", \"-1\", \"151\", \"4 2\"} {\n        t.Run(\"ошибка \"+s, func(t *testing.T) {\n            if _, err := ParseAge(s); err == nil {\n                t.Errorf(\"ParseAge(%q) не вернула ошибку\", s)\n            }\n        })\n    }\n}",
+    "requirements": [
+     {
+      "input": "проверяет ошибку strconv.Atoi",
+      "expected": {
+       "regex": "err\\s*!=\\s*nil"
+      }
+     },
+     {
+      "input": "проверяет диапазон 0…150",
+      "expected": {
+       "regex": "150"
+      }
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "Ошибку strconv.Atoi нельзя выбрасывать в _: для «abc» Atoi вернёт 0 и ошибку. Диапазон проверяется отдельно — число «-1» разберётся без ошибки, но возрастом не является.",
+   "hints": [
+    "n, err := strconv.Atoi(s); if err != nil { … }",
+    "Потом проверь n < 0 || n > 150."
+   ]
+  },
+  {
+   "task_id": "go-functions-05",
+   "topic_id": "go-functions",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Молчаливый ноль",
+   "story": "Ира: «Если в поле количества ввести «два», заказ оформляется на 0 штук и никто не видит ошибки. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "package main\n\nimport (\n    \"fmt\"\n    \"strconv\"\n)\n\nfunc Quantity(s string) int {\n    n, _ := strconv.Atoi(s)\n    return n\n}\n\nfunc main() {\n    fmt.Println(Quantity(\"два\"))\n}",
+    "bug_line": 9,
+    "options": [
+     "Ошибка разбора выброшена в _: неверный ввод молча превращается в 0",
+     "strconv.Atoi не умеет разбирать числа",
+     "Функция должна возвращать string",
+     "Нужно использовать var вместо :="
+    ],
+    "correct_answer": 0,
+    "language": "go"
+   },
+   "explanation": "Подчёркивание выбрасывает ошибку, и для «два» функция молча вернёт 0. Нужно вернуть ошибку наверх: func Quantity(s string) (int, error) и if err != nil { return 0, err }.",
+   "hints": [
+    "Что делает _ во втором значении?",
+    "Ошибку надо проверить и вернуть."
+   ]
+  },
+  {
+   "task_id": "go-structs-01",
+   "topic_id": "go-structs",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Итог корзины методом",
+   "story": "Гена: «Корзина теперь структура. Нужен метод, который считает итог.»",
+   "content": {
+    "question": "Допиши метод (c Cart) Total() int — сумма Price × Qty по всем позициям.",
+    "entry": "Total",
+    "code": "package main\n\nimport \"fmt\"\n\ntype Item struct {\n    Title string\n    Price int\n    Qty   int\n}\n\ntype Cart struct {\n    Items []Item\n}\n\n// Total — итог корзины\nfunc (c Cart) Total() int {\n    return 0\n}\n\nfunc main() {\n    c := Cart{Items: []Item{{\"Лампа\", 1990, 2}, {\"Стол\", 7490, 1}}}\n    fmt.Println(c.Total())\n}",
+    "correct_answer": "package main\n\nimport \"fmt\"\n\ntype Item struct {\n    Title string\n    Price int\n    Qty   int\n}\n\ntype Cart struct {\n    Items []Item\n}\n\n// Total — итог корзины\nfunc (c Cart) Total() int {\n    total := 0\n    for _, it := range c.Items {\n        total += it.Price * it.Qty\n    }\n    return total\n}\n\nfunc main() {\n    c := Cart{Items: []Item{{\"Лампа\", 1990, 2}, {\"Стол\", 7490, 1}}}\n    fmt.Println(c.Total())\n}",
+    "tests_code": "package main\n\nimport \"testing\"\n\nfunc TestTotal(t *testing.T) {\n    cases := []struct {\n        name string\n        cart Cart\n        want int\n    }{\n        {\"две позиции\", Cart{Items: []Item{{\"Лампа\", 1990, 2}, {\"Стол\", 7490, 1}}}, 11470},\n        {\"пустая корзина\", Cart{}, 0},\n        {\"нулевое количество\", Cart{Items: []Item{{\"Стул\", 2500, 0}}}, 0},\n    }\n    for _, c := range cases {\n        t.Run(c.name, func(t *testing.T) {\n            if got := c.cart.Total(); got != c.want {\n                t.Errorf(\"Total() = %d, ожидалось %d\", got, c.want)\n            }\n        })\n    }\n}",
+    "requirements": [
+     {
+      "input": "обходит позиции c.Items",
+      "expected": {
+       "regex": "range\\s+c\\.Items"
+      }
+     },
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "\\.Price\\s*\\*\\s*\\w+\\.Qty|\\.Qty\\s*\\*\\s*\\w+\\.Price"
+      }
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "Метод объявляется с получателем: func (c Cart) Total(). Внутри c — обычная переменная структуры, её поля доступны через точку. Пустая корзина даёт 0 — range по nil-срезу просто не выполняется.",
+   "hints": [
+    "for _, it := range c.Items { … }",
+    "Каждая позиция: it.Price * it.Qty."
+   ]
+  },
+  {
+   "task_id": "go-structs-02",
+   "topic_id": "go-structs",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Копия или указатель",
+   "story": "Марина: «Почему счётчик увеличился не три раза? Что напечатает код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "package main\n\nimport \"fmt\"\n\ntype Counter struct {\n    n int\n}\n\nfunc (c Counter) IncValue() { c.n++ }\n\nfunc (c *Counter) IncPtr() { c.n++ }\n\nfunc main() {\n    c := Counter{}\n    c.IncValue()\n    c.IncPtr()\n    c.IncPtr()\n    fmt.Println(c.n)\n}",
+    "language": "go",
+    "output": "2"
+   },
+   "explanation": "IncValue получает копию структуры и меняет её — оригинал не трогается. IncPtr получает указатель и меняет сам объект. Итог: 2.",
+   "hints": [
+    "Получатель по значению — это копия.",
+    "Какие вызовы меняют сам c?"
+   ]
+  },
+  {
+   "task_id": "go-structs-03",
+   "topic_id": "go-structs",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Фигуры для конструктора витрины",
+   "story": "Гена: «Конструктор витрины считает площадь любых фигур. Допиши интерфейс и метод.»",
+   "content": {
+    "question": "Заполни пропуски: объяви интерфейс, получатель метода и вызов.",
+    "code": "package main\n\nimport \"fmt\"\n\ntype Shape [[1]] {\n    Area() float64\n}\n\ntype Rect struct {\n    W, H float64\n}\n\nfunc (r [[2]]) Area() float64 {\n    return r.W * r.H\n}\n\nfunc main() {\n    var s Shape = Rect{W: 2, H: 3}\n    fmt.Println(s.[[3]]())\n}",
+    "blanks": [
+     {
+      "answer": [
+       "interface"
+      ]
+     },
+     {
+      "answer": [
+       "Rect"
+      ]
+     },
+     {
+      "answer": [
+       "Area"
+      ]
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "Интерфейс — набор методов. Rect подходит под Shape сам, потому что у него есть Area() float64. Получатель здесь по значению (r Rect): с указателем *Rect присвоить Rect{…} в Shape было бы нельзя.",
+   "hints": [
+    "Набор методов описывает ключевое слово interface.",
+    "Метод принадлежит типу Rect."
+   ]
+  },
+  {
+   "task_id": "go-structs-04",
+   "topic_id": "go-structs",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товар печатает себя сам",
+   "story": "Стас: «В логах товары выглядят как {Лампа 1990}. Хочу «Лампа — 1990 ₽».»",
+   "content": {
+    "question": "Добавь Product метод String() string, чтобы fmt печатал «Название — цена ₽».",
+    "entry": "String",
+    "code": "package main\n\nimport \"fmt\"\n\ntype Product struct {\n    Title string\n    Price int\n}\n\n// допиши метод String() string\n\nfunc main() {\n    fmt.Println(Product{\"Лампа\", 1990})\n}",
+    "correct_answer": "package main\n\nimport \"fmt\"\n\ntype Product struct {\n    Title string\n    Price int\n}\n\nfunc (p Product) String() string {\n    return fmt.Sprintf(\"%s — %d ₽\", p.Title, p.Price)\n}\n\nfunc main() {\n    fmt.Println(Product{\"Лампа\", 1990})\n}",
+    "tests_code": "package main\n\nimport (\n    \"fmt\"\n    \"testing\"\n)\n\nfunc TestString(t *testing.T) {\n    cases := []struct {\n        p    Product\n        want string\n    }{\n        {Product{\"Лампа\", 1990}, \"Лампа — 1990 ₽\"},\n        {Product{\"Стол\", 7490}, \"Стол — 7490 ₽\"},\n    }\n    for _, c := range cases {\n        if got := fmt.Sprint(c.p); got != c.want {\n            t.Errorf(\"fmt.Sprint(%#v) = %q, ожидалось %q\", c.p, got, c.want)\n        }\n    }\n}",
+    "requirements": [
+     {
+      "input": "метод String() string у Product",
+      "expected": {
+       "regex": "func\\s*\\(\\s*\\w+\\s+\\*?Product\\s*\\)\\s*String\\s*\\(\\s*\\)\\s*string"
+      }
+     },
+     {
+      "input": "собирает строку через fmt.Sprintf",
+      "expected": {
+       "regex": "Sprintf|\\+\\s*\\\"\\s*—"
+      }
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "fmt проверяет, реализует ли значение интерфейс fmt.Stringer, и если да — печатает результат String(). Никакого implements: достаточно метода с нужной сигнатурой.",
+   "hints": [
+    "func (p Product) String() string { … }",
+    "fmt.Sprintf(\"%s — %d ₽\", p.Title, p.Price)"
+   ]
+  },
+  {
+   "task_id": "go-structs-05",
+   "topic_id": "go-structs",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Пополнение не работает",
+   "story": "Ира: «Deposit вызывается, а баланс не меняется. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "package main\n\nimport \"fmt\"\n\ntype Account struct {\n    Balance int\n}\n\nfunc (a Account) Deposit(sum int) {\n    a.Balance += sum\n}\n\nfunc main() {\n    acc := Account{}\n    acc.Deposit(500)\n    fmt.Println(acc.Balance)\n}",
+    "bug_line": 9,
+    "options": [
+     "Получатель по значению: метод меняет копию, нужен *Account",
+     "Поле Balance должно начинаться с маленькой буквы",
+     "+= не работает с полями структуры",
+     "Deposit должен возвращать int"
+    ],
+    "correct_answer": 0,
+    "language": "go"
+   },
+   "explanation": "(a Account) — копия счёта, изменения пропадают при выходе из метода. С получателем (a *Account) метод меняет сам объект, а вызов acc.Deposit(500) Go сам превратит в (&acc).Deposit(500).",
+   "hints": [
+    "Что получает метод — сам объект или копию?",
+    "Методы, меняющие объект, объявляют с указателем."
+   ]
+  },
+  {
+   "task_id": "go-errors-01",
+   "topic_id": "go-errors",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Списание со счёта",
+   "story": "Гена: «Платёжный сервис должен различать ошибки: «мало денег» — одно, «кривая сумма» — другое.»",
+   "content": {
+    "question": "Напиши Withdraw(balance, sum int) (int, error): sum ≤ 0 — любая ошибка; sum > balance — ErrNotEnough; иначе новый баланс и nil.",
+    "entry": "Withdraw",
+    "code": "package main\n\nimport (\n    \"errors\"\n    \"fmt\"\n)\n\nvar ErrNotEnough = errors.New(\"недостаточно средств\")\n\n// Withdraw списывает sum с balance\nfunc Withdraw(balance, sum int) (int, error) {\n    return balance - sum, nil\n}\n\nfunc main() {\n    fmt.Println(Withdraw(1000, 300))\n}",
+    "correct_answer": "package main\n\nimport (\n    \"errors\"\n    \"fmt\"\n)\n\nvar ErrNotEnough = errors.New(\"недостаточно средств\")\n\n// Withdraw списывает sum с balance\nfunc Withdraw(balance, sum int) (int, error) {\n    if sum <= 0 {\n        return balance, fmt.Errorf(\"сумма должна быть больше нуля: %d\", sum)\n    }\n    if sum > balance {\n        return balance, ErrNotEnough\n    }\n    return balance - sum, nil\n}\n\nfunc main() {\n    fmt.Println(Withdraw(1000, 300))\n}",
+    "tests_code": "package main\n\nimport (\n    \"errors\"\n    \"testing\"\n)\n\nfunc TestWithdraw(t *testing.T) {\n    t.Run(\"обычное списание\", func(t *testing.T) {\n        got, err := Withdraw(1000, 300)\n        if err != nil || got != 700 {\n            t.Errorf(\"Withdraw(1000, 300) = %d, %v; ожидалось 700, nil\", got, err)\n        }\n    })\n    t.Run(\"всё до нуля\", func(t *testing.T) {\n        got, err := Withdraw(500, 500)\n        if err != nil || got != 0 {\n            t.Errorf(\"Withdraw(500, 500) = %d, %v; ожидалось 0, nil\", got, err)\n        }\n    })\n    t.Run(\"мало денег\", func(t *testing.T) {\n        _, err := Withdraw(100, 300)\n        if !errors.Is(err, ErrNotEnough) {\n            t.Errorf(\"Withdraw(100, 300): ошибка %v, ожидалась ErrNotEnough\", err)\n        }\n    })\n    t.Run(\"отрицательная сумма\", func(t *testing.T) {\n        _, err := Withdraw(100, -5)\n        if err == nil || errors.Is(err, ErrNotEnough) {\n            t.Errorf(\"Withdraw(100, -5): ошибка %v, ожидалась ошибка про сумму\", err)\n        }\n    })\n}",
+    "requirements": [
+     {
+      "input": "проверяет сумму ≤ 0",
+      "expected": {
+       "regex": "sum\\s*<=\\s*0|sum\\s*<\\s*1|0\\s*>=\\s*sum"
+      }
+     },
+     {
+      "input": "возвращает ErrNotEnough",
+      "expected": {
+       "regex": "return\\s+\\w+\\s*,\\s*ErrNotEnough"
+      }
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "Метка ErrNotEnough позволяет вызывающему коду отличить «мало денег» через errors.Is и, например, показать кнопку пополнения. Для кривой суммы достаточно обычной ошибки с понятным текстом.",
+   "hints": [
+    "Сначала проверь sum <= 0, потом sum > balance.",
+    "return balance, ErrNotEnough"
+   ]
+  },
+  {
+   "task_id": "go-errors-02",
+   "topic_id": "go-errors",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Порядок defer",
+   "story": "Гена: «Ресурсы закрываются в каком-то странном порядке. Что напечатает код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    for i := 1; i <= 3; i++ {\n        defer fmt.Println(\"закрыл\", i)\n    }\n    fmt.Println(\"работаю\")\n}",
+    "language": "go",
+    "output": "работаю\nзакрыл 3\nзакрыл 2\nзакрыл 1"
+   },
+   "explanation": "defer складывает вызовы в стек: при выходе из main они выполняются в обратном порядке. Значение i запоминается в момент defer, поэтому печатаются 3, 2, 1.",
+   "hints": [
+    "Сначала выполняется весь обычный код функции.",
+    "Отложенные вызовы идут в обратном порядке."
+   ]
+  },
+  {
+   "task_id": "go-errors-03",
+   "topic_id": "go-errors",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Обёртка ошибки",
+   "story": "Гена: «В логах только «не найдено» — непонятно, что искали. Допиши обёртку.»",
+   "content": {
+    "question": "Заполни пропуски: оберни ошибку с контекстом и проверь метку внутри обёртки.",
+    "code": "package main\n\nimport (\n    \"errors\"\n    \"fmt\"\n)\n\nvar ErrNotFound = errors.New(\"не найдено\")\n\nfunc Find(id int) error {\n    return fmt.Errorf(\"товар %d: [[1]]\", id, ErrNotFound)\n}\n\nfunc main() {\n    err := Find(7)\n    fmt.Println(err)\n    fmt.Println(errors.[[2]](err, ErrNotFound))\n}",
+    "blanks": [
+     {
+      "answer": [
+       "%w"
+      ]
+     },
+     {
+      "answer": [
+       "Is"
+      ]
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "%w кладёт исходную ошибку внутрь новой, поэтому errors.Is находит ErrNotFound и через обёртку. С %v текст был бы тем же, но связь с меткой потерялась бы.",
+   "hints": [
+    "Глагол Errorf для обёртки ошибки — %w.",
+    "Проверка метки в цепочке — errors.Is."
+   ]
+  },
+  {
+   "task_id": "go-errors-04",
+   "topic_id": "go-errors",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Порт из конфига",
+   "story": "Гена: «Сервис стартует на порту из конфига. Собери разбор с понятной ошибкой.»",
+   "content": {
+    "question": "Собери LoadPort(s string) (int, error): разбери число и оберни ошибку с контекстом.",
+    "lines": [
+     "func LoadPort(s string) (int, error) {",
+     "    port, err := strconv.Atoi(s)",
+     "    if err != nil {",
+     "        return 0, fmt.Errorf(\"порт %q: %w\", s, err)",
+     "    }",
+     "    return port, nil",
+     "}"
+    ],
+    "distractors": [
+     "        panic(err)",
+     "    if err == nil {"
+    ],
+    "language": "go"
+   },
+   "explanation": "Неверный конфиг — обычная ошибка, её возвращают, а не роняют программу через panic. Контекст «порт \"80a\"» плюс %w дают и понятный текст, и исходную ошибку strconv.",
+   "hints": [
+    "Сначала разбор, потом проверка err != nil.",
+    "В конце — порт и nil."
+   ]
+  },
+  {
+   "task_id": "go-errors-05",
+   "topic_id": "go-errors",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Резерв на складе",
+   "story": "Стас: «Когда товара не хватает, фронту нужны цифры: сколько просили и сколько есть. Сделай свою ошибку.»",
+   "content": {
+    "question": "Допиши Reserve(want, have int) error: want ≤ 0 — любая ошибка; want > have — &StockError{Want: want, Have: have}; иначе nil.",
+    "entry": "Reserve",
+    "code": "package main\n\nimport (\n    \"errors\"\n    \"fmt\"\n)\n\ntype StockError struct {\n    Want, Have int\n}\n\nfunc (e *StockError) Error() string {\n    return fmt.Sprintf(\"нужно %d, на складе %d\", e.Want, e.Have)\n}\n\n// Reserve резервирует want штук при остатке have\nfunc Reserve(want, have int) error {\n    return nil\n}\n\nfunc main() {\n    err := Reserve(5, 2)\n    var se *StockError\n    if errors.As(err, &se) {\n        fmt.Println(\"не хватает\", se.Want-se.Have)\n    }\n}",
+    "correct_answer": "package main\n\nimport (\n    \"errors\"\n    \"fmt\"\n)\n\ntype StockError struct {\n    Want, Have int\n}\n\nfunc (e *StockError) Error() string {\n    return fmt.Sprintf(\"нужно %d, на складе %d\", e.Want, e.Have)\n}\n\n// Reserve резервирует want штук при остатке have\nfunc Reserve(want, have int) error {\n    if want <= 0 {\n        return errors.New(\"количество должно быть больше нуля\")\n    }\n    if want > have {\n        return &StockError{Want: want, Have: have}\n    }\n    return nil\n}\n\nfunc main() {\n    err := Reserve(5, 2)\n    var se *StockError\n    if errors.As(err, &se) {\n        fmt.Println(\"не хватает\", se.Want-se.Have)\n    }\n}",
+    "tests_code": "package main\n\nimport (\n    \"errors\"\n    \"testing\"\n)\n\nfunc TestReserve(t *testing.T) {\n    t.Run(\"хватает\", func(t *testing.T) {\n        if err := Reserve(2, 5); err != nil {\n            t.Errorf(\"Reserve(2, 5) = %v, ожидалось nil\", err)\n        }\n    })\n    t.Run(\"ровно столько\", func(t *testing.T) {\n        if err := Reserve(5, 5); err != nil {\n            t.Errorf(\"Reserve(5, 5) = %v, ожидалось nil\", err)\n        }\n    })\n    t.Run(\"не хватает\", func(t *testing.T) {\n        err := Reserve(5, 2)\n        var se *StockError\n        if !errors.As(err, &se) {\n            t.Fatalf(\"Reserve(5, 2) = %v, ожидалась *StockError\", err)\n        }\n        if se.Want != 5 || se.Have != 2 {\n            t.Errorf(\"StockError{Want: %d, Have: %d}, ожидалось Want 5, Have 2\", se.Want, se.Have)\n        }\n    })\n    t.Run(\"ноль штук\", func(t *testing.T) {\n        err := Reserve(0, 10)\n        var se *StockError\n        if err == nil || errors.As(err, &se) {\n            t.Errorf(\"Reserve(0, 10) = %v, ожидалась обычная ошибка про количество\", err)\n        }\n    })\n}",
+    "requirements": [
+     {
+      "input": "проверяет want ≤ 0",
+      "expected": {
+       "regex": "want\\s*<=\\s*0|want\\s*<\\s*1"
+      }
+     },
+     {
+      "input": "возвращает &StockError",
+      "expected": {
+       "regex": "&StockError\\s*\\{"
+      }
+     }
+    ],
+    "language": "go"
+   },
+   "explanation": "Свой тип ошибки несёт данные: фронт через errors.As достаёт *StockError и показывает, сколько не хватает. Метод Error объявлен у указателя, поэтому возвращаем &StockError{…}.",
+   "hints": [
+    "return &StockError{Want: want, Have: have}",
+    "Проверку want <= 0 поставь первой."
+   ]
+  }
+ ]
+}

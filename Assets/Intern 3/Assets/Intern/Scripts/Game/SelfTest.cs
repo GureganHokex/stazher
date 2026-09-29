@@ -499,6 +499,16 @@ namespace Intern.Game
             T(EnvCheck.Evaluate(new EnvCheckDef { kind = "ips", refCmd = "ref" }, fake, new ShellRecord { cmd = "x", output = "    173 10.0.0.7\n    151 192.168.1.4\n" }, out note), "ips: " + note);
             T(!EnvCheck.Evaluate(new EnvCheckDef { kind = "ips", refCmd = "ref" }, fake, new ShellRecord { cmd = "x", output = "192.168.1.4\n10.0.0.7\n" }, out note), "ips: неверный порядок прошёл");
             T(!EnvCheck.Evaluate(new EnvCheckDef { kind = "host", cmd = "ps", notExpect = "\\bsite\\b" }, new FakeEnv { hostAll = "site\n" }, null, out note), "not_expect не сработал");
+            // разбор go test -json (раннер языков, спринт 10)
+            {
+                Func<string, string, string, string> J = (action, test, output) => "{\"Action\":\"" + action + "\"" + (test != null ? ",\"Test\":\"" + test + "\"" : "") + (output != null ? ",\"Output\":\"" + output + "\"" : "") + "}";
+                var gt = LangBox.ParseGoTest(string.Join("\n", new[] { J("run", "TestA", null), J("run", "TestA/1_x_2", null), J("output", "TestA/1_x_2", "    main_test.go:9: A(1, 2) = 3, ожидалось 2\\n"), J("fail", "TestA/1_x_2", null),
+                    J("run", "TestA/0", null), J("pass", "TestA/0", null), J("fail", "TestA", null) }), "main.go");
+                T(gt.results.Count == 2 && !gt.results[0].Passed && gt.results[0].InputsText == "1 x 2" && gt.results[0].Note == "A(1, 2) = 3, ожидалось 2" && gt.results[1].Passed, "go test: подтесты " + string.Join(" / ", gt.results.Select(x => x.InputsText + ":" + x.Passed + ":" + x.Note).ToArray()));
+                var bf = LangBox.ParseGoTest("{\"ImportPath\":\"stazher [stazher.test]\",\"Action\":\"build-output\",\"Output\":\"./main.go:6:5: declared and not used: x\\n\"}\n{\"Action\":\"build-fail\"}", "main.go");
+                T(bf.buildFailed && bf.errLine == 6 && bf.results.Count == 1 && !bf.results[0].Passed, "go test: ошибка сборки " + bf.errLine + " " + bf.errText);
+                string em; T(LangBox.ErrorLine("panic: boom\n\ngoroutine 1 [running]:\nmain.main()\n\t/work/.stazher/run/x/main.go:7 +0x18\n", "main.go", out em) == 7, "go run: строка паники");
+            }
             if (report != null) report.Add("окружение: сценариев " + list.Count + ", шагов " + list.Sum(s => s.steps.Count));
             return bad;
         }
@@ -615,6 +625,18 @@ namespace Intern.Game
                         if ((t.distractors ?? new string[0]).Any(x => trimmed.Contains(x.Trim()))) return "лишняя строка совпадает с нужной";
                         var se = SyntaxOf(t.language, string.Join("\n", t.lines));
                         return se == null ? null : "собранный код не разбирается: " + se;
+                    }
+                case "box":
+                    {
+                        if (LangBox.For(t.language) == null) return "нет раннера для языка " + t.language;
+                        if (string.IsNullOrEmpty(t.testCode) || !t.testCode.Contains("func Test")) return "нет тестов go test";
+                        if (string.IsNullOrEmpty(t.solution)) return "нет эталона";
+                        if (!string.IsNullOrEmpty(t.entry) && (!t.solution.Contains(t.entry) || !t.testCode.Contains(t.entry))) return "функции " + t.entry + " нет в эталоне или в тестах";
+                        if (t.requirements == null || t.requirements.Count == 0) return "нет требований для проверки без Docker";
+                        var rq = TaskChecks.Static(t.solution, t.requirements);
+                        if (rq.Any(x => !x.Passed)) return "эталон не выполняет требования: " + string.Join(" | ", rq.Where(x => !x.Passed).Select(x => x.InputsText).ToArray());
+                        if (TaskChecks.Static(t.starter, t.requirements).All(x => x.Passed)) return "заготовка выполняет все требования";
+                        return null;   // сами тесты гоняет меню «Стажёр → Проверить ветки языков в Docker»
                     }
                 case "ts":
                     {

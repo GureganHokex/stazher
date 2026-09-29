@@ -447,6 +447,7 @@ namespace Intern.Game
             }
             t.bugLine = Int(c, "bug_line", 0);
             object reqs; c.TryGetValue("requirements", out reqs); t.requirements = reqs as List<object>;
+            t.testCode = Str(c, "tests_code");
             // программа на Python (stdin → stdout): тесты в старом формате — для «Запустить», отладчика и старой IDE
             if (!t.IsChoice && t.language == "python" && string.IsNullOrEmpty(t.entry) && t.testCases != null)
             {

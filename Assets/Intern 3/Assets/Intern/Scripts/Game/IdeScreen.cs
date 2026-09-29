@@ -88,7 +88,7 @@ namespace Intern.Game
         bool IsSql { get { return TMode == "sql"; } }
         bool IsStatic { get { return TMode == "static"; } }
         bool IsScenario { get { return TMode == "scenario"; } }
-        bool CanRun { get { return IsPy || IsJs || IsSql; } }
+        bool CanRun { get { return IsPy || IsJs || IsSql || IsBox; } }
 
         // выбор вариантов
         readonly Dictionary<string, HashSet<int>> picks = new Dictionary<string, HashSet<int>>();
@@ -102,7 +102,7 @@ namespace Intern.Game
         JsJob<JsCheckResult> jsCheck; JsJob<JsRunOutput> jsRun; TaskData jsTask;
         JsError jsLint; string jsLinted;
         static bool jsWarm;
-        bool Busy { get { return jsCheck != null || jsRun != null; } }
+        bool Busy { get { return jsCheck != null || jsRun != null || BoxBusy; } }
 
         // проводник: папки, которые игрок сам свернул или развернул (остальные — по умолчанию: текущий грейд и тема открыты)
         readonly Dictionary<string, bool> toggled = new Dictionary<string, bool>();
@@ -576,7 +576,7 @@ namespace Intern.Game
             }
             SetText(statusErr, (Task != null ? ProblemCount : 0).ToString());
             SetText(statusWarn, "0");
-            string mode = Busy ? (jsCheck != null ? "Проверка…" : "Выполняется…") : IsScenario ? EnvStatusMode() : dbg == null ? "" : dbg.Finished ? "Отладка завершена" : dbg.Paused ? "Отладка: пауза на строке " + dbg.Line : "Отладка: выполняется…";
+            string mode = Busy ? (jsCheck != null || boxCheck != null || boxProbing ? "Проверка…" : "Выполняется…") : IsScenario ? EnvStatusMode() : dbg == null ? "" : dbg.Finished ? "Отладка завершена" : dbg.Paused ? "Отладка: пауза на строке " + dbg.Line : "Отладка: выполняется…";
             SetText(statusMode, mode);
             var col = dbg != null ? K.StatusDebug : K.Status;
             if (statusBar.style.backgroundColor.value != col) statusBar.style.backgroundColor = col;
@@ -1087,6 +1087,7 @@ namespace Intern.Game
                 }
                 else if ((IsChoice || IsNoRun) && !showExpl)
                     Para(c, "Сначала ответь сам — разбор решения откроется, когда задача будет сдана.", 14f, K.Muted, 6f);
+                if (IsBox) BoxHowChecked(c, hasExpl);
                 if (IsTs && Task.requirements != null && Task.requirements.Count > 0)
                 {
                     Section(c, "ТИПЫ — ПРОВЕРКА ПО КОДУ");
@@ -1209,7 +1210,9 @@ namespace Intern.Game
                             var row = K.Box(true); row.style.alignItems = Align.FlexStart; row.style.marginTop = 4f;
                             row.Add(new Icon(r.Passed ? "check" : "error", r.Passed ? K.Green : K.Red, 16f));
                             int nTests = IsTs && Task.testCases != null ? Task.testCases.Count : -1;   // TS: после тестов идут требования к типам
-                            string what = IsStatic || (nTests >= 0 && i >= nTests) ? "Требование " + (IsStatic ? i + 1 : i - nTests + 1) + "   <color=#CCCCCC>" + K.Esc(r.InputsText) + "</color>"
+                            if (IsBox) nTests = boxStaticCheck ? 0 : -1;
+                            string what = IsBox && !boxStaticCheck ? "Тест " + (i + 1) + "   <color=#CCCCCC>" + K.Esc(r.InputsText) + "</color>"
+                                : IsStatic || (nTests >= 0 && i >= nTests) ? "Требование " + (IsStatic ? i + 1 : i - nTests + 1) + "   <color=#CCCCCC>" + K.Esc(r.InputsText) + "</color>"
                                 : IsSql ? "Тест " + (i + 1) + "   <color=#9D9D9D>результат последнего запроса</color>"
                                 : "Тест " + (i + 1) + "   <color=#9D9D9D>" + (func ? "вызов: " : "ввод: ") + K.Esc(string.IsNullOrEmpty(r.InputsText) ? "—" : Short(r.InputsText, 140)) + "</color>";
                             var tl = K.T(what, 15f, K.Text, false, false, true); tl.style.marginLeft = 8f; tl.style.flexShrink = 1f; row.Add(tl);
@@ -1217,14 +1220,14 @@ namespace Intern.Game
                             if (!r.Passed && !shownFail)
                             {
                                 shownFail = true;
-                                if (Diff != Difficulty.Hard && !IsStatic)
+                                if (Diff != Difficulty.Hard && !IsStatic && !(IsBox && string.IsNullOrEmpty(r.Expected) && string.IsNullOrEmpty(r.Actual)))
                                 {
                                     var grid = K.Box(true); grid.style.marginLeft = 24f; grid.style.marginTop = 4f;
                                     var a = K.Box(); K.Grow(a); a.style.flexBasis = 0f; a.Add(K.T("ожидалось", 12f, K.Muted)); CodeBlock(a, r.Expected ?? "", Pal.Hex("89D185"));
                                     var b = K.Box(); K.Grow(b); b.style.flexBasis = 0f; b.style.marginLeft = 12f; b.Add(K.T("получилось", 12f, K.Muted)); CodeBlock(b, string.IsNullOrEmpty(r.Actual) ? "(пусто)" : r.Actual, Pal.Hex("FF8FA3"));
                                     grid.Add(a); grid.Add(b); c.Add(grid);
                                 }
-                                if (!string.IsNullOrEmpty(r.Note) && !(Diff == Difficulty.Hard && !IsStatic)) { var n = Para(c, K.Esc(r.Note), 14f, K.Muted, 4f); n.style.marginLeft = 24f; }
+                                if (!string.IsNullOrEmpty(r.Note) && !(Diff == Difficulty.Hard && !IsStatic && !IsBox)) { var n = Para(c, K.Esc(r.Note), 14f, K.Muted, 4f); n.style.marginLeft = 24f; }
                                 if (r.Error != null) { var n = Para(c, ErrorRich(r.Error), 14f, K.Text, 4f); n.style.marginLeft = 24f; }
                             }
                         }
@@ -1293,7 +1296,7 @@ namespace Intern.Game
         {
             if (Task != null) SaveCode();
             StopDebugSilently();
-            jsCheck = null; jsRun = null;
+            jsCheck = null; jsRun = null; boxCheck = null; boxRun = null; boxStaticCheck = false;
             Task = t;
             bool ticket = t.IsChoice && string.IsNullOrEmpty(t.starter);
             if (IsScenario) EnvLoadEditor(t);
@@ -1361,7 +1364,7 @@ namespace Intern.Game
         {
             StopDebugSilently();
             hintsShown.Clear(); failedChecks.Clear(); timeSpent.Clear(); usedSolution.Clear();
-            picks.Clear(); wrongPicks.Clear(); revealed.Clear(); toggled.Clear(); jsCheck = null; jsRun = null;
+            picks.Clear(); wrongPicks.Clear(); revealed.Clear(); toggled.Clear(); jsCheck = null; jsRun = null; boxCheck = null; boxRun = null; boxStaticCheck = false;
             predictAns.Clear(); clozeAns.Clear(); clozeMarks.Clear(); parsonsPool.Clear(); parsonsSol.Clear(); bugPicks.Clear(); fieldFocus = -1;
             Task = null;
             if (t != null) Open(t);
@@ -1403,6 +1406,7 @@ namespace Intern.Game
             if (g.Work != null && Mathf.FloorToInt(g.Work.Minute) != lastClockMin) RefreshStatus();
             // разбор кода и проверка синтаксиса — когда пользователь перестал печатать
             if (dbg == null && !IsChoice && explainedCode != Code && ed.SinceEdit > 0.4f) { RefreshExplanations(true); RefreshRight(); RefreshBottom(); RefreshStatus(); RefreshEditorFlags(); }
+            BoxPoll();
             // JavaScript: фоновые запуск и проверка
             if (jsRun != null && jsRun.IsDone) { var r = jsRun.Result; jsRun = null; if (jsTask == Task) FinishJsRun(r); }
             if (jsCheck != null && jsCheck.IsDone)
@@ -1472,6 +1476,7 @@ namespace Intern.Game
             g.ReportWork(WorkKind.Run);
             SaveCode();
             if (IsJs) { RunJs(); return; }
+            if (IsBox) { RunBox(); return; }
             if (IsSql) { RunSql(); return; }
             var inputs = SampleInputs;
             var r = PyRun.Run(Code, inputs);
@@ -1569,7 +1574,7 @@ namespace Intern.Game
         void StartDebug()
         {
             if (Task == null || dbg != null || Busy) return;
-            if (!IsPy) { Notice("Пошаговая отладка есть только для Python. " + (IsJs ? "В JavaScript — console.log и «Запустить» (Ctrl+F5)." : IsSql ? "В SQL — «Запустить» (Ctrl+F5)." : ""), "debug", K.Orange); return; }
+            if (!IsPy) { Notice("Пошаговая отладка есть только для Python. " + (IsJs ? "В JavaScript — console.log и «Запустить» (Ctrl+F5)." : IsSql ? "В SQL — «Запустить» (Ctrl+F5)." : IsBox ? "В Go — fmt.Println и «Запустить» (Ctrl+F5)." : ""), "debug", K.Orange); return; }
             SaveCode();
             try { Parser.ParseProgram(Code); }
             catch (PyError e)
@@ -1625,6 +1630,9 @@ namespace Intern.Game
                         FinishCheck(res, err ? last.ErrorLine : -1, err ? last.Error : null);
                         return;
                     }
+                case "box":
+                    CheckBox();
+                    return;   // итог — в Update, когда контейнер ответит
                 case "static":
                     terminal.Append(Prompt()).Append("kodzilla lint " + FileName(Task) + "\n");
                     FinishCheck(TaskChecks.Static(Code, Task.testCases), -1, null);
@@ -1655,13 +1663,15 @@ namespace Intern.Game
 
         void FinishCheck(List<CheckResult> res, int errLine, string errText, string errRich = null)
         {
+            if (!IsBox) boxStaticCheck = false;
             lastCheck = res;
             int passed = res.Count(c => c.Passed);
             runtimeErrorLine = errLine; runtimeErrorText = errText;
-            string noun = IsStatic ? "требований" : "тестов";
+            bool reqs = IsStatic || (IsBox && boxStaticCheck);
+            string noun = reqs ? "требований" : "тестов";
             if (res.Count > 0 && passed == res.Count)
             {
-                string msg = (IsStatic ? "Все требования выполнены: " : "Все тесты пройдены: ") + passed + " из " + passed + "!";
+                string msg = (reqs ? "Все требования выполнены: " : "Все тесты пройдены: ") + passed + " из " + passed + "!";
                 terminal.Append("<color=#89D185><b>" + msg + "</b></color>\n");
                 Notice(msg, "check", K.Green);
                 g.CompleteTask(Task, usedSolution.Contains(Task.id), Late, HintsShown > 0, Spent);
@@ -1669,7 +1679,7 @@ namespace Intern.Game
             else
             {
                 failedChecks[Task.id] = Fails + 1;
-                terminal.Append("<color=#F14C4C><b>Пройдено " + passed + " из " + res.Count + ".</b></color> <color=#9D9D9D>Подробности — на вкладке «" + (IsStatic ? "Требования" : "Тесты") + "».</color>\n");
+                terminal.Append("<color=#F14C4C><b>Пройдено " + passed + " из " + res.Count + ".</b></color> <color=#9D9D9D>Подробности — на вкладке «" + (reqs ? "Требования" : "Тесты") + "».</color>\n");
                 if (errRich != null) terminal.Append(errRich).Append('\n');
                 else if (errText != null) terminal.Append("<color=#F14C4C>" + K.Esc(errText) + "</color>\n");
                 terminal.Append("<color=#9D9D9D>Из-за ошибки в офисе завёлся баг. Выйди и поймай его!</color>\n");

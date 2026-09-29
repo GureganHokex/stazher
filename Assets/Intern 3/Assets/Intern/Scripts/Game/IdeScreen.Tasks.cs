@@ -399,5 +399,145 @@ namespace Intern.Game
                 default: return "";
             }
         }
+
+        // ======================= компилируемые языки в Docker (спринт 10) =======================
+        // «Проверить» — go test в контейнере языка; без Docker — проверка по требованиям к коду.
+        // «Запустить» — go run. Всё идёт в фоне: строки хода работы попадают в терминал, итог — в BoxPoll.
+        BoxJob<BoxReport> boxCheck; BoxJob<BoxRun> boxRun; TaskData boxTask;
+        bool boxProbing, boxStaticCheck;
+        bool IsBox { get { return TMode == "box"; } }
+        bool BoxBusy { get { return boxCheck != null || boxRun != null || boxProbing; } }
+        bool DockerUp { get { var sh = g.Env; return sh != null && (sh.State == EnvState.Ready || sh.State == EnvState.NoImage); } }
+        LangSpec BoxSpec { get { return Task != null ? LangBox.For(Task.language) : null; } }
+
+        // Состояние Docker ещё неизвестно — сначала проверить его, потом продолжить (then)
+        bool BoxNeedProbe(Action then)
+        {
+            var sh = g.Env;
+            if (sh == null || sh.State != EnvState.Unknown) return false;
+            boxProbing = true; var t = Task;
+            terminal.Append("<color=#9D9D9D>Проверяю Docker…</color>\n");
+            sh.Probe(st => { boxProbing = false; if (Task == t) then(); else RefreshStatus(); });
+            RefreshBottom(); RefreshStatus();
+            return true;
+        }
+
+        void CheckBox()
+        {
+            var spec = BoxSpec;
+            if (spec == null) return;
+            if (BoxNeedProbe(CheckBox)) return;
+            string cmd = spec.testCmd.Replace(" -json", " -v");
+            if (!DockerUp) { BoxStaticCheck("Docker не запущен — решение проверено по коду, без запуска. С Docker задачу проверят настоящие тесты (" + cmd + ")."); return; }
+            boxStaticCheck = false;
+            terminal.Append(Prompt()).Append(cmd).Append('\n');
+            string code = Code, tests = Task.testCode, id = Task.id;
+            boxTask = Task;
+            boxCheck = BoxJob<BoxReport>.Start(j => LangBox.Test(spec, id, code, tests, j.Note));
+            bottom = Bottom.Terminal;
+            RefreshBottom(); RefreshEditorFlags(); RefreshStatus();
+        }
+
+        void BoxStaticCheck(string why)
+        {
+            boxStaticCheck = true;
+            terminal.Append(Prompt()).Append("kodzilla lint ").Append(FileName(Task)).Append('\n');
+            terminal.Append("<color=#CCA700>").Append(K.Esc(why)).Append("</color>\n");
+            FinishCheck(TaskChecks.Static(Code, Task.requirements ?? new List<object>()), -1, null);
+        }
+
+        void RunBox()
+        {
+            var spec = BoxSpec;
+            if (spec == null) return;
+            if (BoxNeedProbe(RunBox)) return;
+            terminal.Append(Prompt()).Append(spec.runCmd).Append('\n');
+            if (!DockerUp)
+            {
+                terminal.Append("<color=#CCA700>Код на " + spec.name + " компилируется и запускается в Docker, а он сейчас не запущен. Запусти Docker Desktop — или сдавай задачу кнопкой «Проверить»: без Docker решение проверится по коду.</color>\n");
+                Notice("Для запуска " + spec.name + " нужен Docker. «Проверить» работает и без него — по коду.", "warning", K.Orange);
+                bottom = Bottom.Terminal; RefreshBottom(); return;
+            }
+            string code = Code, id = Task.id;
+            boxTask = Task;
+            boxRun = BoxJob<BoxRun>.Start(j => LangBox.Run(spec, id, code, j.Note));
+            bottom = Bottom.Terminal;
+            RefreshBottom(); RefreshEditorFlags(); RefreshStatus();
+        }
+
+        // Каждый кадр: строки хода работы и готовые результаты
+        void BoxPoll()
+        {
+            bool dirty = false;
+            if (boxCheck != null)
+            {
+                foreach (var n in boxCheck.TakeNotes()) { terminal.Append("<color=#9D9D9D>").Append(K.Esc(n)).Append("</color>\n"); dirty = true; }
+                if (boxCheck.IsDone) { var r = boxCheck.Result; boxCheck = null; if (boxTask == Task) FinishBox(r); else RefreshStatus(); return; }
+            }
+            if (boxRun != null)
+            {
+                foreach (var n in boxRun.TakeNotes()) { terminal.Append("<color=#9D9D9D>").Append(K.Esc(n)).Append("</color>\n"); dirty = true; }
+                if (boxRun.IsDone) { var r = boxRun.Result; boxRun = null; if (boxTask == Task) FinishBoxRun(r); else RefreshStatus(); return; }
+            }
+            if (dirty) RefreshBottom();
+        }
+
+        void BoxPulled(bool pulled)
+        {
+            var spec = BoxSpec;
+            if (!pulled || spec == null || g.Env == null || g.Env.ImagePulled == null) return;
+            g.Env.ImagePulled(spec.image);   // «Удалить всё, что создала игра» уберёт и образ компилятора
+        }
+
+        void FinishBox(BoxReport r)
+        {
+            if (r == null) { BoxStaticCheck("Тесты не запустились (внутренняя ошибка) — решение проверено по коду."); return; }
+            BoxPulled(r.pulled);
+            if (r.setupError != null) { terminal.Append("<color=#F14C4C>").Append(K.Esc(r.setupError)).Append("</color>\n"); BoxStaticCheck("Пока проверяю по коду, без запуска."); return; }
+            string log = (r.log ?? "").TrimEnd('\n');
+            if (log.Length > 6000) log = "…\n" + log.Substring(log.Length - 6000);
+            if (log.Length > 0) terminal.Append(K.Esc(log)).Append('\n');
+            if (r.ms > 0) terminal.Append("<color=#9D9D9D>go test: " + (r.ms / 1000.0).ToString("0.0") + " с</color>\n");
+            FinishCheck(r.results, r.errLine, r.errText);
+        }
+
+        void FinishBoxRun(BoxRun r)
+        {
+            if (r == null) return;
+            BoxPulled(r.pulled);
+            if (r.setupError != null) terminal.Append("<color=#F14C4C>").Append(K.Esc(r.setupError)).Append("</color>\n");
+            else
+            {
+                if (r.output.Length > 0) terminal.Append(K.Esc(r.output.TrimEnd('\n'))).Append('\n');
+                if (r.timedOut) terminal.Append("<color=#F14C4C>Программа не завершилась за " + LangBox.RunTimeoutSec + " с и остановлена — похоже на бесконечный цикл.</color>\n");
+                else if (r.errLine != 0 && r.errText != null)
+                {
+                    runtimeErrorLine = r.errLine; runtimeErrorText = r.errText;
+                    Notice(r.errText.Length > 90 ? r.errText.Substring(0, 90) + "…" : r.errText, "error", K.Red);
+                }
+                else if (r.code == 0) { terminal.Append("<color=#89D185>Готово за " + (r.ms / 1000.0).ToString("0.0") + " с.</color> <color=#9D9D9D>Чтобы сдать задачу — «Проверить» (Ctrl+Enter).</color>\n"); runtimeErrorLine = -1; runtimeErrorText = null; }
+                else terminal.Append("<color=#F14C4C>Код выхода " + r.code + ".</color>\n");
+            }
+            TrimTerminal();
+            RefreshBottom(); RefreshEditorFlags(); RefreshStatus();
+        }
+
+        // Правая панель: как проверяется задача на компилируемом языке
+        void BoxHowChecked(VisualElement c, bool hasExpl)
+        {
+            var spec = BoxSpec;
+            if (spec == null) return;
+            Section(c, "КАК ПРОВЕРЯЕТСЯ", hasExpl ? 18f : 4f);
+            Para(c, "Тесты лежат в " + spec.test + " и запускаются настоящим " + spec.testCmd.Replace(" -json", "").Replace(" -count=1", "") + " в контейнере " + spec.image + " (Docker). Первый запуск скачает образ — " + spec.size + ".", 14f, K.Text, 6f);
+            var st = g.Env != null ? g.Env.State : EnvState.Unknown;
+            if (st == EnvState.Unknown) Para(c, "Docker проверится при первом «Запустить» или «Проверить».", 13f, K.Muted, 4f);
+            else Para(c, DockerUp ? "Docker работает: «Проверить» запустит тесты, «Запустить» — " + spec.runCmd + "." : "Docker сейчас не запущен: «Проверить» сверит решение с требованиями ниже, без запуска.", 13f, DockerUp ? K.Green : K.Orange, 4f);
+            if (Diff != Difficulty.Hard && !string.IsNullOrEmpty(Task.testCode)) { Section(c, "ТЕСТЫ — " + spec.test.ToUpperInvariant()); CodeBlock(c, Task.testCode, Pal.Hex("9CDCFE")); }
+            if (Task.requirements != null && Task.requirements.Count > 0)
+            {
+                Section(c, "БЕЗ DOCKER — ПРОВЕРКА ПО КОДУ");
+                foreach (var x in Task.requirements) { var d = x as Dictionary<string, object>; object inp = null; if (d != null) d.TryGetValue("input", out inp); Para(c, "• " + K.Esc(inp as string ?? ""), 14f, K.Text, 4f); }
+            }
+        }
     }
 }
