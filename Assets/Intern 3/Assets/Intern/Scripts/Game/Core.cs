@@ -143,13 +143,16 @@ namespace Intern.Game
         // задачи из генератора (спринт 5): id = gen:<fix|ask>:<исходная задача>:<seed>
         [NonSerialized] public bool generated;
         [NonSerialized] public string srcId, genKind;    // genKind: fix — «Почини баг», ask — «Что вернёт код?»
+        // задачи-сценарии в песочнице Docker (спринт 7): Resources/Tasks/env.json
+        [NonSerialized] public EnvScenario scenario;
 
         public bool IsChoice { get { return options != null && options.Length > 0; } }
-        // Как проверяется: choice | py | js | sql | static
+        // Как проверяется: choice | py | js | sql | static | scenario
         public string Mode
         {
             get
             {
+                if (type == "scenario") return "scenario";
                 if (IsChoice) return "choice";
                 switch (language)
                 {
@@ -180,6 +183,10 @@ namespace Intern.Game
     // Звёзды темы: сколько задач из генератора сдано, из них без подсказок, серия вовремя, выданные звёзды
     [Serializable]
     public class TopicStat { public string id; public int solved, clean, streak, best, stars; }
+
+    // Прогресс задачи-сценария: текущий шаг и подготовлена ли она в песочнице
+    [Serializable]
+    public class EnvProgress { public string id; public int step; public bool setup; }
 
     [Serializable]
     public class SaveData
@@ -238,6 +245,11 @@ namespace Intern.Game
         public int practiceNo, genSolved;
         public int dailyBonusDay;                                  // день, за который уже дана премия за все тикеты
         public List<TopicStat> topicStats = new List<TopicStat>();
+        // окружение (версия 7): терминал с песочницей Docker и задачи-сценарии
+        public List<string> envDone = new List<string>();          // пройденные сценарии (и миссия env-setup)
+        public List<EnvProgress> envProgress = new List<EnvProgress>();
+        public List<string> envImages = new List<string>();        // образы, скачанные в игре: их можно удалить из терминала
+        public bool envAnnounced;                                  // Гена уже рассказал про миссию
 
         public string GetCode(string id) { int i = codeIds.IndexOf(id); return i >= 0 ? codeTexts[i] : null; }
         public void SetCode(string id, string code)

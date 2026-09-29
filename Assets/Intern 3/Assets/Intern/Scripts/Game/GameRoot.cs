@@ -165,12 +165,14 @@ namespace Intern.Game
             MigrateDay();
             MigrateArsenal();
             MigrateGen();
+            MigrateEnv();
 #if UNITY_EDITOR
             Balance.ExportIfMissing();
 #endif
             Balance.Load();
             LoadPath();
             SetupWork();
+            SetupEnv();
             ide = new IdeWindow(this);
             wardrobe = new WardrobeScreen(this);
 
@@ -223,7 +225,7 @@ namespace Intern.Game
 
         public bool IsUnlocked(int i) { return i >= 0 && i < Tasks.tasks.Length && Path.TaskOpen(Tasks.tasks[i], Done); }
         public bool IsOpen(TaskData t) { return Path.TaskOpen(t, Done); }
-        public bool IsDone(TaskData t) { return t != null && (Done.Contains(t.id) || GenDone(t)); }
+        public bool IsDone(TaskData t) { return t != null && (t.scenario != null ? EnvDone(t) : Done.Contains(t.id) || GenDone(t)); }
 
         public TaskData CurrentTaskPublic { get { return CurrentTask; } }
 
@@ -323,6 +325,7 @@ namespace Intern.Game
                 if (toast != null) toastUntil = Time.unscaledTime + 3.2f;
             }
             bugs.RemoveAll(b => b == null);
+            EnvTick();
             if (ideUi != null) ideUi.Update(Time.deltaTime);
             if (ui != null) ui.Tick(Time.unscaledDeltaTime);
 #if UNITY_EDITOR
@@ -591,6 +594,7 @@ namespace Intern.Game
             ideShownAt = Time.unscaledTime;
             if (ideUi != null) ideUi.SetActive(true);
             SetCursor(false);
+            EnvAnnounce();
         }
 
         // Кат-сцена: откатиться, встать, отойти; кресло откатывается на место
@@ -1103,7 +1107,13 @@ namespace Intern.Game
             GUILayout.EndArea();
         }
 
-        void OnApplicationQuit() { if (ideUi != null) ideUi.Close(); else ide.Close(); if (lunch != null) FinishLunchNow(); if (FiredReport == null) Persist(); }
+        void OnApplicationQuit()
+        {
+            if (ideUi != null) ideUi.Close(); else ide.Close();
+            if (lunch != null) FinishLunchNow();
+            if (FiredReport == null) Persist();
+            if (Env != null && Env.ContainerUp) DevEnv.StopSandboxDetached();   // песочница не висит в Docker после выхода из игры
+        }
         void OnDestroy() { if (ideUi != null) ideUi.Dispose(); if (ui != null) ui.Dispose(); }
 
         // ================== Рабочий день ==================

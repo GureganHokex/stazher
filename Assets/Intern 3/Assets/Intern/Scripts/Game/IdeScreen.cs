@@ -12,7 +12,7 @@ using Intern.Py;
 
 namespace Intern.Game
 {
-    public class IdeScreen
+    public partial class IdeScreen
     {
         readonly GameRoot g;
         public TaskData Task;
@@ -87,6 +87,7 @@ namespace Intern.Game
         bool IsJs { get { return TMode == "js"; } }
         bool IsSql { get { return TMode == "sql"; } }
         bool IsStatic { get { return TMode == "static"; } }
+        bool IsScenario { get { return TMode == "scenario"; } }
         bool CanRun { get { return IsPy || IsJs || IsSql; } }
 
         // выбор вариантов
@@ -110,6 +111,7 @@ namespace Intern.Game
         public static string FileName(TaskData t)
         {
             if (t == null) return "main.py";
+            if (t.type == "scenario") return t.scenario != null && !string.IsNullOrEmpty(t.scenario.file) ? System.IO.Path.GetFileName(t.scenario.file) : "README.md";
             if (t.IsChoice && string.IsNullOrEmpty(t.starter)) return t.type == "incident" ? "incident.md" : "ticket.md";
             string c = t.starter ?? "";
             switch (t.language)
@@ -140,6 +142,7 @@ namespace Intern.Game
 
         public static string Ext(TaskData t)
         {
+            if (t.type == "scenario") return ".sh";
             if (t.IsChoice && string.IsNullOrEmpty(t.starter)) return ".md";
             switch (t.language)
             {
@@ -193,6 +196,7 @@ namespace Intern.Game
                 case "architecture": shortName = "ARC"; name = "АРХИТЕКТУРА"; col = K.Orange; break;
                 case "incident": shortName = "INC"; name = "ИНЦИДЕНТ"; col = K.Red; break;
                 case "estimation": shortName = "EST"; name = "ОЦЕНКА"; col = K.Sun; break;
+                case "scenario": shortName = "ENV"; name = "ОКРУЖЕНИЕ"; col = EnvColor; break;
                 default: shortName = "DEV"; name = "КОД"; col = K.Green; break;
             }
         }
@@ -201,6 +205,7 @@ namespace Intern.Game
         static VisualElement FileIcon(TaskData t, bool unlocked, float size = 16f)
         {
             if (!unlocked) return new Icon("lock", K.Dim, size);
+            if (t.type == "scenario") return new Icon("terminal", EnvColor, size);
             if (!t.IsChoice && t.language == "python") return new Icon("py", Color.white, size);
             string txt; Color col;
             if (t.IsChoice) { string nm; TypeInfo(t.type, out txt, out nm, out col); }
@@ -433,7 +438,7 @@ namespace Intern.Game
                 bottomTabLabels[t] = l; bottomTabMarks[t] = mark; bottomTabBtns[t] = b; bottomTabsRow.Add(b);
             }
             bottomTabsRow.Add(K.Spacer());
-            var clear = new Btn(() => { if (bottom == Bottom.Terminal) { terminal.Length = 0; RefreshBottom(); } }); clear.Tip = "Очистить терминал"; clear.style.width = 30f; clear.style.justifyContent = Justify.Center;
+            var clear = new Btn(() => { if (bottom == Bottom.Terminal) { if (IsScenario) g.EnvClear(); else terminal.Length = 0; RefreshBottom(); } }); clear.Tip = "Очистить терминал"; clear.style.width = 30f; clear.style.justifyContent = Justify.Center;
             clear.Add(new Icon("close", K.Muted, 14f)); bottomTabsRow.Add(clear);
             panel.Add(bottomTabsRow);
             bottomScroll = new ScrollBox(); K.Pad(bottomScroll, 0f, 0f, 0f, 0f); panel.Add(bottomScroll);
@@ -526,7 +531,7 @@ namespace Intern.Game
             SetText(chipMoney, g.Save.money.ToString());
             SetText(chipRank, g.RankFull);
             SetText(chipDiff, Progress.DifficultyName(Diff));
-            bool timer = (Diff == Difficulty.Hard || Timed) && !g.IsDone(Task);
+            bool timer = (Diff == Difficulty.Hard || Timed) && !g.IsDone(Task) && !IsScenario;
             deadlineChip.style.display = timer ? DisplayStyle.Flex : DisplayStyle.None;
             if (timer)
             {
@@ -550,17 +555,17 @@ namespace Intern.Game
             }
             SetText(statusErr, (Task != null ? ProblemCount : 0).ToString());
             SetText(statusWarn, "0");
-            string mode = Busy ? (jsCheck != null ? "Проверка…" : "Выполняется…") : dbg == null ? "" : dbg.Finished ? "Отладка завершена" : dbg.Paused ? "Отладка: пауза на строке " + dbg.Line : "Отладка: выполняется…";
+            string mode = Busy ? (jsCheck != null ? "Проверка…" : "Выполняется…") : IsScenario ? EnvStatusMode() : dbg == null ? "" : dbg.Finished ? "Отладка завершена" : dbg.Paused ? "Отладка: пауза на строке " + dbg.Line : "Отладка: выполняется…";
             SetText(statusMode, mode);
             var col = dbg != null ? K.StatusDebug : K.Status;
             if (statusBar.style.backgroundColor.value != col) statusBar.style.backgroundColor = col;
-            bool dirty = !IsChoice && Code != savedCode;
+            bool dirty = !IsChoice && Code != savedCode && !(IsScenario && EnvFileReadOnly);
             tabDot.style.display = dirty ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         void RefreshEditorFlags()
         {
-            ed.ReadOnly = dbg != null || IsChoice;
+            ed.ReadOnly = dbg != null || IsChoice || (IsScenario && EnvFileReadOnly);
             if (dbg != null)
             {
                 bool stopped = dbg.Paused || dbg.Finished;
@@ -575,12 +580,12 @@ namespace Intern.Game
             if (dbg != null) SetText(debugState, dbg.Finished ? (dbg.Error != null ? "упала с ошибкой" : "завершилась") : dbg.Paused ? "пауза · строка " + dbg.Line : "выполняется…");
             bool busy = (dbg != null && !dbg.Finished) || Busy;   // завершившуюся отладку кнопки закрывают сами
             runBtn.Enabled = !busy; resetBtn.Enabled = !busy;
-            checkBtn.Enabled = !busy && !(IsChoice && Task != null && (Picks.Count == 0 || g.IsDone(Task)));
+            checkBtn.Enabled = !busy && !(IsChoice && Task != null && (Picks.Count == 0 || g.IsDone(Task))) && !(IsScenario && (envChecking || EnvFinished));
             runBtn.style.display = dbg != null || !CanRun ? DisplayStyle.None : DisplayStyle.Flex;
             debugBtn.style.display = dbg != null || !IsPy ? DisplayStyle.None : DisplayStyle.Flex;
             resetBtn.style.display = IsChoice ? DisplayStyle.None : DisplayStyle.Flex;
             var cl = checkBtn.Q<Label>(); if (cl != null) SetText(cl, IsChoice ? "Ответить" : "Проверить");
-            SetText(resetLabel, confirmReset ? "Точно сбросить?" : "Сбросить");
+            SetText(resetLabel, IsScenario ? (confirmReset ? "Точно заново?" : "Заново") : confirmReset ? "Точно сбросить?" : "Сбросить");
             resetLabel.style.color = confirmReset ? K.Red : K.Muted;
             ed.Place();
         }
@@ -595,7 +600,7 @@ namespace Intern.Game
             if (Task == null) return;
             switch (side)
             {
-                case Side.Task: SideTask(c); sideTitle.text = "ЗАДАЧА"; break;
+                case Side.Task: if (IsScenario) SideScenario(c); else SideTask(c); sideTitle.text = "ЗАДАЧА"; break;
                 case Side.Files: SideFiles(c); sideTitle.text = "ПРОВОДНИК"; break;
                 case Side.Debug: SideDebug(c); sideTitle.text = "ЗАПУСК И ОТЛАДКА"; break;
             }
@@ -807,6 +812,8 @@ namespace Intern.Game
                 if (g.DailyDone >= daily.Count) Para(c, "Все тикеты дня закрыты. Новые — завтра утром; пока можно потренироваться в темах ниже.", 13f, K.Muted, 4f);
             }
 
+            if (g.EnvVisible) EnvSection(c);
+
             var rootRow = K.Box(true); rootRow.style.alignItems = Align.Center; rootRow.style.marginTop = 12f; rootRow.style.marginLeft = -12f;
             rootRow.Add(new Icon("chevD", K.Text, 16f)); rootRow.Add(K.T(g.Save.company > 0 ? g.CompanyName.ToUpperInvariant() : "KODZILLA-SOFT", 12f, K.Text, false, true)); c.Add(rootRow);
             for (int gi = 0; gi < 4; gi++)
@@ -988,6 +995,7 @@ namespace Intern.Game
         {
             var c = rightScroll.Content; c.Clear(); K.Pad(c, 0f, 16f, 24f, 16f);
             if (Task == null) return;
+            if (IsScenario) { RightScenario(c); rightScroll.Apply(); return; }
             if (dbg != null)
             {
                 rightTitle.text = "РАЗБОР · ОТЛАДКА";
@@ -1087,9 +1095,9 @@ namespace Intern.Game
             {
                 case Bottom.Answer: return IsChoice;
                 case Bottom.Problems: return IsPy || IsJs || IsSql;
-                case Bottom.Terminal: return CanRun;
+                case Bottom.Terminal: return CanRun || IsScenario;
                 case Bottom.DebugConsole: return IsPy;
-                default: return !IsChoice;
+                default: return !IsChoice && !IsScenario;
             }
         }
 
@@ -1107,7 +1115,7 @@ namespace Intern.Game
         void RefreshBottom()
         {
             foreach (var kv in bottomTabBtns) kv.Value.style.display = TabVisible(kv.Key) ? DisplayStyle.Flex : DisplayStyle.None;
-            if (!TabVisible(bottom)) bottom = IsChoice ? Bottom.Answer : CanRun ? Bottom.Terminal : Bottom.Tests;
+            if (!TabVisible(bottom)) bottom = IsChoice ? Bottom.Answer : CanRun || IsScenario ? Bottom.Terminal : Bottom.Tests;
             foreach (var kv in bottomTabLabels)
             {
                 bool on = kv.Key == bottom;
@@ -1126,6 +1134,7 @@ namespace Intern.Game
                 case Bottom.Answer: AnswerTab(c); break;
                 case Bottom.Terminal:
                     {
+                        if (IsScenario) { TermBuild(c); break; }
                         string txt = terminal.ToString() + (Busy ? "<color=#9D9D9D>выполняется…</color>" : Prompt() + "<color=#CCCCCC>█</color>");
                         var l = K.T(txt, 15f, K.Text, true, false, true); l.style.whiteSpace = WhiteSpace.PreWrap; c.Add(l);
                         bottomScroll.ToBottom();
@@ -1246,24 +1255,30 @@ namespace Intern.Game
             jsCheck = null; jsRun = null;
             Task = t;
             bool ticket = t.IsChoice && string.IsNullOrEmpty(t.starter);
-            ed.Language = ticket ? "text" : t.language;   // язык — до текста: от него зависит ширина табуляции
-            ed.Text = t.IsChoice ? (ticket ? TicketText(t) : t.starter) : (g.Save.GetCode(t.id) ?? t.starter);
+            if (IsScenario) EnvLoadEditor(t);
+            else
+            {
+                ed.Language = ticket ? "text" : t.language;   // язык — до текста: от него зависит ширина табуляции
+                ed.Text = t.IsChoice ? (ticket ? TicketText(t) : t.starter) : (g.Save.GetCode(t.id) ?? t.starter);
+            }
             savedCode = ed.Text;
             ed.Breakpoints.Clear();
             lastCheck = null; runtimeErrorLine = -1; runtimeErrorText = null; explainedCode = null; lint = null; explains.Clear();
             jsLint = null; jsLinted = null; choiceVerdict = null; choiceOk = false;
             solutionShown = usedSolution.Contains(t.id) && !t.IsChoice; confirmReset = false;
             if (IsJs && !jsWarm) { jsWarm = true; try { JsRun.Prewarm(); } catch (Exception e) { Debug.LogWarning("[Стажёр] Прогрев JS: " + e.Message); } }
-            bottomPanel.style.height = IsChoice ? 470f : 270f;
+            bottomPanel.style.height = IsChoice ? 470f : IsScenario ? 340f : 270f;
             tabIconHost.Clear(); tabIconHost.Add(FileIcon(t, true));
             tabName.text = FileName(t);
-            SetText(statusLang, "{ } " + LangName(ticket ? "text" : t.language));
+            SetText(statusLang, "{ } " + LangName(ticket ? "text" : IsScenario ? ed.Language : t.language));
             SetText(statusIndent, "Пробелы: " + Syntax.IndentWidth(ed.Language));
             terminal.Length = 0;
             terminal.Append("<color=#9D9D9D>Кодзилла Софт · терминал. " + (CanRun ? "Запуск: кнопка «Запустить» или Ctrl+F5. " : "") + "Сдать задачу: «Проверить» или Ctrl+Enter.</color>\n");
-            side = Side.Task; bottom = IsChoice ? Bottom.Answer : CanRun ? Bottom.Terminal : Bottom.Tests;
+            side = Side.Task; bottom = IsChoice ? Bottom.Answer : CanRun || IsScenario ? Bottom.Terminal : Bottom.Tests;
             sideScroll.ToTop(); rightScroll.ToTop(); bottomScroll.ToTop();
             RefreshExplanations(true);
+            if (IsScenario) EnvOpened(); else termFocus = false;
+            ed.Active = Active && !termFocus;
             RefreshAll();
         }
 
@@ -1312,12 +1327,13 @@ namespace Intern.Game
         void SaveCode()
         {
             if (Task == null || Task.IsChoice) return;
+            if (IsScenario) { EnvSaveFile(); return; }
             g.Save.SetCode(Task.id, Code); g.Persist(); savedCode = Code;
         }
 
         public void SetActive(bool a)
         {
-            Active = a; ed.Active = a;
+            Active = a; ed.Active = a && !(IsScenario && termFocus);
             if (!a) { ed.HidePopup(); ed.HideTooltip(); if (hoverBtn != null) { hoverBtn.SetHover(false); hoverBtn = null; } }
             ed.Place(); RefreshStatus();
         }
@@ -1367,6 +1383,7 @@ namespace Intern.Game
                     RefreshSide(); RefreshRight(); RefreshBottom(); RefreshStatus();
                 }
             }
+            if (IsScenario) EnvUpdate();
             if (Active) PollHover();
         }
 
@@ -1539,6 +1556,7 @@ namespace Intern.Game
             if (dbg != null && dbg.Finished) StopDebug();
             if (Task == null || dbg != null || Busy) return;
             g.ReportWork(WorkKind.Check);
+            if (IsScenario) { SaveCode(); EnvCheckStep(true); return; }
             if (IsChoice) { SubmitChoice(); return; }
             SaveCode();
             switch (TMode)
@@ -1666,6 +1684,7 @@ namespace Intern.Game
         {
             if (dbg != null && dbg.Finished) StopDebug();
             if (Task == null || dbg != null || Busy || IsChoice) return;
+            if (IsScenario) { EnvResetClicked(); return; }
             if (confirmReset) { ed.Text = Task.starter; confirmReset = false; SaveCode(); runtimeErrorLine = -1; Notice("Код сброшен к заготовке задачи.", "reset", K.Muted); }
             else { confirmReset = true; confirmResetUntil = Time.unscaledTime + 3f; }
             RefreshEditorFlags(); RefreshStatus();
@@ -1695,6 +1714,7 @@ namespace Intern.Game
                         var pp = screenToPanel(e.mousePosition); if (!pp.HasValue) return;
                         var p = pp.Value; var v = PickAt(p);
                         if (e.button != 0) { e.Use(); return; }
+                        if (IsScenario) EnvFocusByClick(v);
                         var b = Up<Btn>(v);
                         if (b != null && !InEditor(v)) { pressedBtn = b; e.Use(); return; }
                         if (InEditor(v)) { pressedEditor = true; ed.MouseDown(p, e.clickCount, e.shift); RefreshStatus(); if (!ed.PopupOpen) { } e.Use(); return; }
@@ -1725,6 +1745,7 @@ namespace Intern.Game
                         e.Use(); return;
                     }
                 case EventType.KeyDown:
+                    if (IsScenario && termFocus && bottom == Bottom.Terminal && TermKey(e)) { e.Use(); return; }
                     if (HotKey(e)) { e.Use(); return; }
                     if (IsChoice && !(e.control || e.command || e.alt))
                     {
@@ -1744,6 +1765,7 @@ namespace Intern.Game
         bool HotKey(Event e)
         {
             bool ctrl = e.control || e.command;
+            if (IsScenario && (e.keyCode == KeyCode.F5 || e.keyCode == KeyCode.F9 || e.keyCode == KeyCode.F10 || e.keyCode == KeyCode.F11)) return true;   // запускать и отлаживать тут нечего — всё в терминале
             switch (e.keyCode)
             {
                 case KeyCode.F5:

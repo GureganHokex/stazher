@@ -348,6 +348,9 @@ namespace Intern.Game
                         for (int i = 0; i < 10; i++) { float a = -Mathf.PI / 2 + i * Mathf.PI / 5, r = i % 2 == 0 ? .44f : .19f; var q = P(.5f + Mathf.Cos(a) * r, .54f + Mathf.Sin(a) * r); if (i == 0) p.MoveTo(q); else p.LineTo(q); }
                         p.ClosePath(); p.Fill(); break;
                     }
+                case "terminal": // окно терминала: «>_»
+                    Poly(p, true, P(.08f, .16f), P(.92f, .16f), P(.92f, .84f), P(.08f, .84f)); p.Stroke();
+                    Poly(p, false, P(.24f, .36f), P(.4f, .5f), P(.24f, .64f)); p.Stroke(); Seg(p, P(.48f, .66f), P(.72f, .66f)); break;
                 case "fire":     // инцидент
                     p.BeginPath(); p.MoveTo(P(.5f, .08f)); p.BezierCurveTo(P(.62f, .3f), P(.84f, .42f), P(.8f, .66f)); p.BezierCurveTo(P(.76f, .9f), P(.24f, .92f), P(.2f, .66f));
                     p.BezierCurveTo(P(.18f, .48f), P(.34f, .4f), P(.34f, .26f)); p.BezierCurveTo(P(.44f, .34f), P(.46f, .2f), P(.5f, .08f)); p.ClosePath(); p.Fill(); break;

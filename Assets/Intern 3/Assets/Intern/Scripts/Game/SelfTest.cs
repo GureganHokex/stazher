@@ -75,6 +75,11 @@ namespace Intern.Game
             var bs = BalanceSim(null, balInfo);
             foreach (var line in bs) { fail++; sb.AppendLine("FAIL баланс: " + line); }
             foreach (var line in balInfo) sb.AppendLine(line);
+            var envInfo = new List<string>();
+            var es = EnvSim(null, envInfo);
+            foreach (var line in es) { fail++; sb.AppendLine("FAIL окружение: " + line); }
+            foreach (var line in envInfo) sb.AppendLine(line);
+            sb.AppendLine("фильтр docker и сценарии: " + (es.Count == 0 ? "проверки прошли" : es.Count + " ошибок"));
             sb.AppendLine("режимы: " + string.Join(", ", counts.Select(kv => kv.Key + " " + kv.Value).ToArray()));
             sb.AppendLine("итог: " + ok + " ок, " + fail + " ошибок, " + (DateTime.Now - started).TotalSeconds.ToString("0") + " с");
             string file = Path.Combine(Application.persistentDataPath, "selftest.txt");
@@ -394,6 +399,99 @@ namespace Intern.Game
             if (Levels.TicketXp(30, "fix", 3, true) >= Levels.TicketXp(30, "fix", 3, false)) bad.Add("баланс: тренировка даёт не меньше тикета дня");
             if (Levels.DayBonus(30) != 160) bad.Add("баланс: премия за день на 30-м уровне " + Levels.DayBonus(30) + ", ждали 160");
             return bad;
+        }
+
+        // Спринт 7: фильтр docker-команд, разбор команд для «Что произошло», сценарии окружения и их проверки (на подделке, без Docker)
+        public static List<string> EnvSim(string envJson = null, List<string> report = null)
+        {
+            var bad = new List<string>();
+            Action<bool, string> T = (ok, what) => { if (!ok) bad.Add(what); };
+            const string host = @"C:\Users\u\Documents\Стажёр\work";
+            Func<string, DockerPlan> P = l => DockerGuard.Plan(l, "/work", host);
+            var p = P("docker run -d --name site -p 8080:80 -v /work/site:/usr/share/nginx/html:ro nginx:alpine");
+            T(p.Error == null, "docker run nginx отклонён: " + p.Error);
+            T(p.ArgLine.Contains("--label stazher=1"), "run без метки stazher: " + p.ArgLine);
+            T(p.Args.Contains("127.0.0.1:8080:80"), "порт не привязан к 127.0.0.1: " + p.ArgLine);
+            T(p.Args.Contains(host + @"\site:/usr/share/nginx/html:ro"), "том /work/site не переведён в путь ПК: " + p.ArgLine);
+            T(p.PulledImage == "nginx:alpine", "образ в run не распознан: " + p.PulledImage);
+            foreach (var l in new[] { "docker run --privileged alpine", "docker run -v /:/host alpine", "docker run -v /var/run/docker.sock:/var/run/docker.sock alpine",
+                                      "docker run --network host nginx", "docker run --net=host nginx", "docker run -P nginx", "docker system prune -af", "docker run -it ubuntu",
+                                      "docker exec -it site sh", "docker build -t x /etc", "docker run --pid=host alpine", "docker run -v ../../..:/x alpine", "docker cp site:/etc/passwd .",
+                                      "docker -H tcp://1.2.3.4 ps", "docker image prune -a", "docker run --mount type=bind,source=/,target=/h alpine", "docker run --cap-add=SYS_ADMIN alpine",
+                                      "docker rm -f stazher-sandbox", "docker stop stazher-sandbox", "docker rmi stazher/sandbox:1" })
+                T(P(l).Error != null, "опасная команда пропущена: " + l);
+            var rm = P("docker rm -f site"); T(rm.Error == null && rm.Targets.SequenceEqual(new[] { "site" }), "docker rm: цели " + string.Join(",", rm.Targets.ToArray()));
+            var ri = P("docker rmi nginx:alpine"); T(ri.ImageTargets.SequenceEqual(new[] { "nginx:alpine" }), "docker rmi: образ не распознан");
+            var ex = P("docker exec site ls /usr/share/nginx/html"); T(ex.Error == null && ex.Targets.SequenceEqual(new[] { "site" }) && ex.Args.Contains("ls"), "docker exec: " + ex.Error + " " + ex.ArgLine);
+            var rr = P("docker run --rm alpine echo привет"); T(rr.Error == null && rr.ArgLine.EndsWith("alpine echo привет"), "docker run --rm alpine echo: " + rr.Error + " " + rr.ArgLine);
+            var bd = P("docker build -t site ./site"); T(bd.Error == null && bd.Args.Contains(host + @"\site") && bd.ArgLine.Contains("--label stazher=1"), "docker build ./site: " + bd.Error + " " + bd.ArgLine);
+            var ps = P("docker ps -a"); T(ps.Error == null && ps.ArgLine == "ps -a", "docker ps -a: " + ps.ArgLine);
+            T(DockerGuard.MapPath("../../etc", "/work/a", host) == null, "MapPath выпустил из /work");
+            T(DockerGuard.MapPath("$(pwd)/x", "/work/site", host) == host + @"\site\x", "MapPath $(pwd): " + DockerGuard.MapPath("$(pwd)/x", "/work/site", host));
+            T(DockerGuard.LocalPort("0.0.0.0:8080:80") == "127.0.0.1:8080:80", "порт 0.0.0.0 не переписан на 127.0.0.1");
+            T(DockerGuard.LocalPort("80") == null, "порт без номера на ПК принят");
+            var tk = DockerGuard.Tokenize("echo 'a b' \"c d\" e\\ f"); T(tk.SequenceEqual(new[] { "echo", "a b", "c d", "e f" }), "Tokenize: " + string.Join("|", tk.ToArray()));
+            T(DevEnv.NormImage("nginx") == "nginx:latest" && DevEnv.NormImage("localhost:5000/x") == "localhost:5000/x:latest" && DevEnv.NormImage("nginx:alpine") == "nginx:alpine", "NormImage");
+            T(DevEnv.ShellQuote("echo \"a b\"") == "\"echo \\\"a b\\\"\"", "ShellQuote: " + DevEnv.ShellQuote("echo \"a b\""));
+            T(Shell.Marker.IsMatch("__STAZHER__0|/work/shop"), "маркер stazher-run");
+            var df = DevEnv.SandboxDockerfile(); T(df.Contains("FROM ubuntu:24.04") && df.Contains("/usr/local/bin/stazher-run"), "Dockerfile песочницы");
+            // «Что произошло»
+            var exl = ShellExplain.Explain("cut -d' ' -f1 logs/access.log | sort | uniq -c | sort -rn | head -5");
+            T(exl.Any(x => x.Contains("конвейер")) && exl.Any(x => x.Contains("uniq")) && exl.Any(x => x.Contains("-rn")), "объяснение конвейера: " + string.Join(" / ", exl.ToArray()));
+            var ops = ShellExplain.SplitOps("echo \"a | b\" > hello.txt && cat hello.txt");
+            T(ops.Count == 4 && ops[1].Key == "> hello.txt" && ops[2].Key == "&&", "SplitOps: " + string.Join(" / ", ops.Select(o => o.Key ?? o.Value).ToArray()));
+            T(ShellExplain.Explain("git switch -c fix/price").Any(x => x.Contains("git switch")), "объяснение git switch");
+            // сценарии
+            if (envJson == null) { var ta = Resources.Load<TextAsset>("Tasks/env"); envJson = ta != null ? ta.text : null; }
+            if (envJson == null) { bad.Add("нет Resources/Tasks/env.json"); return bad; }
+            var list = EnvContent.Parse(envJson);
+            T(list.Count >= 4, "сценариев " + list.Count + ", ждали 4+");
+            T(list.Count(s => s.mission) == 1 && list.Any(s => s.id == EnvContent.MissionId && s.mission), "миссия env-setup");
+            var kinds = new HashSet<string> { "sandbox", "host", "http", "last", "file", "ips" };
+            foreach (var s in list)
+            {
+                var t = EnvContent.ToTask(s, 1);
+                T(t.Mode == "scenario" && t.scenario == s, s.id + ": режим " + t.Mode);
+                foreach (var st in s.steps)
+                {
+                    string w = s.id + " / " + st.title + ": ";
+                    T(kinds.Contains(st.check.kind), w + "неизвестная проверка " + st.check.kind);
+                    foreach (var re in new[] { st.check.expect, st.check.notExpect, st.check.lastCmd })
+                        if (!string.IsNullOrEmpty(re)) { try { new System.Text.RegularExpressions.Regex(re); } catch (Exception e) { bad.Add(w + "регулярка " + re + ": " + e.Message); } }
+                    T(!string.IsNullOrEmpty(st.check.expect) || !string.IsNullOrEmpty(st.check.notExpect) || st.check.kind == "ips", w + "проверка без expect");
+                    T((st.check.kind != "last" && st.check.kind != "ips") || !string.IsNullOrEmpty(st.solve), w + "нет команды-решения");
+                    if (st.check.kind == "last" && !string.IsNullOrEmpty(st.check.lastCmd) && st.solve != null)
+                        T(System.Text.RegularExpressions.Regex.IsMatch(st.solve.Trim(), st.check.lastCmd), w + "решение не проходит last_cmd " + st.check.lastCmd);
+                    if (st.solve != null && st.solve.StartsWith("docker")) { var sp = P(st.solve); T(sp.Error == null, w + "фильтр не пропускает решение: " + sp.Error); }
+                    if (st.action != null) T(new[] { "docker-site", "docker-start", "build", "start" }.Contains(st.action), w + "неизвестное действие " + st.action);
+                }
+            }
+            // проверки шагов на подделке
+            string note;
+            var fake = new FakeEnv();
+            fake.host["image inspect --format {{.Id}} nginx:alpine"] = "sha256:abc";
+            T(EnvCheck.Evaluate(new EnvCheckDef { kind = "host", cmd = "image inspect --format {{.Id}} nginx:alpine", expect = "sha256" }, fake, null, out note), "host-проверка: " + note);
+            T(!EnvCheck.Evaluate(new EnvCheckDef { kind = "http", url = "http://localhost:8080/", expect = "x" }, fake, null, out note) && note != null, "http без ответа прошла");
+            fake.http = "<h1>Мы открылись!</h1>";
+            T(EnvCheck.Evaluate(new EnvCheckDef { kind = "http", url = "http://localhost:8080/", expect = "Мы открылись" }, fake, null, out note), "http-проверка: " + note);
+            T(EnvCheck.Evaluate(new EnvCheckDef { kind = "last", lastCmd = "^pwd$", expect = "^/work" }, fake, new ShellRecord { cmd = "pwd", output = "/work\n" }, out note), "last pwd: " + note);
+            T(!EnvCheck.Evaluate(new EnvCheckDef { kind = "last", lastCmd = "^pwd$", expect = "^/work" }, fake, new ShellRecord { cmd = "ls", output = "/work" }, out note), "last: чужая команда прошла");
+            fake.sandbox["ref"] = "10.0.0.7\n192.168.1.4\n";
+            T(EnvCheck.Evaluate(new EnvCheckDef { kind = "ips", refCmd = "ref" }, fake, new ShellRecord { cmd = "x", output = "    173 10.0.0.7\n    151 192.168.1.4\n" }, out note), "ips: " + note);
+            T(!EnvCheck.Evaluate(new EnvCheckDef { kind = "ips", refCmd = "ref" }, fake, new ShellRecord { cmd = "x", output = "192.168.1.4\n10.0.0.7\n" }, out note), "ips: неверный порядок прошёл");
+            T(!EnvCheck.Evaluate(new EnvCheckDef { kind = "host", cmd = "ps", notExpect = "\\bsite\\b" }, new FakeEnv { hostAll = "site\n" }, null, out note), "not_expect не сработал");
+            if (report != null) report.Add("окружение: сценариев " + list.Count + ", шагов " + list.Sum(s => s.steps.Count));
+            return bad;
+        }
+
+        public class FakeEnv : IEnvRunner
+        {
+            public Dictionary<string, string> sandbox = new Dictionary<string, string>(), host = new Dictionary<string, string>();
+            public string http, hostAll;
+            public ProcResult Sandbox(string c) { string o; return new ProcResult { Code = sandbox.TryGetValue(c, out o) ? 0 : 1, Out = o ?? "" }; }
+            public ProcResult Host(string a) { string o = hostAll; if (o == null) host.TryGetValue(a, out o); return new ProcResult { Code = o != null ? 0 : 1, Out = o ?? "" }; }
+            public string Http(string url, out int status) { status = http != null ? 200 : 0; return http; }
+            public string HostPath(string p) { return p; }
         }
 
         static string Check(TaskData t)

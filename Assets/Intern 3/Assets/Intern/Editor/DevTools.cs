@@ -67,6 +67,22 @@ namespace Intern.EditorTools
             finally { File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false)); Debug.Log("[Стажёр] " + log.ToString().Split('\n').Last(l => l.Length > 0)); }
         }
 
+        [MenuItem("Стажёр/Проверить Docker", false, 22)]
+        public static void CheckDocker()
+        {
+            var log = new StringBuilder("docker " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\n");
+            try
+            {
+                string detail; var st = Intern.Game.DevEnv.Probe(out detail);
+                log.AppendLine("состояние: " + st + " — " + detail);
+                var v = Intern.Game.DevEnv.DockerCmd("version", 15000);
+                log.AppendLine(v.Text);
+                log.AppendLine("папка work: " + Intern.Game.DevEnv.WorkDir);
+            }
+            catch (Exception e) { log.AppendLine("ошибка: " + e.Message); }
+            finally { File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false)); }
+        }
+
         [MenuItem("Стажёр/Selftest последней сборки", false, 21)]
         public static void SelftestBuild()
         {
