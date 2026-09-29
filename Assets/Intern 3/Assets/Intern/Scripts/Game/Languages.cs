@@ -23,7 +23,7 @@ namespace Intern.Game
             new LangInfo { id = "javascript", name = "JavaScript", badge = "JS", runner = "js", ready = true, professions = new[] { "frontend" } },
             new LangInfo { id = "typescript", name = "TypeScript", badge = "TS", runner = "ts", ready = true, professions = new[] { "frontend" } },
             new LangInfo { id = "go", name = "Go", badge = "GO", runner = "docker", ready = true, professions = new[] { "backend", "devops" } },
-            new LangInfo { id = "java", name = "Java", badge = "JAVA", runner = "docker", soon = "спринт 12", professions = new[] { "backend" } },
+            new LangInfo { id = "java", name = "Java", badge = "JAVA", runner = "docker", ready = true, professions = new[] { "backend" } },
             new LangInfo { id = "csharp", name = "C#", badge = "C#", runner = "docker", soon = "спринт 13", professions = new[] { "backend" } },
             new LangInfo { id = "php", name = "PHP", badge = "PHP", runner = "docker", soon = "позже", professions = new[] { "backend" } },
         };
@@ -55,6 +55,7 @@ namespace Intern.Game
                 case "javascript": return "Язык браузера: код запускается прямо в игре. На нём держится весь фронтенд.";
                 case "typescript": return "JavaScript с типами: ошибки видны до запуска. Код запускается в игре, типы проверяются по коду.";
                 case "go": return "Быстрый компилируемый язык серверов и DevOps-инструментов. Код и тесты (go test) запускаются в песочнице Docker — образ golang скачается при первом запуске. Без Docker задачи проверяются по коду.";
+                case "java": return "Строгий язык больших корпоративных систем, банков и Android. Код компилируется javac и тестируется в песочнице Docker — образ JDK (около 200 МБ) скачается при первом запуске. Без Docker задачи проверяются по коду.";
                 default: return "Ветка языка появится в " + (Get(id) != null ? Get(id).soon : "следующих обновлениях") + ": задачи запускаются в песочнице Docker, без Docker — задачи без запуска.";
             }
         }

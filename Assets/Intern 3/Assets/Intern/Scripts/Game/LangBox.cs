@@ -18,6 +18,9 @@ namespace Intern.Game
     public class LangSpec
     {
         public string id, name, image, container, cacheVolume, cachePath, src, test, runCmd, testCmd, size;
+        public string parser = "go";     // go — go test -json; check — строки ##TEST|имя|PASS/FAIL (свой набор проверок языка)
+        public string testShow, runShow; // что показать игроку в терминале вместо полной команды
+        public string testMarker;        // без этого в файле тестов задача считается сломанной (selftest)
         public string[] env = new string[0];
         public Dictionary<string, string> extraFiles = new Dictionary<string, string>();
     }
@@ -74,12 +77,88 @@ namespace Intern.Game
             id = "go", name = "Go", image = "golang:1.24-alpine", container = "stazher-go",
             cacheVolume = "stazher-go-cache", cachePath = "/root/.cache",
             src = "main.go", test = "main_test.go", runCmd = "go run .", testCmd = "go test -json -count=1 .", size = "около 100 МБ",
+            testShow = "go test -v", runShow = "go run .", testMarker = "func Test",
             env = new[] { "GOTOOLCHAIN=local", "GOFLAGS=-mod=mod", "GOPROXY=off", "CGO_ENABLED=0" },
             extraFiles = new Dictionary<string, string> { { "go.mod", "module stazher\n\ngo 1.24\n" } },
         };
 
-        public static LangSpec For(string lang) { return lang == "go" ? Go : null; }
-        public static IEnumerable<LangSpec> All { get { yield return Go; } }
+        // Спринт 12: Java. Тесты — MainTest.java на своём маленьком наборе проверок Check.java (без JUnit: сети в контейнере нет)
+        public static readonly LangSpec Java = new LangSpec
+        {
+            id = "java", name = "Java", image = "eclipse-temurin:21-jdk-alpine", container = "stazher-java",
+            src = "Main.java", test = "MainTest.java", parser = "check", size = "около 200 МБ",
+            runCmd = "sh -c \"rm -rf out && javac -J-Xmx256m -encoding UTF-8 -d out Main.java && java -Xmx256m -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp out Main\"",
+            testCmd = "sh -c \"rm -rf out && javac -J-Xmx256m -encoding UTF-8 -d out *.java && java -Xmx256m -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp out MainTest\"",
+            testShow = "javac *.java && java MainTest", runShow = "javac Main.java && java Main", testMarker = "Check.",
+            env = new[] { "LANG=C.UTF-8" },
+            extraFiles = new Dictionary<string, string> { { "Check.java", CheckJava } },
+        };
+
+        public static LangSpec For(string lang) { return lang == "go" ? Go : lang == "java" ? Java : null; }
+        public static IEnumerable<LangSpec> All { get { yield return Go; yield return Java; } }
+
+        public const string CheckJava =
+            "// Проверки «Стажёра» для задач на Java: каждая проверка печатает строку ##TEST|имя|PASS или ##TEST|имя|FAIL|почему.\n" +
+            "// Исключение в проверяемом коде ловится внутри проверки — остальные тесты всё равно выполнятся.\n" +
+            "import java.util.Arrays;\n" +
+            "import java.util.Objects;\n" +
+            "import java.util.function.Supplier;\n" +
+            "\n" +
+            "public final class Check {\n" +
+            "    private Check() {}\n" +
+            "\n" +
+            "    public static void eq(String name, Supplier<?> got, Object want) {\n" +
+            "        Object g;\n" +
+            "        try { g = got.get(); } catch (Throwable e) { fail(name, \"исключение \" + e + where(e)); return; }\n" +
+            "        if (same(g, want)) pass(name); else fail(name, \"получено \" + show(g) + \", ожидалось \" + show(want));\n" +
+            "    }\n" +
+            "\n" +
+            "    public static void near(String name, Supplier<? extends Number> got, double want) {\n" +
+            "        Number g;\n" +
+            "        try { g = got.get(); } catch (Throwable e) { fail(name, \"исключение \" + e + where(e)); return; }\n" +
+            "        if (g != null && Math.abs(g.doubleValue() - want) < 1e-9) pass(name); else fail(name, \"получено \" + g + \", ожидалось \" + want);\n" +
+            "    }\n" +
+            "\n" +
+            "    public static void ok(String name, Supplier<Boolean> cond, String why) {\n" +
+            "        try { if (Boolean.TRUE.equals(cond.get())) pass(name); else fail(name, why); }\n" +
+            "        catch (Throwable e) { fail(name, \"исключение \" + e + where(e)); }\n" +
+            "    }\n" +
+            "\n" +
+            "    public static void throwsEx(String name, Runnable r, Class<? extends Throwable> type) {\n" +
+            "        try { r.run(); fail(name, \"исключения не было, ожидалось \" + type.getSimpleName()); }\n" +
+            "        catch (Throwable e) {\n" +
+            "            if (type.isInstance(e)) pass(name);\n" +
+            "            else fail(name, \"исключение \" + e.getClass().getSimpleName() + \", ожидалось \" + type.getSimpleName() + where(e));\n" +
+            "        }\n" +
+            "    }\n" +
+            "\n" +
+            "    static boolean same(Object a, Object b) {\n" +
+            "        if (a == null || b == null) return a == b;\n" +
+            "        if (a.getClass().isArray() || b.getClass().isArray()) return Arrays.deepEquals(new Object[] { a }, new Object[] { b });\n" +
+            "        if (a instanceof Number && b instanceof Number && !(a instanceof Double) && !(b instanceof Double) && !(a instanceof Float))\n" +
+            "            return ((Number) a).longValue() == ((Number) b).longValue();\n" +
+            "        return Objects.equals(a, b);\n" +
+            "    }\n" +
+            "\n" +
+            "    static String show(Object o) {\n" +
+            "        if (o == null) return \"null\";\n" +
+            "        if (o instanceof String) return \"\\\"\" + o + \"\\\"\";\n" +
+            "        if (o instanceof Character) return \"'\" + o + \"'\";\n" +
+            "        if (o.getClass().isArray()) { String s = Arrays.deepToString(new Object[] { o }); return s.substring(1, s.length() - 1); }\n" +
+            "        return String.valueOf(o);\n" +
+            "    }\n" +
+            "\n" +
+            "    static String where(Throwable e) {\n" +
+            "        for (StackTraceElement s : e.getStackTrace())\n" +
+            "            if (\"Main.java\".equals(s.getFileName())) return \" (Main.java:\" + s.getLineNumber() + \")\";\n" +
+            "        return \"\";\n" +
+            "    }\n" +
+            "\n" +
+            "    static void pass(String n) { System.out.println(\"##TEST|\" + clean(n) + \"|PASS\"); }\n" +
+            "    static void fail(String n, String m) { System.out.println(\"##TEST|\" + clean(n) + \"|FAIL|\" + clean(m)); }\n" +
+            "    static String clean(String s) { return String.valueOf(s).replace(\"|\", \"/\").replace(\"\\r\", \"\").replace(\"\\n\", \" ⏎ \"); }\n" +
+            "}\n" +
+            "";
 
         // ---------- контейнер языка ----------
         public static bool HasImage(LangSpec s) { return DevEnv.DockerCmd("image inspect --format \"{{.Id}}\" " + s.image, 15000).Ok; }
@@ -95,11 +174,12 @@ namespace Intern.Game
                 if (DevEnv.DockerCmd("start " + s.container, 30000).Ok) return true;
                 DevEnv.DockerCmd("rm -f " + s.container, 30000);
             }
-            DevEnv.DockerCmd("volume create --label " + DevEnv.Label + " " + s.cacheVolume, 30000);
+            if (!string.IsNullOrEmpty(s.cacheVolume)) DevEnv.DockerCmd("volume create --label " + DevEnv.Label + " " + s.cacheVolume, 30000);
             var sb = new StringBuilder("run -d --name " + s.container + " --label " + DevEnv.Label + " --network none --memory 1g --pids-limit 256");
             foreach (var e in s.env) sb.Append(" -e ").Append(e);
-            sb.Append(" -v \"").Append(DevEnv.WorkDir).Append(":/work\" -v ").Append(s.cacheVolume).Append(':').Append(s.cachePath)
-              .Append(" -w /work ").Append(s.image).Append(" tail -f /dev/null");
+            sb.Append(" -v \"").Append(DevEnv.WorkDir).Append(":/work\"");
+            if (!string.IsNullOrEmpty(s.cacheVolume)) sb.Append(" -v ").Append(s.cacheVolume).Append(':').Append(s.cachePath);
+            sb.Append(" -w /work ").Append(s.image).Append(" tail -f /dev/null");
             var r = DevEnv.DockerCmd(sb.ToString(), 60000);
             if (!r.Ok) { error = r.Text; return false; }
             return true;
@@ -152,9 +232,9 @@ namespace Intern.Game
             rep.setupError = Prepare(s, note, out pulled); rep.pulled = pulled;
             if (rep.setupError != null) return rep;
             WriteFiles(s, id, new Dictionary<string, string> { { s.src, code }, { s.test, testCode } });
-            if (note != null) note(s.testCmd.Replace(" -json", " -v") + "   # в контейнере " + s.image);
+            if (note != null) note(s.testShow + "   # в контейнере " + s.image);
             var r = Exec(s, id, s.testCmd, RunTimeoutSec + 10);
-            rep = ParseGoTest(r.Out + "\n" + r.Err, s.src);
+            rep = s.parser == "check" ? ParseCheck(r.Out, r.Err, s.src) : ParseGoTest(r.Out + "\n" + r.Err, s.src);
             rep.pulled = pulled; rep.ms = r.Ms;
             if (r.TimedOut && !rep.buildFailed)
             {
@@ -162,7 +242,7 @@ namespace Intern.Game
                 rep.results.Add(new CheckResult { Passed = false, InputsText = "время", Note = "Тесты не уложились в " + (RunTimeoutSec + 10) + " с — похоже на бесконечный цикл (или программе не хватило памяти)." });
             }
             if (rep.results.Count == 0 && rep.setupError == null)
-                rep.results.Add(new CheckResult { Passed = false, InputsText = "go test", Note = "Тесты не запустились: " + FirstLine(r.Text) });
+                rep.results.Add(new CheckResult { Passed = false, InputsText = "тесты", Note = "Тесты не запустились: " + FirstLine(r.Text) });
             return rep;
         }
 
@@ -280,10 +360,101 @@ namespace Intern.Game
             return rep;
         }
 
+        // ---------- разбор ##TEST (Java и дальше) ----------
+        static readonly Regex JavacErr = new Regex(@"^(\w+\.java):(\d+): error: (.*)$");
+        static readonly Regex JavaAt = new Regex(@"\((\w+\.java):(\d+)\)");
+
+        public static BoxReport ParseCheck(string stdout, string stderr, string srcName)
+        {
+            var rep = new BoxReport();
+            var log = new StringBuilder();
+            foreach (var raw in (stdout ?? "").Split('\n'))
+            {
+                string line = raw.TrimEnd('\r');
+                if (!line.StartsWith("##TEST|")) { if (line.Length > 0) log.AppendLine(line); continue; }
+                var p = line.Split(new[] { '|' }, 4);
+                if (p.Length < 3) continue;
+                bool ok = p[2] == "PASS";
+                string note = p.Length > 3 ? p[3].Replace(" ⏎ ", "\n") : null;
+                rep.results.Add(new CheckResult { Passed = ok, InputsText = p[1], Expected = "", Actual = "", Note = ok ? null : note ?? "Тест не прошёл." });
+                if (!ok && rep.errLine < 0 && note != null)
+                {
+                    var m = JavaAt.Match(note);
+                    if (m.Success && m.Groups[1].Value == srcName) { rep.errLine = int.Parse(m.Groups[2].Value); rep.errText = "Ошибка в строке " + rep.errLine + ": " + note; }
+                }
+            }
+            string err = string.Join("\n", (stderr ?? "").Replace("\r", "").Split('\n').Where(l => !l.StartsWith("Picked up ") && !l.StartsWith("NOTE: Picked up")).ToArray()).Trim();
+            if (err.Length > 0) log.AppendLine(err);
+            rep.log = CleanPaths(log.ToString());
+            if (rep.results.Count > 0) return rep;
+            // тестов нет: не собралось или упало до первой проверки
+            var lines = err.Split('\n');
+            var nice = new List<string>();
+            for (int i = 0; i < lines.Length && nice.Count < 8; i++)
+            {
+                var m = JavacErr.Match(lines[i].Trim());
+                if (!m.Success) continue;
+                string text = Explain(m.Groups[3].Value);
+                for (int j = i + 1; j < Math.Min(lines.Length, i + 5); j++)
+                {
+                    string sym = lines[j].Trim();
+                    if (sym.StartsWith("symbol:")) { text += " — " + sym.Substring(7).Trim(); break; }
+                    if (JavacErr.IsMatch(sym)) break;
+                }
+                int ln = int.Parse(m.Groups[2].Value);
+                if (m.Groups[1].Value == srcName)
+                {
+                    if (rep.errLine < 0) { rep.errLine = ln; rep.errText = "Ошибка компиляции в строке " + ln + ": " + text; }
+                    nice.Add("строка " + ln + ": " + text);
+                }
+                else nice.Add("тесты (" + m.Groups[1].Value + ", строка " + ln + "): " + text + (text.Contains("cannot find symbol") || text.Contains("не найдено") ? " — не переименовывай методы и классы из задания." : ""));
+            }
+            if (nice.Count > 0)
+            {
+                rep.buildFailed = true;
+                rep.results.Add(new CheckResult { Passed = false, InputsText = "сборка", Expected = "", Actual = "", Note = "Код не компилируется, тесты не запускались.\n" + string.Join("\n", nice.ToArray()) });
+                return rep;
+            }
+            string ex; int exLine = JavaException(err, srcName, out ex);
+            if (ex != null)
+            {
+                rep.panicked = true; rep.errLine = exLine; rep.errText = "Программа упала: " + ex + (exLine > 0 ? " (строка " + exLine + ")" : "");
+                rep.results.Add(new CheckResult { Passed = false, InputsText = "запуск", Expected = "", Actual = "", Note = rep.errText });
+            }
+            return rep;
+        }
+
+        // «Exception in thread "main" java.lang.X: сообщение» и строка из Main.java в трассировке
+        static int JavaException(string err, string srcName, out string ex)
+        {
+            ex = null;
+            int i = (err ?? "").IndexOf("Exception in thread", StringComparison.Ordinal);
+            if (i < 0) { i = (err ?? "").IndexOf("Error: ", StringComparison.Ordinal); if (i < 0) return -1; }
+            int end = err.IndexOf('\n', i); ex = (end > 0 ? err.Substring(i, end - i) : err.Substring(i)).Replace("Exception in thread \"main\" ", "").Trim();
+            var m = JavaAt.Matches(err).Cast<Match>().FirstOrDefault(x => x.Groups[1].Value == srcName);
+            return m != null ? int.Parse(m.Groups[2].Value) : -1;
+        }
+
         // Строка ошибки из вывода go run / go build (компиляция или паника); 0 — нет
         public static int ErrorLine(string stderr, string srcName, out string msg)
         {
             msg = null;
+            if (srcName.EndsWith(".java"))
+            {
+                var lines = (stderr ?? "").Replace("\r", "").Split('\n');
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    var m = JavacErr.Match(lines[i].Trim());
+                    if (!m.Success || m.Groups[1].Value != srcName) continue;
+                    string text = Explain(m.Groups[3].Value);
+                    for (int j = i + 1; j < Math.Min(lines.Length, i + 5); j++) if (lines[j].Trim().StartsWith("symbol:")) { text += " — " + lines[j].Trim().Substring(7).Trim(); break; }
+                    msg = "Ошибка компиляции в строке " + m.Groups[2].Value + ": " + text;
+                    return int.Parse(m.Groups[2].Value);
+                }
+                string ex; int ln = JavaException(stderr, srcName, out ex);
+                if (ex != null) { msg = "Программа упала: " + ex; return ln; }
+                return 0;
+            }
             foreach (var raw in (stderr ?? "").Split('\n'))
             {
                 var m = SrcErr.Match(raw.Trim());
@@ -312,6 +483,16 @@ namespace Intern.Game
             if (e.StartsWith("syntax error")) return "синтаксическая ошибка (" + e + ")";
             if (e.StartsWith("cannot use ")) return "не тот тип значения (" + e + ")";
             if (e.Contains("mismatched types")) return "разные типы в одном выражении (" + e + ")";
+            // javac
+            if (e == "cannot find symbol") return "имя не найдено: опечатка или не объявлено (" + e + ")";
+            if ((m = Regex.Match(e, "^'(.+)' expected$")).Success) return "не хватает «" + m.Groups[1].Value + "» (" + e + ")";
+            if (e == "missing return statement") return "метод должен вернуть значение: не хватает return (" + e + ")";
+            if (e.StartsWith("incompatible types")) return "несовместимые типы (" + e + ")";
+            if ((m = Regex.Match(e, @"^variable (\w+) might not have been initialized$")).Success) return "переменной " + m.Groups[1].Value + " не присвоено значение (" + e + ")";
+            if ((m = Regex.Match(e, @"^variable (\w+) is already defined")).Success) return "переменная " + m.Groups[1].Value + " уже объявлена (" + e + ")";
+            if (e == "unreachable statement") return "до этой строки выполнение никогда не дойдёт (" + e + ")";
+            if (e.StartsWith("class ") && e.Contains("is public, should be declared in a file named")) return "публичный класс должен называться как файл — Main (" + e + ")";
+            if (e.Contains("unreported exception")) return "проверяемое исключение нужно поймать или объявить в throws (" + e + ")";
             return e;
         }
 

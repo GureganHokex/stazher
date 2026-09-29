@@ -1,0 +1,1139 @@
+{
+ "track": "lang-java",
+ "roadmap": [
+  {
+   "topic_id": "java-basics",
+   "lang": "java",
+   "replaces": [
+    "be-py-basics"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Java: переменные и типы",
+   "grade": "junior",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "Класс Main и метод main, System.out, int/long/double/String/boolean, var и final, целое деление и приведение типов.",
+   "theory": "Java — компилируемый язык со строгими типами. Сначала javac проверяет весь код и превращает его в байт-код, потом java запускает программу. Опечатки и несовпадения типов видны до запуска.\n\nВесь код живёт внутри классов. Программа начинается с метода main:\n\n    public class Main {\n        public static void main(String[] args) {\n            System.out.println(\"Привет, Кодзилла!\");\n        }\n    }\n\n• Публичный класс называется как файл: class Main — в Main.java.\n• Каждая инструкция заканчивается точкой с запятой.\n\nПеременные объявляются с типом:\n\n    int qty = 2;              // целое\n    long views = 5_000_000_000L; // большое целое\n    double price = 19.90;     // дробное\n    String title = \"Лампа\";   // строка — в двойных кавычках\n    boolean inStock = true;\n    var total = qty * 1990;   // var: тип выводится сам (здесь int)\n    final int VAT = 20;       // final — значение нельзя изменить\n\nВажные мелочи:\n• int / int — целое деление: 7 / 2 == 3. Чтобы получить 3.5, одно из чисел нужно сделать дробным: (double) 7 / 2.\n• % — остаток от деления: 7 % 2 == 1.\n• + со строкой склеивает: \"Итого: \" + 2 + 3 даёт \"Итого: 23\", а \"Итого: \" + (2 + 3) — \"Итого: 5\".\n• System.out.println печатает и переводит строку, System.out.printf — по шаблону: %d целое, %s строка, %.2f дробь, %n перевод строки.\n\nМетод с параметрами и результатом объявляется внутри класса:\n\n    static int cartTotal(int price, int qty) {\n        return price * qty;\n    }\n\nТесты лежат рядом, в MainTest.java: он вызывает методы Main и сверяет результаты."
+  },
+  {
+   "topic_id": "java-control",
+   "lang": "java",
+   "replaces": [
+    "be-py-control"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Java: условия и циклы",
+   "grade": "junior",
+   "requires": [
+    "java-basics"
+   ],
+   "description": "if/else, логические операторы, switch со стрелками, циклы for, while и for-each, break и continue.",
+   "theory": "Условие пишется в круглых скобках, тело — в фигурных:\n\n    if (score >= 90) {\n        return \"отлично\";\n    } else if (score >= 75) {\n        return \"хорошо\";\n    } else {\n        return \"на доработку\";\n    }\n\n• Логика: && — «и», || — «или», ! — «не». Сравнение: ==, !=, <, <=, >, >=.\n• Тернарный оператор — короткое if: String label = qty > 0 ? \"в наличии\" : \"нет\";\n\nswitch со стрелками (Java 14+) выбирает вариант и сам останавливается, break не нужен:\n\n    String kind = switch (day) {\n        case 6, 7 -> \"выходной\";\n        default -> \"будни\";\n    };\n\nЦиклы:\n\n    for (int i = 0; i < 10; i++) { … }   // со счётчиком\n    while (total < 100) { … }             // пока условие верно\n    for (int price : prices) { … }        // по всем элементам массива или списка\n\n• break выходит из цикла, continue переходит к следующему шагу.\n• Индексы массива идут от 0 до length - 1: условие i < prices.length, а не <=.\n\nЕсли сумма может не влезть в int (больше 2 147 483 647), считай её в long: переполнение int не выдаёт ошибку, а молча портит число."
+  },
+  {
+   "topic_id": "java-collections",
+   "lang": "java",
+   "replaces": [
+    "be-py-collections"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Java: массивы, List и Map",
+   "grade": "junior",
+   "requires": [
+    "java-control"
+   ],
+   "description": "Массивы, ArrayList, HashMap, обёртки Integer и Double, getOrDefault, List.of и Map.of.",
+   "theory": "Массив — набор фиксированной длины:\n\n    int[] prices = {1990, 500, 7500};\n    prices[0] = 1890;\n    System.out.println(prices.length);   // 3 — это поле, без скобок\n\nСписок ArrayList растёт сам. Коллекции подключают через import java.util.*:\n\n    List<String> cart = new ArrayList<>();\n    cart.add(\"лампа\");\n    cart.add(0, \"стул\");      // вставить в начало\n    cart.get(1);              // \"лампа\"\n    cart.size();              // 2\n    cart.contains(\"стол\");    // false\n\nСловарь HashMap хранит пары ключ → значение:\n\n    Map<String, Integer> stock = new HashMap<>();\n    stock.put(\"лампа\", 3);\n    stock.put(\"лампа\", 5);           // тот же ключ — значение заменится\n    stock.get(\"шкаф\");               // null — такого ключа нет\n    stock.getOrDefault(\"шкаф\", 0);   // 0\n    for (var e : stock.entrySet()) { e.getKey(); e.getValue(); }\n\n• В угловых скобках пишут только классы: List<Integer>, а не List<int>. int, double и boolean автоматически упаковываются в Integer, Double и Boolean.\n• null нельзя распаковать в int: int n = stock.get(\"шкаф\") упадёт с NullPointerException.\n• List.of(1, 2, 3) и Map.of(\"a\", 1) создают неизменяемые коллекции — удобно для тестов и констант.\n• Списки и словари сравнивают через equals: он сверяет содержимое, а не адрес в памяти."
+  },
+  {
+   "topic_id": "java-methods",
+   "lang": "java",
+   "replaces": [
+    "be-py-functions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Java: методы и строки",
+   "grade": "junior",
+   "requires": [
+    "java-collections"
+   ],
+   "description": "static-методы, передача по значению, перегрузка, varargs, рекурсия; методы String и сравнение строк через equals.",
+   "theory": "Метод объявляет тип результата, имя и параметры с типами:\n\n    static int clamp(int value, int min, int max) {\n        return Math.max(min, Math.min(max, value));\n    }\n\n• void — метод ничего не возвращает.\n• Параметры передаются по значению: метод получает копию. Присвоение параметру не меняет переменную снаружи. Но у массива или объекта копируется ссылка — изменения внутри них видны снаружи.\n• Перегрузка: у методов может быть одно имя, если отличаются параметры — print(int) и print(String). Java выбирает подходящий по типам аргументов.\n• varargs: static int sum(int... nums) принимает любое число аргументов, внутри nums — массив.\n• Рекурсия — метод вызывает сам себя. Нужен базовый случай, иначе StackOverflowError:\n\n    static int digits(int n) {\n        if (n < 10) return 1;\n        return 1 + digits(n / 10);\n    }\n\nСтроки — объекты с полезными методами:\n\n    String s = \"  Гена Петров \";\n    s.trim();              // \"Гена Петров\"\n    s.trim().split(\" \");   // массив [\"Гена\", \"Петров\"]; split(\"\\\\s+\") — по любым пробелам\n    s.length();            // длина — это метод, со скобками\n    \"лампа\".toUpperCase(); // \"ЛАМПА\"\n    \"лампа\".charAt(0);     // 'л' — символ, тип char\n    String.valueOf(42);    // \"42\"\n\nСтроки сравнивают через equals: a.equals(b). Оператор == сравнивает ссылки — две одинаковые по тексту строки могут оказаться разными объектами."
+  },
+  {
+   "topic_id": "java-oop",
+   "lang": "java",
+   "replaces": [
+    "be-py-oop"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Java: классы и объекты",
+   "grade": "junior",
+   "requires": [
+    "java-methods"
+   ],
+   "description": "Классы, поля, конструкторы и this, private и геттеры, toString и @Override, static, интерфейсы.",
+   "theory": "Класс описывает данные (поля) и поведение (методы). Объект создают через new:\n\n    class Product {\n        private final String name;\n        private int price;\n\n        Product(String name, int price) {   // конструктор: имя как у класса, без типа результата\n            this.name = name;               // this.name — поле, name — параметр\n            this.price = price;\n        }\n\n        int getPrice() { return price; }\n\n        @Override\n        public String toString() {\n            return name + \" — \" + price + \" ₽\";\n        }\n    }\n\n    Product lamp = new Product(\"Лампа\", 1990);\n    System.out.println(lamp);   // вызовет toString\n\n• private закрывает поле от чужого кода — снаружи работают через методы (геттеры).\n• toString определяет, как объект печатается. Без него — что-то вроде Product@1b6d3586.\n• @Override просит компилятор проверить, что метод действительно переопределяет родительский.\n• static — общее для всего класса, а не для объекта: Counter.created.\n• Переменная хранит ссылку: Product b = a — это тот же объект, а не копия. == сравнивает ссылки.\n\nИнтерфейс — договор: какие методы обязан иметь класс.\n\n    interface Shape { double area(); }\n\n    class Circle implements Shape {\n        private final double r;\n        Circle(double r) { this.r = r; }\n        @Override\n        public double area() { return Math.PI * r * r; }\n    }\n\nВ одном файле может быть несколько классов, но публичный — только один, Main."
+  },
+  {
+   "topic_id": "java-exceptions",
+   "lang": "java",
+   "replaces": [
+    "be-py-exceptions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Java: исключения",
+   "grade": "junior",
+   "requires": [
+    "java-methods"
+   ],
+   "description": "try/catch/finally, throw, стандартные исключения, проверяемые и непроверяемые, свой класс исключения.",
+   "theory": "Ошибку во время работы Java сообщает исключением. Непойманное исключение останавливает программу и печатает трассировку со строкой, где всё случилось.\n\n    try {\n        int port = Integer.parseInt(text);\n    } catch (NumberFormatException e) {\n        System.out.println(\"не число: \" + e.getMessage());\n    } finally {\n        System.out.println(\"выполнится в любом случае\");\n    }\n\nБросить исключение самому:\n\n    if (amount <= 0) {\n        throw new IllegalArgumentException(\"сумма должна быть больше нуля\");\n    }\n\nЧастые стандартные исключения:\n• IllegalArgumentException — неверный аргумент.\n• IllegalStateException — операция невозможна в текущем состоянии (например, не хватает денег).\n• NullPointerException — обращение к null.\n• ArrayIndexOutOfBoundsException — индекс за пределами массива.\n• NumberFormatException — строка не превращается в число.\n\nПроверяемые (checked) исключения наследуют Exception. Метод, который их бросает, обязан объявить это в throws, а вызывающий — поймать или объявить дальше:\n\n    class StockException extends Exception {\n        StockException(String message) { super(message); }\n    }\n\n    static void reserve(int want) throws StockException { … }\n\nНепроверяемые наследуют RuntimeException — их объявлять не нужно.\n\n• Ловят конкретные исключения, а не всё подряд: catch (Exception e) спрячет и настоящие баги.\n• finally срабатывает даже после return внутри try.\n• Можно передать причину: new IllegalArgumentException(\"порт\", e) — исходная ошибка сохранится."
+  }
+ ],
+ "tasks": [
+  {
+   "task_id": "java-basics-01",
+   "topic_id": "java-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Итог корзины на Java",
+   "story": "Гена: «Часть бэкенда корзины живёт на Java. Начнём с простого: стоимость позиции.»",
+   "content": {
+    "question": "Допиши метод cartTotal(int price, int qty) — стоимость позиции: цена × количество.",
+    "entry": "cartTotal",
+    "code": "public class Main {\n    // стоимость позиции: цена × количество\n    static int cartTotal(int price, int qty) {\n        return 0;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(cartTotal(1990, 2));\n    }\n}",
+    "correct_answer": "public class Main {\n    // стоимость позиции: цена × количество\n    static int cartTotal(int price, int qty) {\n        return price * qty;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(cartTotal(1990, 2));\n    }\n}",
+    "tests_code": "public class MainTest {\n    public static void main(String[] args) {\n        Check.eq(\"1990 × 2\", () -> Main.cartTotal(1990, 2), 3980);\n        Check.eq(\"250 × 0\", () -> Main.cartTotal(250, 0), 0);\n        Check.eq(\"99 × 3\", () -> Main.cartTotal(99, 3), 297);\n    }\n}",
+    "requirements": [
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "Метод в Java объявляется внутри класса: тип результата (int), имя, параметры с типами. static значит, что метод вызывается без объекта — Main.cartTotal(…). Результат возвращают через return, инструкция заканчивается точкой с запятой.",
+   "hints": [
+    "Верни произведение через return.",
+    "Умножение — звёздочка: price * qty."
+   ]
+  },
+  {
+   "task_id": "java-basics-02",
+   "topic_id": "java-basics",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Где потерялась половина",
+   "story": "Ира: «В отчёте то цены круглые, то к итогу приклеилась цифра. Разберись, что печатает этот код.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "public class Main {\n    public static void main(String[] args) {\n        int price = 7;\n        System.out.println(price / 2);\n        System.out.println((double) price / 2);\n        System.out.println(\"Итого: \" + price + 3);\n        System.out.println(\"Итого: \" + (price + 3));\n        System.out.println(price % 4);\n    }\n}",
+    "language": "java",
+    "output": "3\n3.5\nИтого: 73\nИтого: 10\n3"
+   },
+   "explanation": "7 / 2 — деление двух int, оно целое: 3. (double) превращает 7 в 7.0 до деления, поэтому получается 3.5. Выражение со строкой считается слева направо: \"Итого: \" + 7 — уже строка, и к ней приклеивается 3 — выходит «Итого: 73». В скобках сначала считается сумма. 7 % 4 — остаток, 3.",
+   "hints": [
+    "Деление двух int отбрасывает дробную часть.",
+    "Строка + число = строка, дальше + тоже склеивает."
+   ]
+  },
+  {
+   "task_id": "java-basics-03",
+   "topic_id": "java-basics",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Первая программа",
+   "story": "Гена: «Допиши пропуски — без них javac программу не соберёт.»",
+   "content": {
+    "question": "Заполни пропуски: тип строки, печать по шаблону и константа.",
+    "code": "public class Main {\n    public static void main(String[] args) {\n        [[1]] title = \"Лампа\";\n        int price = 1990;\n        System.out.[[2]](\"%s стоит %d ₽%n\", title, price);\n        [[3]] int VAT = 20;\n        System.out.println(\"НДС \" + VAT + \"%\");\n    }\n}",
+    "blanks": [
+     {
+      "answer": [
+       "String",
+       "var"
+      ]
+     },
+     {
+      "answer": [
+       "printf"
+      ]
+     },
+     {
+      "answer": [
+       "final"
+      ]
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "Строковый тип — String (с большой буквы: это класс). Можно и var — тип выведется сам. Печать по шаблону с %s и %d — printf, %n переводит строку. final запрещает менять значение: так объявляют константы.",
+   "hints": [
+    "Строки в Java — класс с большой буквы.",
+    "Печать по шаблону — print с буквой f."
+   ]
+  },
+  {
+   "task_id": "java-basics-04",
+   "topic_id": "java-basics",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Средний чек без копеек",
+   "story": "Ира: «Средний чек всегда круглый: 2.0 вместо 2.5. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "public class Main {\n    static double average(int sum, int count) {\n        return sum / count;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(average(5, 2));\n    }\n}",
+    "bug_line": 3,
+    "options": [
+     "Деление двух int целое — дробная часть теряется ещё до превращения в double",
+     "Метод не может возвращать double",
+     "Параметры sum и count должны быть long",
+     "println не печатает дробные числа"
+    ],
+    "correct_answer": 0,
+    "language": "java"
+   },
+   "explanation": "sum / count — деление двух int, результат 2. Только потом Java превращает 2 в double — получается 2.0, потерянная половина уже не вернётся. Нужно сделать дробным хотя бы одно число до деления: (double) sum / count.",
+   "hints": [
+    "Что происходит раньше: деление или превращение в double?",
+    "Приведи sum к double перед делением."
+   ]
+  },
+  {
+   "task_id": "java-basics-05",
+   "topic_id": "java-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Температура для витрины",
+   "story": "Стас: «Для американского магазина нужны градусы Фаренгейта. Напиши перевод из Цельсия.»",
+   "content": {
+    "question": "Напиши fahrenheit(double c): F = C × 9 / 5 + 32.",
+    "entry": "fahrenheit",
+    "code": "public class Main {\n    // переводит градусы Цельсия в Фаренгейт\n    static double fahrenheit(double c) {\n        return 0;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(fahrenheit(100));\n    }\n}",
+    "correct_answer": "public class Main {\n    // переводит градусы Цельсия в Фаренгейт\n    static double fahrenheit(double c) {\n        return c * 9 / 5 + 32;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(fahrenheit(100));\n    }\n}",
+    "tests_code": "public class MainTest {\n    public static void main(String[] args) {\n        Check.near(\"кипение: 100\", () -> Main.fahrenheit(100), 212);\n        Check.near(\"замерзание: 0\", () -> Main.fahrenheit(0), 32);\n        Check.near(\"минус 40\", () -> Main.fahrenheit(-40), -40);\n        Check.near(\"36.6\", () -> Main.fahrenheit(36.6), 97.88000000000001);\n    }\n}",
+    "requirements": [
+     {
+      "input": "умножает на 9 и делит на 5 (или умножает на 1.8)",
+      "expected": {
+       "regex": "\\*\\s*9\\s*/\\s*5|9\\.0?\\s*/\\s*5|1\\.8"
+      }
+     },
+     {
+      "input": "прибавляет 32",
+      "expected": {
+       "regex": "\\+\\s*32"
+      }
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "c — double, поэтому c * 9 / 5 считается в дробных числах. Ловушка: 9 / 5 * c даст 1 * c, потому что 9 / 5 — деление двух int. Дробные числа сравнивают с допуском: 36.6 × 9 / 5 + 32 = 97.88000000000001 — так устроен double.",
+   "hints": [
+    "Формула: c * 9 / 5 + 32.",
+    "Начни с c — тогда всё выражение будет дробным."
+   ]
+  },
+  {
+   "task_id": "java-control-01",
+   "topic_id": "java-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Оценка за код-ревью",
+   "story": "Гена: «Бот код-ревью ставит оценку по баллам. Перенеси правило на Java.»",
+   "content": {
+    "question": "Напиши reviewGrade(int score): от 90 — «отлично», от 75 — «хорошо», от 50 — «зачёт», иначе «на доработку».",
+    "entry": "reviewGrade",
+    "code": "public class Main {\n    // оценка за код-ревью по баллам\n    static String reviewGrade(int score) {\n        return \"\";\n    }\n\n    public static void main(String[] args) {\n        System.out.println(reviewGrade(80));\n    }\n}",
+    "correct_answer": "public class Main {\n    // оценка за код-ревью по баллам\n    static String reviewGrade(int score) {\n        if (score >= 90) {\n            return \"отлично\";\n        } else if (score >= 75) {\n            return \"хорошо\";\n        } else if (score >= 50) {\n            return \"зачёт\";\n        }\n        return \"на доработку\";\n    }\n\n    public static void main(String[] args) {\n        System.out.println(reviewGrade(80));\n    }\n}",
+    "tests_code": "public class MainTest {\n    public static void main(String[] args) {\n        Check.eq(\"95\", () -> Main.reviewGrade(95), \"отлично\");\n        Check.eq(\"ровно 90\", () -> Main.reviewGrade(90), \"отлично\");\n        Check.eq(\"80\", () -> Main.reviewGrade(80), \"хорошо\");\n        Check.eq(\"ровно 75\", () -> Main.reviewGrade(75), \"хорошо\");\n        Check.eq(\"50\", () -> Main.reviewGrade(50), \"зачёт\");\n        Check.eq(\"12\", () -> Main.reviewGrade(12), \"на доработку\");\n    }\n}",
+    "requirements": [
+     {
+      "input": "сравнивает с 90",
+      "expected": {
+       "regex": ">=?\\s*(90|89)\\b|\\b(90|89)\\s*<=?"
+      }
+     },
+     {
+      "input": "сравнивает с 75",
+      "expected": {
+       "regex": ">=?\\s*(75|74)\\b|\\b(75|74)\\s*<=?"
+      }
+     },
+     {
+      "input": "сравнивает с 50",
+      "expected": {
+       "regex": ">=?\\s*(50|49)\\b|\\b(50|49)\\s*<=?"
+      }
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "Условия проверяются сверху вниз, и первое сработавшее возвращает результат. Поэтому начинают с самого высокого порога: если сначала проверить score >= 50, то 95 получит «зачёт». Границы включительные — нужен >=, а не >.",
+   "hints": [
+    "Начни с порога 90 и спускайся вниз.",
+    "Ровно 90 — это «отлично»: используй >=."
+   ]
+  },
+  {
+   "task_id": "java-control-02",
+   "topic_id": "java-control",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "continue и break",
+   "story": "Ира: «Цикл выгрузки обрывается раньше, чем я ждала. Что он печатает?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "public class Main {\n    public static void main(String[] args) {\n        int total = 0;\n        for (int i = 1; i <= 10; i++) {\n            if (i % 2 == 0) {\n                continue;\n            }\n            if (i > 7) {\n                break;\n            }\n            total += i;\n            System.out.println(\"i = \" + i);\n        }\n        System.out.println(\"total = \" + total);\n    }\n}",
+    "language": "java",
+    "output": "i = 1\ni = 3\ni = 5\ni = 7\ntotal = 16"
+   },
+   "explanation": "continue пропускает чётные i — до печати дело не доходит. Нечётные 1, 3, 5, 7 печатаются и копятся в total: 1 + 3 + 5 + 7 = 16. На i = 9 срабатывает break и цикл заканчивается.",
+   "hints": [
+    "continue сразу переходит к следующему i.",
+    "break на первом нечётном больше 7."
+   ]
+  },
+  {
+   "task_id": "java-control-03",
+   "topic_id": "java-control",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "FizzBuzz для ленты заказов",
+   "story": "Гена: «Классика собеседований. Собери метод из строк.»",
+   "content": {
+    "question": "Собери label(int n): кратно 15 — FizzBuzz, кратно 3 — Fizz, кратно 5 — Buzz, иначе само число строкой.",
+    "lines": [
+     "static String label(int n) {",
+     "    if (n % 15 == 0) return \"FizzBuzz\";",
+     "    if (n % 3 == 0) return \"Fizz\";",
+     "    if (n % 5 == 0) return \"Buzz\";",
+     "    return String.valueOf(n);",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "static String label(int n) {",
+      "    if (n % 15 == 0) return \"FizzBuzz\";",
+      "    if (n % 5 == 0) return \"Buzz\";",
+      "    if (n % 3 == 0) return \"Fizz\";",
+      "    return String.valueOf(n);",
+      "}"
+     ]
+    ],
+    "distractors": [
+     "    return n;",
+     "        break;"
+    ],
+    "language": "java"
+   },
+   "explanation": "Кратность 15 проверяют первой, иначе 15 успеет попасть в Fizz. Fizz и Buzz можно поменять местами. return n не соберётся — метод возвращает String, число превращают в строку через String.valueOf. break здесь не нужен: return сразу выходит из метода.",
+   "hints": [
+    "Самый частный случай — первым.",
+    "Число в строку превращает String.valueOf."
+   ]
+  },
+  {
+   "task_id": "java-control-04",
+   "topic_id": "java-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма до n",
+   "story": "Гена: «Для отчёта нужна сумма 1 + 2 + … + n. Осторожно: n бывает большим.»",
+   "content": {
+    "question": "Напиши sumTo(int n) — сумму чисел от 1 до n включительно. Для n ≤ 0 — 0. Сумма может не влезть в int.",
+    "entry": "sumTo",
+    "code": "public class Main {\n    // сумма 1 + 2 + ... + n\n    static long sumTo(int n) {\n        return 0;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(sumTo(10));\n    }\n}",
+    "correct_answer": "public class Main {\n    // сумма 1 + 2 + ... + n\n    static long sumTo(int n) {\n        long total = 0;\n        for (int i = 1; i <= n; i++) {\n            total += i;\n        }\n        return total;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(sumTo(10));\n    }\n}",
+    "tests_code": "public class MainTest {\n    public static void main(String[] args) {\n        Check.eq(\"n = 1\", () -> Main.sumTo(1), 1);\n        Check.eq(\"n = 10\", () -> Main.sumTo(10), 55);\n        Check.eq(\"n = 0\", () -> Main.sumTo(0), 0);\n        Check.eq(\"n = -5\", () -> Main.sumTo(-5), 0);\n        Check.eq(\"n = 100000 (не влезает в int)\", () -> Main.sumTo(100000), 5000050000L);\n    }\n}",
+    "requirements": [
+     {
+      "input": "копит сумму в переменной long",
+      "expected": {
+       "regex": "long\\s+\\w+\\s*="
+      }
+     },
+     {
+      "input": "обходит числа циклом",
+      "expected": {
+       "regex": "\\b(for|while)\\s*\\("
+      }
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "Сумма до 100 000 — 5 000 050 000, это больше максимума int (2 147 483 647). Переменная int молча переполнилась бы и выдала отрицательное число, поэтому копим в long. Цикл for с условием i <= n сам не выполнится ни разу для n ≤ 0 — отдельная проверка не нужна.",
+   "hints": [
+    "long total = 0; и цикл for от 1 до n.",
+    "Условие цикла — i <= n, включительно."
+   ]
+  },
+  {
+   "task_id": "java-control-05",
+   "topic_id": "java-control",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Сумма заказа падает",
+   "story": "Ира: «Подсчёт суммы заказа падает с ArrayIndexOutOfBoundsException. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "public class Main {\n    static int orderSum(int[] prices) {\n        int sum = 0;\n        for (int i = 0; i <= prices.length; i++) {\n            sum += prices[i];\n        }\n        return sum;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(orderSum(new int[] {100, 250, 40}));\n    }\n}",
+    "bug_line": 4,
+    "options": [
+     "Условие i <= prices.length заходит за последний индекс",
+     "Счётчик должен начинаться с 1",
+     "sum нужно объявить как double",
+     "length у массива пишется со скобками: length()"
+    ],
+    "correct_answer": 0,
+    "language": "java"
+   },
+   "explanation": "Индексы массива из трёх элементов — 0, 1 и 2, а length равно 3. С условием <= цикл делает лишний шаг с i = 3 и падает. Нужно i < prices.length — или цикл for-each: for (int p : prices) sum += p;",
+   "hints": [
+    "Какой последний индекс у массива длины 3?",
+    "Поменяй <= на <."
+   ]
+  },
+  {
+   "task_id": "java-collections-01",
+   "topic_id": "java-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Частота тегов",
+   "story": "Стас: «Хочу видеть, какие теги у товаров встречаются чаще. Посчитай их.»",
+   "content": {
+    "question": "Напиши tagCounts(List<String> tags) — Map, где у каждого тега записано, сколько раз он встретился.",
+    "entry": "tagCounts",
+    "code": "import java.util.HashMap;\nimport java.util.List;\nimport java.util.Map;\n\npublic class Main {\n    // сколько раз встретился каждый тег\n    static Map<String, Integer> tagCounts(List<String> tags) {\n        Map<String, Integer> counts = new HashMap<>();\n        return counts;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(tagCounts(List.of(\"sale\", \"new\", \"sale\")));\n    }\n}",
+    "correct_answer": "import java.util.HashMap;\nimport java.util.List;\nimport java.util.Map;\n\npublic class Main {\n    // сколько раз встретился каждый тег\n    static Map<String, Integer> tagCounts(List<String> tags) {\n        Map<String, Integer> counts = new HashMap<>();\n        for (String tag : tags) {\n            counts.put(tag, counts.getOrDefault(tag, 0) + 1);\n        }\n        return counts;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(tagCounts(List.of(\"sale\", \"new\", \"sale\")));\n    }\n}",
+    "tests_code": "import java.util.List;\nimport java.util.Map;\n\npublic class MainTest {\n    public static void main(String[] args) {\n        Check.eq(\"sale, new, sale\", () -> Main.tagCounts(List.of(\"sale\", \"new\", \"sale\")), Map.of(\"sale\", 2, \"new\", 1));\n        Check.eq(\"один тег\", () -> Main.tagCounts(List.of(\"hit\")), Map.of(\"hit\", 1));\n        Check.eq(\"пустой список\", () -> Main.tagCounts(List.of()), Map.of());\n        Check.eq(\"регистр важен\", () -> Main.tagCounts(List.of(\"New\", \"new\", \"new\")), Map.of(\"New\", 1, \"new\", 2));\n    }\n}",
+    "requirements": [
+     {
+      "input": "обходит список тегов",
+      "expected": {
+       "regex": "for\\s*\\("
+      }
+     },
+     {
+      "input": "берёт текущее значение через getOrDefault, merge или containsKey",
+      "expected": {
+       "regex": "getOrDefault|\\.merge\\s*\\(|containsKey"
+      }
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "Классический подсчёт: для каждого тега берём текущее число (getOrDefault вернёт 0, если тега ещё нет) и кладём на единицу больше. Короче — counts.merge(tag, 1, Integer::sum). Map сравнивается по содержимому, поэтому порядок ключей в HashMap не важен.",
+   "hints": [
+    "for (String tag : tags) — обход списка.",
+    "counts.put(tag, counts.getOrDefault(tag, 0) + 1);"
+   ]
+  },
+  {
+   "task_id": "java-collections-02",
+   "topic_id": "java-collections",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Список и словарь",
+   "story": "Гена: «Прежде чем писать склад, проверь, как ведут себя ArrayList и HashMap.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "import java.util.ArrayList;\nimport java.util.HashMap;\nimport java.util.List;\nimport java.util.Map;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<String> cart = new ArrayList<>();\n        cart.add(\"лампа\");\n        cart.add(\"стол\");\n        cart.add(0, \"стул\");\n        System.out.println(cart);\n        System.out.println(cart.size() + \" \" + cart.get(1));\n\n        Map<String, Integer> stock = new HashMap<>();\n        stock.put(\"лампа\", 3);\n        stock.put(\"лампа\", 5);\n        System.out.println(stock.get(\"лампа\") + \" \" + stock.get(\"шкаф\"));\n        System.out.println(stock.getOrDefault(\"шкаф\", 0));\n    }\n}",
+    "language": "java",
+    "output": "[стул, лампа, стол]\n3 лампа\n5 null\n0"
+   },
+   "explanation": "add(0, …) вставляет в начало, остальные сдвигаются: [стул, лампа, стол], индекс 1 — «лампа». Второй put с тем же ключом заменяет значение — 5. get для отсутствующего ключа возвращает null, а getOrDefault — запасное значение.",
+   "hints": [
+    "add(0, x) вставляет в начало списка.",
+    "get по несуществующему ключу даёт null."
+   ]
+  },
+  {
+   "task_id": "java-collections-03",
+   "topic_id": "java-collections",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Цены из справочника",
+   "story": "Гена: «Справочник цен на HashMap почти готов. Заполни пропуски.»",
+   "content": {
+    "question": "Заполни пропуски: тип значений словаря, запись и чтение.",
+    "code": "import java.util.HashMap;\nimport java.util.Map;\n\npublic class Main {\n    public static void main(String[] args) {\n        Map<String, [[1]]> prices = new HashMap<>();\n        prices.[[2]](\"лампа\", 1990);\n        prices.put(\"стол\", 7500);\n        int lamp = prices.[[3]](\"лампа\");\n        System.out.println(lamp + prices.getOrDefault(\"шкаф\", 0));\n    }\n}",
+    "blanks": [
+     {
+      "answer": [
+       "Integer"
+      ]
+     },
+     {
+      "answer": [
+       "put"
+      ]
+     },
+     {
+      "answer": [
+       "get"
+      ]
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "В угловых скобках пишут классы, поэтому не int, а обёртка Integer. Записывают пару через put, читают по ключу через get. Integer из get автоматически распаковывается в int.",
+   "hints": [
+    "List<int> и Map<String, int> не компилируются.",
+    "Запись — put, чтение — get."
+   ]
+  },
+  {
+   "task_id": "java-collections-04",
+   "topic_id": "java-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товары по бюджету",
+   "story": "Стас: «Покупатель ввёл бюджет. Оставь цены, которые в него укладываются, в том же порядке.»",
+   "content": {
+    "question": "Напиши affordable(List<Integer> prices, int budget) — новый список цен не дороже бюджета, в исходном порядке.",
+    "entry": "affordable",
+    "code": "import java.util.ArrayList;\nimport java.util.List;\n\npublic class Main {\n    // цены, которые укладываются в бюджет\n    static List<Integer> affordable(List<Integer> prices, int budget) {\n        List<Integer> result = new ArrayList<>();\n        return result;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(affordable(List.of(500, 1500, 999, 2000), 1000));\n    }\n}",
+    "correct_answer": "import java.util.ArrayList;\nimport java.util.List;\n\npublic class Main {\n    // цены, которые укладываются в бюджет\n    static List<Integer> affordable(List<Integer> prices, int budget) {\n        List<Integer> result = new ArrayList<>();\n        for (int price : prices) {\n            if (price <= budget) {\n                result.add(price);\n            }\n        }\n        return result;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(affordable(List.of(500, 1500, 999, 2000), 1000));\n    }\n}",
+    "tests_code": "import java.util.List;\n\npublic class MainTest {\n    public static void main(String[] args) {\n        Check.eq(\"бюджет 1000\", () -> Main.affordable(List.of(500, 1500, 999, 2000), 1000), List.of(500, 999));\n        Check.eq(\"ровно бюджет\", () -> Main.affordable(List.of(1000, 1001), 1000), List.of(1000));\n        Check.eq(\"всё дорого\", () -> Main.affordable(List.of(3000, 4000), 100), List.of());\n        Check.eq(\"пустой список\", () -> Main.affordable(List.of(), 500), List.of());\n    }\n}",
+    "requirements": [
+     {
+      "input": "сравнивает цену с бюджетом",
+      "expected": {
+       "regex": "<=\\s*budget|budget\\s*>="
+      }
+     },
+     {
+      "input": "собирает подходящие цены (add или filter)",
+      "expected": {
+       "regex": "\\.add\\s*\\(|\\.filter\\s*\\("
+      }
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "Обходим список, подходящие цены добавляем в новый ArrayList — исходный список не трогаем (List.of вообще нельзя менять). «Не дороже» — это <=, иначе цена ровно в бюджет потеряется. То же самое на стримах: prices.stream().filter(p -> p <= budget).toList().",
+   "hints": [
+    "for (int price : prices) и if (price <= budget).",
+    "Подходящие — в result.add(price)."
+   ]
+  },
+  {
+   "task_id": "java-collections-05",
+   "topic_id": "java-collections",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Остаток на складе падает",
+   "story": "Ира: «Запрос остатка по товару, которого нет, роняет сервис с NullPointerException. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "import java.util.Map;\n\npublic class Main {\n    static int stockOf(Map<String, Integer> stock, String item) {\n        int n = stock.get(item);\n        return n;\n    }\n\n    public static void main(String[] args) {\n        Map<String, Integer> stock = Map.of(\"лампа\", 3);\n        System.out.println(stockOf(stock, \"шкаф\"));\n    }\n}",
+    "bug_line": 5,
+    "options": [
+     "get вернёт null для отсутствующего ключа, а null нельзя распаковать в int",
+     "Map.of создаёт пустой словарь",
+     "Ключи Map не могут быть строками",
+     "Метод должен возвращать Integer"
+    ],
+    "correct_answer": 0,
+    "language": "java"
+   },
+   "explanation": "Для ключа «шкаф» get возвращает null. Присваивание в int распаковывает Integer, а распаковать null нельзя — NullPointerException. Надёжнее stock.getOrDefault(item, 0).",
+   "hints": [
+    "Что возвращает get, если ключа нет?",
+    "Нужно запасное значение — getOrDefault."
+   ]
+  },
+  {
+   "task_id": "java-methods-01",
+   "topic_id": "java-methods",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Инициалы в карточке",
+   "story": "Гена: «В карточке сотрудника нужны инициалы: из „Гена Петров“ — „Г. П.“. Имена приходят как попало.»",
+   "content": {
+    "question": "Напиши initials(String fullName): первые буквы имени и фамилии заглавными, через точку и пробел — «Г. П.». Лишние пробелы вокруг и между словами бывают.",
+    "entry": "initials",
+    "code": "public class Main {\n    // \"Гена Петров\" -> \"Г. П.\"\n    static String initials(String fullName) {\n        return \"\";\n    }\n\n    public static void main(String[] args) {\n        System.out.println(initials(\"Гена Петров\"));\n    }\n}",
+    "correct_answer": "public class Main {\n    // \"Гена Петров\" -> \"Г. П.\"\n    static String initials(String fullName) {\n        String[] parts = fullName.trim().split(\"\\\\s+\");\n        String first = parts[0].substring(0, 1).toUpperCase();\n        String last = parts[1].substring(0, 1).toUpperCase();\n        return first + \". \" + last + \".\";\n    }\n\n    public static void main(String[] args) {\n        System.out.println(initials(\"Гена Петров\"));\n    }\n}",
+    "tests_code": "public class MainTest {\n    public static void main(String[] args) {\n        Check.eq(\"Гена Петров\", () -> Main.initials(\"Гена Петров\"), \"Г. П.\");\n        Check.eq(\"строчные буквы\", () -> Main.initials(\"ира смирнова\"), \"И. С.\");\n        Check.eq(\"лишние пробелы\", () -> Main.initials(\"  Стас   Волков \"), \"С. В.\");\n    }\n}",
+    "requirements": [
+     {
+      "input": "разбивает имя на слова",
+      "expected": {
+       "regex": "split\\s*\\("
+      }
+     },
+     {
+      "input": "делает буквы заглавными",
+      "expected": {
+       "regex": "toUpperCase"
+      }
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "trim убирает пробелы по краям, split(\"\\\\s+\") режет по любому количеству пробелов подряд — с split(\" \") между «Стас» и «Волков» получились бы пустые слова. substring(0, 1) берёт первую букву строкой, toUpperCase делает её заглавной.",
+   "hints": [
+    "fullName.trim().split(\"\\\\s+\") — слова без пустых кусков.",
+    "Первая буква: parts[0].substring(0, 1).toUpperCase()."
+   ]
+  },
+  {
+   "task_id": "java-methods-02",
+   "topic_id": "java-methods",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Копия, ссылка и перегрузка",
+   "story": "Гена: «Один метод меняет данные, другой — нет. А какой из трёх kind вызовется? Проверь себя.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "public class Main {\n    static void bump(int x) {\n        x = x + 10;\n    }\n\n    static void bump(int[] xs) {\n        xs[0] = xs[0] + 10;\n    }\n\n    static String kind(int x) { return \"int\"; }\n    static String kind(long x) { return \"long\"; }\n    static String kind(double x) { return \"double\"; }\n\n    public static void main(String[] args) {\n        int a = 1;\n        int[] b = {1};\n        bump(a);\n        bump(b);\n        System.out.println(a + \" \" + b[0]);\n        System.out.println(kind(5) + \" \" + kind(5L) + \" \" + kind(5.0));\n        System.out.println(kind('A'));\n    }\n}",
+    "language": "java",
+    "output": "1 11\nint long double\nint"
+   },
+   "explanation": "bump(int) получает копию числа — a остаётся 1. bump(int[]) получает копию ссылки на тот же массив, поэтому изменение видно снаружи — 11. Перегрузку Java выбирает по типу аргумента: 5 — int, 5L — long, 5.0 — double. Для char отдельного метода нет, и символ расширяется до ближайшего подходящего типа — int.",
+   "hints": [
+    "Примитив копируется, у массива копируется ссылка.",
+    "char автоматически превращается в int."
+   ]
+  },
+  {
+   "task_id": "java-methods-03",
+   "topic_id": "java-methods",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма любых чисел",
+   "story": "Гена: «Нужен метод, который сложит сколько угодно чисел: sum(1, 2), sum(5, 10, 20)… Собери его.»",
+   "content": {
+    "question": "Собери sum(int... nums) — сумму всех переданных чисел.",
+    "lines": [
+     "static int sum(int... nums) {",
+     "    int total = 0;",
+     "    for (int n : nums) {",
+     "        total += n;",
+     "    }",
+     "    return total;",
+     "}"
+    ],
+    "distractors": [
+     "    return nums;",
+     "    for (int n : total) {"
+    ],
+    "language": "java"
+   },
+   "explanation": "int... nums — varargs: вызывающий пишет числа через запятую, а внутри метода nums — обычный массив int[]. Его обходят for-each и копят сумму. return nums не соберётся: метод возвращает int, а не массив.",
+   "hints": [
+    "Сначала total = 0, потом цикл.",
+    "Обходим nums, а не total."
+   ]
+  },
+  {
+   "task_id": "java-methods-04",
+   "topic_id": "java-methods",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Сумма цифр артикула",
+   "story": "Стас: «Контрольная цифра артикула — сумма его цифр. Минус в начале бывает у возвратов, его не считаем.»",
+   "content": {
+    "question": "Напиши digitSum(long n) — сумму цифр числа. Знак не учитывается: digitSum(-1990) == 19. Можно рекурсией.",
+    "entry": "digitSum",
+    "code": "public class Main {\n    // сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\n    static int digitSum(long n) {\n        return 0;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(digitSum(1990));\n    }\n}",
+    "correct_answer": "public class Main {\n    // сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\n    static int digitSum(long n) {\n        n = Math.abs(n);\n        if (n < 10) {\n            return (int) n;\n        }\n        return (int) (n % 10) + digitSum(n / 10);\n    }\n\n    public static void main(String[] args) {\n        System.out.println(digitSum(1990));\n    }\n}",
+    "tests_code": "public class MainTest {\n    public static void main(String[] args) {\n        Check.eq(\"0\", () -> Main.digitSum(0), 0);\n        Check.eq(\"7\", () -> Main.digitSum(7), 7);\n        Check.eq(\"1990\", () -> Main.digitSum(1990), 19);\n        Check.eq(\"123456789\", () -> Main.digitSum(123456789), 45);\n        Check.eq(\"возврат -1990\", () -> Main.digitSum(-1990), 19);\n        Check.eq(\"длинный 9999999999\", () -> Main.digitSum(9999999999L), 90);\n    }\n}",
+    "requirements": [
+     {
+      "input": "берёт последнюю цифру остатком от деления на 10",
+      "expected": {
+       "regex": "%\\s*10"
+      }
+     },
+     {
+      "input": "отбрасывает последнюю цифру делением на 10",
+      "expected": {
+       "regex": "/\\s*10"
+      }
+     },
+     {
+      "input": "убирает знак",
+      "expected": {
+       "regex": "Math\\.abs|<\\s*0|-\\s*n\\b"
+      }
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "Последняя цифра — n % 10, остальное число — n / 10. Рекурсия: сумма цифр = последняя цифра + сумма цифр остального; базовый случай — однозначное число. Для отрицательного n остаток тоже отрицательный (-1990 % 10 == 0, -199 % 10 == -9), поэтому знак убирают сразу: Math.abs(n). Цикл while (n > 0) тоже подходит.",
+   "hints": [
+    "n % 10 — последняя цифра, n / 10 — число без неё.",
+    "Сначала n = Math.abs(n)."
+   ]
+  },
+  {
+   "task_id": "java-methods-05",
+   "topic_id": "java-methods",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Админ не проходит",
+   "story": "Ира: «Роль „admin“ приходит из базы, а доступ к админке не открывается. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "public class Main {\n    static boolean isAdmin(String role) {\n        return role == \"admin\";\n    }\n\n    public static void main(String[] args) {\n        String role = new String(\"admin\");\n        System.out.println(isAdmin(role));\n    }\n}",
+    "bug_line": 3,
+    "options": [
+     "== сравнивает ссылки на объекты, а не текст — строки сравнивают через equals",
+     "Метод должен возвращать String",
+     "Строку из new String нельзя передавать в метод",
+     "boolean нельзя напечатать через println"
+    ],
+    "correct_answer": 0,
+    "language": "java"
+   },
+   "explanation": "Строка из базы (здесь — new String) — отдельный объект, и == проверяет, тот ли это объект, а не одинаковый ли текст. Получается false. Правильно: \"admin\".equals(role) — такая запись ещё и не падает, если role == null.",
+   "hints": [
+    "Что именно сравнивает == у объектов?",
+    "Для текста — метод equals."
+   ]
+  },
+  {
+   "task_id": "java-oop-01",
+   "topic_id": "java-oop",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Корзина-объект",
+   "story": "Гена: «Хватит считать корзину отдельными методами — пусть объект Cart сам копит сумму.»",
+   "content": {
+    "question": "Допиши класс Cart: метод add(int price, int qty) добавляет позицию, total() возвращает сумму всех позиций.",
+    "entry": "Cart",
+    "code": "class Cart {\n    private int sum;\n\n    // добавить позицию: цена × количество\n    void add(int price, int qty) {\n    }\n\n    int total() {\n        return sum;\n    }\n}\n\npublic class Main {\n    public static void main(String[] args) {\n        Cart cart = new Cart();\n        cart.add(1990, 2);\n        cart.add(500, 1);\n        System.out.println(cart.total());\n    }\n}",
+    "correct_answer": "class Cart {\n    private int sum;\n\n    // добавить позицию: цена × количество\n    void add(int price, int qty) {\n        sum += price * qty;\n    }\n\n    int total() {\n        return sum;\n    }\n}\n\npublic class Main {\n    public static void main(String[] args) {\n        Cart cart = new Cart();\n        cart.add(1990, 2);\n        cart.add(500, 1);\n        System.out.println(cart.total());\n    }\n}",
+    "tests_code": "public class MainTest {\n    public static void main(String[] args) {\n        Check.eq(\"пустая корзина\", () -> new Cart().total(), 0);\n        Check.eq(\"1990 × 2 + 500\", () -> {\n            Cart c = new Cart();\n            c.add(1990, 2);\n            c.add(500, 1);\n            return c.total();\n        }, 4480);\n        Check.eq(\"позиция с количеством 0\", () -> {\n            Cart c = new Cart();\n            c.add(700, 0);\n            c.add(100, 3);\n            return c.total();\n        }, 300);\n        Check.eq(\"у каждой корзины своя сумма\", () -> {\n            Cart a = new Cart();\n            Cart b = new Cart();\n            a.add(100, 1);\n            b.add(5, 2);\n            return a.total() + \"/\" + b.total();\n        }, \"100/10\");\n    }\n}",
+    "requirements": [
+     {
+      "input": "накапливает сумму в поле sum",
+      "expected": {
+       "regex": "\\bsum\\s*\\+=|sum\\s*=\\s*sum\\s*\\+"
+      }
+     },
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "Поле sum живёт внутри объекта: у каждой корзины своё. add увеличивает его на стоимость позиции, total просто отдаёт. Поле private — снаружи сумму не испортить, только через add. Если сделать sum static, все корзины делили бы одну сумму — последний тест это ловит.",
+   "hints": [
+    "В add: sum += price * qty;",
+    "Поле объявлено в классе — в методе к нему обращаются по имени."
+   ]
+  },
+  {
+   "task_id": "java-oop-02",
+   "topic_id": "java-oop",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Ссылка или копия",
+   "story": "Гена: «Кажется, я поменял один счётчик, а изменились два. Что напечатает этот код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "class Counter {\n    static int created = 0;\n    int value;\n\n    Counter() {\n        created++;\n    }\n}\n\npublic class Main {\n    public static void main(String[] args) {\n        Counter a = new Counter();\n        Counter b = a;\n        b.value = 5;\n        Counter c = new Counter();\n        c.value = a.value + 1;\n        System.out.println(a.value + \" \" + b.value + \" \" + c.value);\n        System.out.println(Counter.created);\n        System.out.println(a == b);\n        System.out.println(a == c);\n    }\n}",
+    "language": "java",
+    "output": "5 5 6\n2\ntrue\nfalse"
+   },
+   "explanation": "b = a копирует ссылку, а не объект: a и b — один и тот же счётчик, поэтому у обоих 5. new вызывался дважды, и общее для класса static-поле created равно 2. == у объектов сравнивает ссылки: a и b — один объект, a и c — разные.",
+   "hints": [
+    "Counter b = a — это не новый объект.",
+    "static-поле одно на весь класс."
+   ]
+  },
+  {
+   "task_id": "java-oop-03",
+   "topic_id": "java-oop",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Фигуры для конструктора витрины",
+   "story": "Гена: «Конструктор витрины считает площадь блоков. Прямоугольник должен выполнять договор Shape.»",
+   "content": {
+    "question": "Заполни пропуски: класс реализует интерфейс, конструктор заполняет поле, метод переопределяет area.",
+    "code": "interface Shape {\n    double area();\n}\n\nclass Rect [[1]] Shape {\n    private final double w, h;\n\n    Rect(double w, double h) {\n        [[2]].w = w;\n        this.h = h;\n    }\n\n    [[3]]\n    public double area() {\n        return w * h;\n    }\n}\n\npublic class Main {\n    public static void main(String[] args) {\n        Shape s = new Rect(2, 3);\n        System.out.println(s.area());\n    }\n}",
+    "blanks": [
+     {
+      "answer": [
+       "implements"
+      ]
+     },
+     {
+      "answer": [
+       "this"
+      ]
+     },
+     {
+      "answer": [
+       "@Override"
+      ]
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "Интерфейс класс реализует через implements (extends — для наследования от класса). this.w — поле объекта; без this параметр w присвоился бы сам себе. @Override просит компилятор проверить, что area действительно есть в Shape — опечатка в имени сразу станет ошибкой.",
+   "hints": [
+    "Интерфейсы реализуют, классы наследуют.",
+    "Поле с тем же именем, что у параметра, — через this."
+   ]
+  },
+  {
+   "task_id": "java-oop-04",
+   "topic_id": "java-oop",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товар печатает себя сам",
+   "story": "Стас: «В логах вместо товаров какие-то Product@1b6d3586. Пусть товар печатается по-человечески.»",
+   "content": {
+    "question": "Переопредели в Product метод toString: «Лампа — 1990 ₽» (название, пробел, длинное тире, пробел, цена, пробел, ₽).",
+    "entry": "Product",
+    "code": "class Product {\n    private final String name;\n    private final int price;\n\n    Product(String name, int price) {\n        this.name = name;\n        this.price = price;\n    }\n}\n\npublic class Main {\n    public static void main(String[] args) {\n        System.out.println(new Product(\"Лампа\", 1990));\n    }\n}",
+    "correct_answer": "class Product {\n    private final String name;\n    private final int price;\n\n    Product(String name, int price) {\n        this.name = name;\n        this.price = price;\n    }\n\n    @Override\n    public String toString() {\n        return name + \" — \" + price + \" ₽\";\n    }\n}\n\npublic class Main {\n    public static void main(String[] args) {\n        System.out.println(new Product(\"Лампа\", 1990));\n    }\n}",
+    "tests_code": "public class MainTest {\n    public static void main(String[] args) {\n        Check.eq(\"Лампа\", () -> new Product(\"Лампа\", 1990).toString(), \"Лампа — 1990 ₽\");\n        Check.eq(\"бесплатный товар\", () -> String.valueOf(new Product(\"Стол\", 0)), \"Стол — 0 ₽\");\n        Check.eq(\"склейка со строкой\", () -> \"Хит: \" + new Product(\"Кресло\", 12500), \"Хит: Кресло — 12500 ₽\");\n    }\n}",
+    "requirements": [
+     {
+      "input": "объявляет public String toString()",
+      "expected": {
+       "regex": "public\\s+String\\s+toString\\s*\\(\\s*\\)"
+      }
+     },
+     {
+      "input": "помечает метод @Override",
+      "expected": {
+       "regex": "@Override"
+      }
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "println, String.valueOf и склейка со строкой вызывают toString объекта. Без своего toString работает унаследованный от Object — имя класса и хеш. Метод обязан быть public: в Object он public, а сузить доступ при переопределении нельзя.",
+   "hints": [
+    "public String toString() { return …; }",
+    "Склей: name + \" — \" + price + \" ₽\"."
+   ]
+  },
+  {
+   "task_id": "java-oop-05",
+   "topic_id": "java-oop",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Баланс всегда ноль",
+   "story": "Ира: «Открываем счёт с 500 ₽, а баланс показывает 0. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "class Account {\n    private int balance;\n\n    Account(int balance) {\n        balance = balance;\n    }\n\n    int getBalance() {\n        return balance;\n    }\n}\n\npublic class Main {\n    public static void main(String[] args) {\n        Account acc = new Account(500);\n        System.out.println(acc.getBalance());\n    }\n}",
+    "bug_line": 5,
+    "options": [
+     "Параметр присваивается сам себе — полю нужно this.balance = balance",
+     "private-поле нельзя менять в конструкторе",
+     "Конструктор должен возвращать Account",
+     "getBalance должен быть static"
+    ],
+    "correct_answer": 0,
+    "language": "java"
+   },
+   "explanation": "Внутри конструктора имя balance означает параметр — он «закрывает» поле. balance = balance присваивает параметр сам себе, а поле остаётся 0. Нужно this.balance = balance.",
+   "hints": [
+    "Какой balance слева: поле или параметр?",
+    "Поле объекта — через this."
+   ]
+  },
+  {
+   "task_id": "java-exceptions-01",
+   "topic_id": "java-exceptions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Списание со счёта",
+   "story": "Гена: «Списание должно явно отказывать, а не уводить счёт в минус.»",
+   "content": {
+    "question": "Напиши withdraw(int balance, int amount): сумма ≤ 0 — IllegalArgumentException; сумма больше баланса — IllegalStateException; иначе верни новый баланс.",
+    "entry": "withdraw",
+    "code": "public class Main {\n    // списание со счёта: новый баланс или исключение\n    static int withdraw(int balance, int amount) {\n        return balance - amount;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(withdraw(1000, 300));\n    }\n}",
+    "correct_answer": "public class Main {\n    // списание со счёта: новый баланс или исключение\n    static int withdraw(int balance, int amount) {\n        if (amount <= 0) {\n            throw new IllegalArgumentException(\"сумма должна быть больше нуля: \" + amount);\n        }\n        if (amount > balance) {\n            throw new IllegalStateException(\"недостаточно средств: \" + balance + \" < \" + amount);\n        }\n        return balance - amount;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(withdraw(1000, 300));\n    }\n}",
+    "tests_code": "public class MainTest {\n    public static void main(String[] args) {\n        Check.eq(\"1000 - 300\", () -> Main.withdraw(1000, 300), 700);\n        Check.eq(\"списать всё\", () -> Main.withdraw(500, 500), 0);\n        Check.throwsEx(\"не хватает денег\", () -> Main.withdraw(100, 500), IllegalStateException.class);\n        Check.throwsEx(\"сумма 0\", () -> Main.withdraw(100, 0), IllegalArgumentException.class);\n        Check.throwsEx(\"сумма -5\", () -> Main.withdraw(100, -5), IllegalArgumentException.class);\n    }\n}",
+    "requirements": [
+     {
+      "input": "бросает IllegalArgumentException",
+      "expected": {
+       "regex": "throw\\s+new\\s+IllegalArgumentException"
+      }
+     },
+     {
+      "input": "бросает IllegalStateException",
+      "expected": {
+       "regex": "throw\\s+new\\s+IllegalStateException"
+      }
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "Неверный аргумент (сумма ≤ 0) — IllegalArgumentException, невозможная сейчас операция (денег не хватает) — IllegalStateException. Оба непроверяемые, throws писать не нужно. Проверки ставят в начало метода, до вычислений; текст исключения помогает понять причину по логам.",
+   "hints": [
+    "throw new IllegalArgumentException(\"…\");",
+    "Сначала проверь amount <= 0, потом amount > balance."
+   ]
+  },
+  {
+   "task_id": "java-exceptions-02",
+   "topic_id": "java-exceptions",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "finally после return",
+   "story": "Гена: «Где-то в разборе конфига срабатывает finally. В каком порядке всё печатается?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "public class Main {\n    static int parse(String s) {\n        try {\n            System.out.println(\"разбираю \" + s);\n            return Integer.parseInt(s);\n        } catch (NumberFormatException e) {\n            System.out.println(\"не число\");\n            return -1;\n        } finally {\n            System.out.println(\"готово\");\n        }\n    }\n\n    public static void main(String[] args) {\n        System.out.println(parse(\"42\"));\n        System.out.println(parse(\"4x\"));\n    }\n}",
+    "language": "java",
+    "output": "разбираю 42\nготово\n42\nразбираю 4x\nне число\nготово\n-1"
+   },
+   "explanation": "finally выполняется всегда — даже когда try или catch уже сделали return: сначала вычисляется возвращаемое значение, потом печатается «готово», и только затем main получает результат. «4x» не число — parseInt бросает NumberFormatException, catch печатает «не число» и возвращает -1.",
+   "hints": [
+    "finally срабатывает и после return.",
+    "main печатает результат уже после «готово»."
+   ]
+  },
+  {
+   "task_id": "java-exceptions-03",
+   "topic_id": "java-exceptions",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Порт с понятной ошибкой",
+   "story": "Гена: «Если в конфиге порт „80a“, сервис должен сказать, что именно не так.»",
+   "content": {
+    "question": "Заполни пропуски: попробуй разобрать число, поймай ошибку разбора и брось своё исключение с причиной.",
+    "code": "public class Main {\n    static int port(String s) {\n        [[1]] {\n            return Integer.parseInt(s);\n        } [[2]] (NumberFormatException e) {\n            [[3]] new IllegalArgumentException(\"порт \\\"\" + s + \"\\\" — не число\", e);\n        }\n    }\n\n    public static void main(String[] args) {\n        System.out.println(port(\"8080\"));\n    }\n}",
+    "blanks": [
+     {
+      "answer": [
+       "try"
+      ]
+     },
+     {
+      "answer": [
+       "catch"
+      ]
+     },
+     {
+      "answer": [
+       "throw"
+      ]
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "try пробует разобрать строку, catch ловит именно NumberFormatException, а throw бросает новое исключение с понятным текстом. Второй аргумент e — причина: в трассировке будет видна и исходная ошибка parseInt.",
+   "hints": [
+    "try — попытка, catch — перехват.",
+    "Бросают исключение словом throw (throws — в объявлении метода)."
+   ]
+  },
+  {
+   "task_id": "java-exceptions-04",
+   "topic_id": "java-exceptions",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Порт по умолчанию",
+   "story": "Гена: «Если порт в конфиге кривой, запускаемся на 8080. Собери метод.»",
+   "content": {
+    "question": "Собери portOrDefault(String s): разобрать число (пробелы по краям убрать), при ошибке разбора вернуть 8080.",
+    "lines": [
+     "static int portOrDefault(String s) {",
+     "    try {",
+     "        return Integer.parseInt(s.trim());",
+     "    } catch (NumberFormatException e) {",
+     "        return 8080;",
+     "    }",
+     "}"
+    ],
+    "distractors": [
+     "        return null;",
+     "    } catch (e) {"
+    ],
+    "language": "java"
+   },
+   "explanation": "Внутри try — попытка разбора, в catch — запасное значение. return null не соберётся: метод возвращает int, а у примитива нет null. В catch обязательно указывают тип исключения: catch (e) — синтаксическая ошибка.",
+   "hints": [
+    "try { … } catch (Тип e) { … }",
+    "В catch верни 8080."
+   ]
+  },
+  {
+   "task_id": "java-exceptions-05",
+   "topic_id": "java-exceptions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Резерв на складе",
+   "story": "Стас: «Если товара не хватает, фронт должен показать, сколько есть. Нужно своё исключение с данными.»",
+   "content": {
+    "question": "Допиши reserve(int have, int want): want ≤ 0 — IllegalArgumentException; want > have — брось StockException(want, have); иначе верни остаток have - want.",
+    "entry": "reserve",
+    "code": "class StockException extends Exception {\n    final int want, have;\n\n    StockException(int want, int have) {\n        super(\"не хватает товара: нужно \" + want + \", есть \" + have);\n        this.want = want;\n        this.have = have;\n    }\n}\n\npublic class Main {\n    // резерв товара: остаток или исключение\n    static int reserve(int have, int want) throws StockException {\n        return have - want;\n    }\n\n    public static void main(String[] args) throws StockException {\n        System.out.println(reserve(10, 3));\n    }\n}",
+    "correct_answer": "class StockException extends Exception {\n    final int want, have;\n\n    StockException(int want, int have) {\n        super(\"не хватает товара: нужно \" + want + \", есть \" + have);\n        this.want = want;\n        this.have = have;\n    }\n}\n\npublic class Main {\n    // резерв товара: остаток или исключение\n    static int reserve(int have, int want) throws StockException {\n        if (want <= 0) {\n            throw new IllegalArgumentException(\"количество должно быть больше нуля: \" + want);\n        }\n        if (want > have) {\n            throw new StockException(want, have);\n        }\n        return have - want;\n    }\n\n    public static void main(String[] args) throws StockException {\n        System.out.println(reserve(10, 3));\n    }\n}",
+    "tests_code": "public class MainTest {\n    // StockException проверяемое: вызов оборачиваем, чтобы тест увидел его данные\n    static Object call(int have, int want) {\n        try {\n            return Main.reserve(have, want);\n        } catch (StockException e) {\n            return \"StockException(want=\" + e.want + \", have=\" + e.have + \")\";\n        }\n    }\n\n    public static void main(String[] args) {\n        Check.eq(\"резерв 3 из 10\", () -> call(10, 3), 7);\n        Check.eq(\"забрать всё\", () -> call(4, 4), 0);\n        Check.eq(\"не хватает: нужно 5, есть 2\", () -> call(2, 5), \"StockException(want=5, have=2)\");\n        Check.throwsEx(\"количество 0\", () -> call(10, 0), IllegalArgumentException.class);\n    }\n}",
+    "requirements": [
+     {
+      "input": "проверяет количество ≤ 0",
+      "expected": {
+       "regex": "want\\s*<=\\s*0|want\\s*<\\s*1"
+      }
+     },
+     {
+      "input": "бросает StockException с данными",
+      "expected": {
+       "regex": "throw\\s+new\\s+StockException\\s*\\("
+      }
+     }
+    ],
+    "language": "java"
+   },
+   "explanation": "StockException наследует Exception — оно проверяемое, поэтому reserve объявляет throws StockException, а вызывающий обязан его обработать. Исключение несёт данные (want и have): фронт достаёт их из e.want и e.have и показывает «есть только 2». Неверное количество — ошибка программиста, для неё хватает непроверяемого IllegalArgumentException.",
+   "hints": [
+    "throw new StockException(want, have);",
+    "Проверку want <= 0 поставь первой."
+   ]
+  }
+ ]
+}

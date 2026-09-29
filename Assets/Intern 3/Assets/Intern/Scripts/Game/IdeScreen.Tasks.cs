@@ -401,8 +401,8 @@ namespace Intern.Game
         }
 
         // ======================= компилируемые языки в Docker (спринт 10) =======================
-        // «Проверить» — go test в контейнере языка; без Docker — проверка по требованиям к коду.
-        // «Запустить» — go run. Всё идёт в фоне: строки хода работы попадают в терминал, итог — в BoxPoll.
+        // «Проверить» — тесты в контейнере языка (go test, javac+MainTest…); без Docker — проверка по требованиям к коду.
+        // «Запустить» — сборка и запуск программы. Всё идёт в фоне: строки хода работы попадают в терминал, итог — в BoxPoll.
         BoxJob<BoxReport> boxCheck; BoxJob<BoxRun> boxRun; TaskData boxTask;
         bool boxProbing, boxStaticCheck;
         bool IsBox { get { return TMode == "box"; } }
@@ -427,7 +427,7 @@ namespace Intern.Game
             var spec = BoxSpec;
             if (spec == null) return;
             if (BoxNeedProbe(CheckBox)) return;
-            string cmd = spec.testCmd.Replace(" -json", " -v");
+            string cmd = spec.testShow ?? spec.testCmd;
             if (!DockerUp) { BoxStaticCheck("Docker не запущен — решение проверено по коду, без запуска. С Docker задачу проверят настоящие тесты (" + cmd + ")."); return; }
             boxStaticCheck = false;
             terminal.Append(Prompt()).Append(cmd).Append('\n');
@@ -451,7 +451,7 @@ namespace Intern.Game
             var spec = BoxSpec;
             if (spec == null) return;
             if (BoxNeedProbe(RunBox)) return;
-            terminal.Append(Prompt()).Append(spec.runCmd).Append('\n');
+            terminal.Append(Prompt()).Append(spec.runShow ?? spec.runCmd).Append('\n');
             if (!DockerUp)
             {
                 terminal.Append("<color=#CCA700>Код на " + spec.name + " компилируется и запускается в Docker, а он сейчас не запущен. Запусти Docker Desktop — или сдавай задачу кнопкой «Проверить»: без Docker решение проверится по коду.</color>\n");
@@ -497,7 +497,7 @@ namespace Intern.Game
             string log = (r.log ?? "").TrimEnd('\n');
             if (log.Length > 6000) log = "…\n" + log.Substring(log.Length - 6000);
             if (log.Length > 0) terminal.Append(K.Esc(log)).Append('\n');
-            if (r.ms > 0) terminal.Append("<color=#9D9D9D>go test: " + (r.ms / 1000.0).ToString("0.0") + " с</color>\n");
+            if (r.ms > 0) terminal.Append("<color=#9D9D9D>Тесты: " + (r.ms / 1000.0).ToString("0.0") + " с</color>\n");
             FinishCheck(r.results, r.errLine, r.errText);
         }
 
@@ -528,10 +528,10 @@ namespace Intern.Game
             var spec = BoxSpec;
             if (spec == null) return;
             Section(c, "КАК ПРОВЕРЯЕТСЯ", hasExpl ? 18f : 4f);
-            Para(c, "Тесты лежат в " + spec.test + " и запускаются настоящим " + spec.testCmd.Replace(" -json", "").Replace(" -count=1", "") + " в контейнере " + spec.image + " (Docker). Первый запуск скачает образ — " + spec.size + ".", 14f, K.Text, 6f);
+            Para(c, "Тесты лежат в " + spec.test + " и запускаются по-настоящему (" + (spec.testShow ?? spec.testCmd) + ") в контейнере " + spec.image + " (Docker). Первый запуск скачает образ — " + spec.size + ".", 14f, K.Text, 6f);
             var st = g.Env != null ? g.Env.State : EnvState.Unknown;
             if (st == EnvState.Unknown) Para(c, "Docker проверится при первом «Запустить» или «Проверить».", 13f, K.Muted, 4f);
-            else Para(c, DockerUp ? "Docker работает: «Проверить» запустит тесты, «Запустить» — " + spec.runCmd + "." : "Docker сейчас не запущен: «Проверить» сверит решение с требованиями ниже, без запуска.", 13f, DockerUp ? K.Green : K.Orange, 4f);
+            else Para(c, DockerUp ? "Docker работает: «Проверить» запустит тесты, «Запустить» — " + (spec.runShow ?? spec.runCmd) + "." : "Docker сейчас не запущен: «Проверить» сверит решение с требованиями ниже, без запуска.", 13f, DockerUp ? K.Green : K.Orange, 4f);
             if (Diff != Difficulty.Hard && !string.IsNullOrEmpty(Task.testCode)) { Section(c, "ТЕСТЫ — " + spec.test.ToUpperInvariant()); CodeBlock(c, Task.testCode, Pal.Hex("9CDCFE")); }
             if (Task.requirements != null && Task.requirements.Count > 0)
             {

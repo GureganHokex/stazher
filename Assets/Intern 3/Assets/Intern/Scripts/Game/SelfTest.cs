@@ -525,6 +525,21 @@ namespace Intern.Game
                 T(bf.buildFailed && bf.errLine == 6 && bf.results.Count == 1 && !bf.results[0].Passed, "go test: ошибка сборки " + bf.errLine + " " + bf.errText);
                 string em; T(LangBox.ErrorLine("panic: boom\n\ngoroutine 1 [running]:\nmain.main()\n\t/work/.stazher/run/x/main.go:7 +0x18\n", "main.go", out em) == 7, "go run: строка паники");
             }
+            // разбор проверок Java: строки ##TEST, ошибки javac, исключения (спринт 12)
+            {
+                var ck = LangBox.ParseCheck("##TEST|1990 × 2|PASS\n##TEST|пусто|FAIL|получено 1, ожидалось 0\n##TEST|падение|FAIL|исключение java.lang.ArithmeticException: / by zero (Main.java:4)\n", "", "Main.java");
+                T(ck.results.Count == 3 && ck.results[0].Passed && !ck.results[1].Passed && ck.results[1].Note == "получено 1, ожидалось 0" && ck.errLine == 4 && !ck.buildFailed, "java: разбор ##TEST " + ck.results.Count + " " + ck.errLine);
+                var jc = LangBox.ParseCheck("", "Main.java:3: error: cannot find symbol\n        return qtx * price;\n               ^\n  symbol:   variable qtx\n  location: class Main\n1 error\n", "Main.java");
+                T(jc.buildFailed && jc.errLine == 3 && jc.errText.Contains("qtx") && jc.results.Count == 1 && !jc.results[0].Passed, "java: ошибка javac " + jc.errLine + " " + jc.errText);
+                var jt = LangBox.ParseCheck("", "MainTest.java:5: error: cannot find symbol\n  symbol:   method total(int)\n", "Main.java");
+                T(jt.buildFailed && jt.errLine < 0 && jt.results[0].Note.Contains("MainTest.java"), "java: ошибка в тестах " + (jt.results.Count > 0 ? jt.results[0].Note : "-"));
+                var jx = LangBox.ParseCheck("", "Exception in thread \"main\" java.lang.StackOverflowError\n\tat Main.digitSum(Main.java:6)\n\tat Main.digitSum(Main.java:6)\n", "Main.java");
+                T(jx.panicked && jx.errLine == 6 && jx.results.Count == 1, "java: исключение до проверок " + jx.errLine + " " + jx.errText);
+                string je; T(LangBox.ErrorLine("Main.java:7: error: ';' expected\n        int x = 1\n                 ^\n1 error\n", "Main.java", out je) == 7 && je.Contains(";"), "javac: строка ошибки " + je);
+                T(LangBox.ErrorLine("Exception in thread \"main\" java.lang.ArithmeticException: / by zero\n\tat Main.div(Main.java:3)\n\tat Main.main(Main.java:9)\n", "Main.java", out je) == 3 && je.Contains("by zero"), "java: строка исключения " + je);
+                var java = LangBox.For("java");
+                T(java != null && java.extraFiles.ContainsKey("Check.java") && java.extraFiles["Check.java"].Contains("##TEST|") && java.testMarker == "Check.", "java: раннер и Check.java");
+            }
             if (report != null) report.Add("окружение: сценариев " + list.Count + ", шагов " + list.Sum(s => s.steps.Count));
             return bad;
         }
@@ -644,8 +659,9 @@ namespace Intern.Game
                     }
                 case "box":
                     {
-                        if (LangBox.For(t.language) == null) return "нет раннера для языка " + t.language;
-                        if (string.IsNullOrEmpty(t.testCode) || !t.testCode.Contains("func Test")) return "нет тестов go test";
+                        var spec = LangBox.For(t.language);
+                        if (spec == null) return "нет раннера для языка " + t.language;
+                        if (string.IsNullOrEmpty(t.testCode) || (spec.testMarker != null && !t.testCode.Contains(spec.testMarker))) return "нет тестов (" + spec.testShow + ")";
                         if (string.IsNullOrEmpty(t.solution)) return "нет эталона";
                         if (!string.IsNullOrEmpty(t.entry) && (!t.solution.Contains(t.entry) || !t.testCode.Contains(t.entry))) return "функции " + t.entry + " нет в эталоне или в тестах";
                         if (t.requirements == null || t.requirements.Count == 0) return "нет требований для проверки без Docker";
