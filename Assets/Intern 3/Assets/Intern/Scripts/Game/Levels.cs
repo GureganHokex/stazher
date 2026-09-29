@@ -77,6 +77,34 @@ namespace Intern.Game
             return Title(at);
         }
 
+        // ---------- опыт за задачи из генератора (спринт 6, модель — Tools/Balance/model.py) ----------
+        // Тикеты дня вместе с бонусом за закрытый день дают около уровня в день: до Senior ~7 дней после пути,
+        // до Lead ~19, Principal ~31, Architect ~43 (путь backend, все тикеты каждый день)
+        public const int TicketsPerDay = 7;
+        public const float TicketShare = 0.6f, DayBonusShare = 0.2f, PracticeShare = 0.3f;
+        public const int LineHintUntil = 40;   // с Lead в подсказке нет номера строки
+        public const int TimerFrom = 50;       // с Principal у тикетов таймер
+
+        static int Round5(float v) { return Mathf.Max(5, Mathf.RoundToInt(v / 5f) * 5); }
+        static int Basis(int level) { return Cost(Mathf.Max(level, 20)); }
+
+        public static int TicketXp(int level, string kind, int difficulty, bool practice)
+        {
+            float xp = Basis(level) * TicketShare / TicketsPerDay;
+            xp *= kind == "ask" ? 0.75f : 1.15f;
+            xp *= 0.8f + 0.1f * Mathf.Clamp(difficulty, 1, 5);
+            if (practice) xp *= PracticeShare;
+            return Round5(xp);
+        }
+
+        public static int DayBonus(int level) { return Round5(Basis(level) * DayBonusShare); }
+
+        // Монеты за тикет — вдвое больше опыта: после конца пути работа по-прежнему даёт больше, чем обед (обед ≤ трети)
+        public const int TicketCoinsPerXp = 2;
+
+        // Звёзды тем: ★★ — четверть уровня опыта, ★★★ — половина
+        public static int StarXp(int stars, int level) { return stars == 2 ? Round5(Basis(level) * 0.25f) : stars == 3 ? Round5(Basis(level) * 0.5f) : 0; }
+
         // ---------- компании ----------
         public const int CompanyLevel = 60;           // сменить компанию можно с Architect
         public const float CompanyBonus = 0.1f;       // +10% монет за каждую смену

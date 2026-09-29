@@ -56,13 +56,14 @@ namespace Intern.Game
         public static string KeyFor(int seed) { return seed >= PracticeBase ? "TR-" + (seed - PracticeBase) : "D" + (seed / 100) + "-" + (seed % 100 + 1); }
 
         // ======================= сборка задачи =======================
-        public static TaskData Build(string spec, Func<string, TaskData> find)
+        // level — уровень игрока: от него опыт задачи, подсказки и таймер
+        public static TaskData Build(string spec, Func<string, TaskData> find, int level = 0)
         {
             string kind, srcId; int seed;
             if (!ParseSpec(spec, out kind, out srcId, out seed)) return null;
             var s = find != null ? find(srcId) : null;
             if (!CanGenerate(s)) return null;
-            try { return kind == "ask" ? BuildAsk(s, seed, spec) : BuildFix(s, seed, spec); }
+            try { return kind == "ask" ? BuildAsk(s, seed, spec, level) : BuildFix(s, seed, spec, level); }
             catch (Exception e) { Debug.LogWarning("[Стажёр] Генератор: " + spec + ": " + e.Message); return null; }
         }
 
@@ -78,7 +79,13 @@ namespace Intern.Game
             };
         }
 
-        static int Round5(float v) { return Mathf.Max(5, Mathf.RoundToInt(v / 5f) * 5); }
+        // Опыт и монеты — от уровня игрока (Levels.TicketXp); с Principal — таймер
+        static void Reward(TaskData t, int level, int seed, int minutes)
+        {
+            t.xp = Levels.TicketXp(level, t.genKind, t.difficulty, seed >= PracticeBase);
+            t.reward = t.xp * Levels.TicketCoinsPerXp;
+            if (level >= Levels.TimerFrom) { t.timeLimit = minutes; t.deadline = minutes * 60; }
+        }
 
         static readonly string[][] FixStories =
         {
@@ -95,7 +102,7 @@ namespace Intern.Game
             new[] { "QA Ира", "qa", "Пишу тест-кейс к «{0}» и хочу проверить себя. Что должно получиться?" },
         };
 
-        static TaskData BuildFix(TaskData s, int seed, string spec)
+        static TaskData BuildFix(TaskData s, int seed, string spec, int level)
         {
             var m = PickMutants(s, seed, 1).FirstOrDefault();
             if (m == null) return null;
@@ -109,14 +116,14 @@ namespace Intern.Game
             t.goal = "В коде ровно одна ошибка, из-за неё тесты падают. Найди её и исправь — переписывать всё не нужно.";
             t.starter = m.code;
             t.solution = s.solution;
-            t.hints = new[] { KindHint(m.kind, s.language), "Ошибка в строке " + m.line + "." };
+            t.hints = level >= Levels.LineHintUntil ? new[] { KindHint(m.kind, s.language) } : new[] { KindHint(m.kind, s.language), "Ошибка в строке " + m.line + "." };
             t.explanation = "Ошибка была в строке " + m.line + ": " + m.what + ".\nС ошибкой:  " + m.after.Trim() + "\nПравильно:  " + m.before.Trim() +
                             (string.IsNullOrEmpty(s.explanation) ? "" : "\n\nПро исходную задачу: " + s.explanation);
-            t.xp = Round5(s.xp * 0.6f); t.reward = t.xp;
+            Reward(t, level, seed, 3 + 2 * s.difficulty);
             return t;
         }
 
-        static TaskData BuildAsk(TaskData s, int seed, string spec)
+        static TaskData BuildAsk(TaskData s, int seed, string spec, int level)
         {
             var orig = Original(s);
             if (orig == null) return null;
@@ -167,7 +174,7 @@ namespace Intern.Game
                     if (w.Value != null) ex.Append("\n• «").Append(w.Key).Append("» — если бы в строке ").Append(w.Value.line).Append(" было ").Append(Code1(w.Value.after)).Append(" вместо ").Append(Code1(w.Value.before)).Append('.');
                 if (!string.IsNullOrEmpty(s.explanation)) ex.Append("\n\n").Append(s.explanation);
                 t.explanation = ex.ToString();
-                t.xp = Round5(s.xp * 0.4f); t.reward = t.xp;
+                Reward(t, level, seed, 2 + s.difficulty);
                 return t;
             }
             return null;
@@ -616,7 +623,7 @@ namespace Intern.Game
 
         // ======================= выбор задач =======================
         // Тикеты дня: 6–8 задач из генератора по пройденному пути (без повторов исходных задач, пока хватает)
-        public static List<string> Daily(IList<TaskData> pool, int day, string salt, Func<string, TaskData> find, int count = -1)
+        public static List<string> Daily(IList<TaskData> pool, int day, string salt, Func<string, TaskData> find, int count = -1, int level = 0)
         {
             var res = new List<string>();
             var src = pool.Where(CanGenerate).ToList();
@@ -631,8 +638,8 @@ namespace Intern.Game
                 var s = src[order[k % order.Count]];
                 string kind = rng.Next(100) < 60 ? "fix" : "ask";
                 var spec = Spec(kind, s.id, day * 100 + slot);
-                var t = Build(spec, find);
-                if (t == null && kind == "ask") { spec = Spec("fix", s.id, day * 100 + slot); t = Build(spec, find); }
+                var t = Build(spec, find, level);
+                if (t == null && kind == "ask") { spec = Spec("fix", s.id, day * 100 + slot); t = Build(spec, find, level); }
                 if (t == null) continue;
                 res.Add(spec); slot++;
             }
@@ -640,7 +647,7 @@ namespace Intern.Game
         }
 
         // Тренировка по теме: новая задача из исходных задач темы
-        public static string Practice(IList<TaskData> topicTasks, int number, Func<string, TaskData> find)
+        public static string Practice(IList<TaskData> topicTasks, int number, Func<string, TaskData> find, int level = 0)
         {
             var src = topicTasks.Where(CanGenerate).ToList();
             if (src.Count == 0) return null;
@@ -650,9 +657,9 @@ namespace Intern.Game
                 var s = src[(rng.Next(src.Count) + attempt) % src.Count];
                 string kind = (number + attempt) % 3 == 2 ? "ask" : "fix";
                 var spec = Spec(kind, s.id, PracticeBase + number);
-                if (Build(spec, find) != null) return spec;
+                if (Build(spec, find, level) != null) return spec;
                 spec = Spec(kind == "ask" ? "fix" : "ask", s.id, PracticeBase + number);
-                if (Build(spec, find) != null) return spec;
+                if (Build(spec, find, level) != null) return spec;
             }
             return null;
         }

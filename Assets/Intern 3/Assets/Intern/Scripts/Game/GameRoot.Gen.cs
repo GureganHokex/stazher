@@ -88,7 +88,7 @@ namespace Intern.Game
         {
             TaskData t;
             if (genCache.TryGetValue(spec, out t)) return t;
-            t = TaskGen.Build(spec, PathTask);
+            t = TaskGen.Build(spec, PathTask, Level);
             genCache[spec] = t;   // null тоже запоминаем: исходной задачи нет в пути
             return t;
         }
@@ -128,7 +128,7 @@ namespace Intern.Game
             if (!force && Save.dailyDay == Save.day && Save.daily.Count > 0) return;
             var old = Save.daily;
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            Save.daily = TaskGen.Daily(Path.Tasks, Save.day, Profession + "#" + Save.company, PathTask);
+            Save.daily = TaskGen.Daily(Path.Tasks, Save.day, Profession + "#" + Save.company, PathTask, -1, Level);
             Save.dailyDay = Save.day;
             Debug.Log("[Стажёр] Тикеты дня " + Save.day + ": " + Save.daily.Count + " шт., " + sw.ElapsedMilliseconds + " мс");
             // вчерашний тикет открыт в IDE — переключаем на сегодняшний (до того, как забудем старый код)
@@ -158,7 +158,7 @@ namespace Intern.Game
             if (tp == null || !TrackPath.TopicDone(tp, Done) || !TopicTrainable(tp)) return null;
             var sw = System.Diagnostics.Stopwatch.StartNew();
             Save.practiceNo++;
-            var spec = TaskGen.Practice(tp.tasks, Save.practiceNo, PathTask);
+            var spec = TaskGen.Practice(tp.tasks, Save.practiceNo, PathTask, Level);
             if (spec == null) return null;
             Save.practice.Add(spec);
             while (Save.practice.Count > 8)
@@ -211,9 +211,10 @@ namespace Intern.Game
                 int stars = TopicStars.Record(StatOf(tp.id, true), !usedHints && !usedSolution, onTime);
                 if (stars > 0 && TrackPath.TopicDone(tp, Done))
                 {
-                    int bonus = TopicStars.BonusFor(stars);
+                    int bonus = TopicStars.BonusFor(stars), sxp = Levels.StarXp(stars, Level);
                     Save.money += Work != null ? Work.Earn(bonus) : bonus;
-                    starNote = new string('★', stars) + " Тема «" + tp.title + "»: " + (stars == 2 ? StarClean + " задач без подсказок" : StarStreak + " задач подряд вовремя") + ". Бонус +" + bonus + " монет!";
+                    Save.xp += sxp; Save.dayXp += sxp;
+                    starNote = new string('★', stars) + " Тема «" + tp.title + "»: " + (stars == 2 ? StarClean + " задач без подсказок" : StarStreak + " задач подряд вовремя") + ". Бонус +" + sxp + " XP и +" + bonus + " монет!";
                 }
             }
             if (Work != null) Work.Activity(WorkKind.Solved);
@@ -223,13 +224,23 @@ namespace Intern.Game
                   (got < reward ? ", из них " + (reward - got) + " в счёт долга Гене" : ""));
             if (player != null && player.avatar != null) player.avatar.React(2, 3f);
             if (starNote != null) Toast(starNote);
-            AfterXp(oldLevel, oldRank);
             if (Save.daily.Contains(t.id))
             {
                 int left = DailyTotal - DailyDone;
-                if (left == 0) Toast("Все тикеты дня закрыты! Дальше — тренировки по темам в проводнике IDE: за них дают звёзды.");
-                else { var next = NextDaily(); if (next != null) Toast("Следующий тикет: " + next.key + " " + next.title + " (осталось " + left + ")."); }
+                if (left == 0 && Save.dailyBonusDay != Save.day)
+                {
+                    // все тикеты дня закрыты — премия опытом и монетами (раз в день)
+                    Save.dailyBonusDay = Save.day;
+                    int bxp = Levels.DayBonus(oldLevel), bcoins = bxp * Levels.TicketCoinsPerXp / 2;
+                    Save.xp += bxp; Save.dayXp += bxp;
+                    Save.money += Work != null ? Work.Earn(bcoins) : bcoins; Save.dayMoney += bcoins;
+                    Persist();
+                    Toast("Все тикеты дня закрыты! Премия: +" + bxp + " XP и +" + bcoins + " монет. Дальше — тренировки по темам в проводнике IDE.");
+                    if (leadWalker != null && lunch == null && (mode == Mode.Walk || mode == Mode.Ide)) LeadVisit(LeadMood.Praise, "Все тикеты дня закрыты — отличная работа! Премию уже начислил.");
+                }
+                else if (left > 0) { var next = NextDaily(); if (next != null) Toast("Следующий тикет: " + next.key + " " + next.title + " (осталось " + left + ")."); }
             }
+            AfterXp(oldLevel, oldRank);
         }
 
 #if UNITY_EDITOR

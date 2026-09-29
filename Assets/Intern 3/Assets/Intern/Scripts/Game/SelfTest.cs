@@ -71,6 +71,10 @@ namespace Intern.Game
             foreach (var line in gs) { fail++; sb.AppendLine("FAIL без потолка: " + line); }
             foreach (var line in genInfo) sb.AppendLine(line);
             sb.AppendLine("уровни, звёзды, генератор: " + (gs.Count == 0 ? "сценарии прошли" : gs.Count + " ошибок"));
+            var balInfo = new List<string>();
+            var bs = BalanceSim(null, balInfo);
+            foreach (var line in bs) { fail++; sb.AppendLine("FAIL баланс: " + line); }
+            foreach (var line in balInfo) sb.AppendLine(line);
             sb.AppendLine("режимы: " + string.Join(", ", counts.Select(kv => kv.Key + " " + kv.Value).ToArray()));
             sb.AppendLine("итог: " + ok + " ок, " + fail + " ошибок, " + (DateTime.Now - started).TotalSeconds.ToString("0") + " с");
             string file = Path.Combine(Application.persistentDataPath, "selftest.txt");
@@ -345,6 +349,50 @@ namespace Intern.Game
                 expect(Mathf.Abs(Levels.CompanyBonus * sv.company - 0.1f) < 1e-4f && Levels.CompanyName(1) != Levels.CompanyName(0), "смена компании: бонус и имя");
             }
             if (report != null) report.Add("генератор: исходных задач " + sources + ", «Почини баг» " + fixes + ", «Что вернёт» " + asks);
+            return bad;
+        }
+
+        // Спринт 6: темп после конца пути (та же формула, что в Tools/Balance/model.py). Все тикеты дня каждый день,
+        // опыт тикета — среднее по исходным задачам пути (60% «Почини баг», 40% «Что вернёт»). Дни до титулов — в отчёт
+        public static Dictionary<string, int[]> TitleDays(Func<string, TrackData> load)
+        {
+            var res = new Dictionary<string, int[]>();
+            foreach (var p in new[] { "backend", "frontend", "devops", "fullstack" })
+            {
+                var path = Tracks.BuildPath(p, load);
+                int xp = path.Tasks.Sum(t => t.xp);
+                var src = path.Tasks.Where(TaskGen.CanGenerate).ToList();
+                var days = new int[Levels.TitleAt.Length];
+                int day = 0;
+                while (day < 400 && days[days.Length - 1] == 0 && src.Count > 0)
+                {
+                    day++;
+                    int lv = Levels.Of(xp);
+                    double mean = src.Average(t => 0.6 * Levels.TicketXp(lv, "fix", t.difficulty, false) + 0.4 * Levels.TicketXp(lv, "ask", t.difficulty, false));
+                    xp += (int)Math.Round(mean * Levels.TicketsPerDay) + Levels.DayBonus(lv);
+                    for (int i = 0; i < days.Length; i++) if (days[i] == 0 && Levels.Of(xp) >= Levels.TitleAt[i]) days[i] = day;
+                }
+                res[p] = days;
+            }
+            return res;
+        }
+
+        public static List<string> BalanceSim(Func<string, TrackData> load = null, List<string> report = null)
+        {
+            var bad = new List<string>();
+            var days = TitleDays(load ?? Tracks.Load);
+            foreach (var kv in days)
+                if (report != null) report.Add("темп после пути " + kv.Key + ": Senior — день " + kv.Value[0] + ", Lead — " + kv.Value[1] + ", Principal — " + kv.Value[2] + ", Architect — " + kv.Value[3]);
+            // план (путь backend): Senior ~6, Lead ~16, Principal ~30, Architect ~45 игровых дней после конца пути
+            var b = days["backend"];
+            if (b[0] < 4 || b[0] > 9) bad.Add("баланс: до Senior " + b[0] + " дн., по плану около 6");
+            if (b[1] < 12 || b[1] > 22) bad.Add("баланс: до Lead " + b[1] + " дн., по плану около 16");
+            if (b[2] < 22 || b[2] > 38) bad.Add("баланс: до Principal " + b[2] + " дн., по плану около 30");
+            if (b[3] < 32 || b[3] > 58) bad.Add("баланс: до Architect " + b[3] + " дн., по плану около 45");
+            foreach (var kv in days) if (kv.Value[3] == 0 || kv.Value[3] > 80) bad.Add("баланс: " + kv.Key + " до Architect не дойти за 80 дней");
+            // тренировка даёт меньше тикета, премия за день — пятая часть уровня
+            if (Levels.TicketXp(30, "fix", 3, true) >= Levels.TicketXp(30, "fix", 3, false)) bad.Add("баланс: тренировка даёт не меньше тикета дня");
+            if (Levels.DayBonus(30) != 160) bad.Add("баланс: премия за день на 30-м уровне " + Levels.DayBonus(30) + ", ждали 160");
             return bad;
         }
 

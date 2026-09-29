@@ -160,7 +160,7 @@ namespace Intern.Game
                 ((Crosshair)cross).Set(gun ? C.SpreadNow : 0f, gun, C.Scoped);
                 cross.style.display = C.Scoped ? DisplayStyle.None : DisplayStyle.Flex;
                 scope.style.display = C.Scoped ? DisplayStyle.Flex : DisplayStyle.None;
-                string lh = "ЛКМ — " + (gun ? "огонь" : "удар") + "  ·  1 / 2 — оружие  ·  E — дверь, магазин  ·  гуманитарий +10, технарь −20";
+                string lh = "ЛКМ — " + (gun ? "огонь" : "удар") + "  ·  1 / 2 — оружие (ещё раз — другое)  ·  E — дверь, магазин  ·  гуманитарий +10, технарь −20";
                 if (lunchHint.text != lh) lunchHint.text = lh;
             }
 

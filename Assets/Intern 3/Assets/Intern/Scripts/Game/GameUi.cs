@@ -27,7 +27,7 @@ namespace Intern.Game
         VisualElement hudCard, clockChip, strikeRow, satedChip, lunchHud, lunchCoinsRow, summary, summaryCard, fired, firedCard;
         Label clockLabel, strikeLabel, lunchTimer, lunchCoins, lunchSeries, lunchPenalty, lunchKills, lunchHint;
         VisualElement toastRow, toastPill, promptRow, promptKeys, crosshair, cursorHint, keysPanel, bugRow, progressFill;
-        Label levelLabel;
+        Label levelLabel; VisualElement rankChip;
         Label toastText, promptText, rankLabel, moneyLabel, taskCode, taskTitle, progressLabel, bugLabel, fpsLabel, pauseTask, pauseDiffDesc;
         UiBtn pauseCamera;
         readonly List<VisualElement> pauseDiffPills = new List<VisualElement>();
@@ -742,7 +742,7 @@ def deploy(env=""staging""):
             hudCard = card;
             card.style.backgroundColor = new Color(Card.r, Card.g, Card.b, 0.9f); K.Radius(card, 18f); Border(card, new Color(Line.r, Line.g, Line.b, 0.8f), 1f); K.Pad(card, 16f, 20f, 18f, 20f);
             var r1 = K.Box(true); r1.style.alignItems = Align.Center; r1.pickingMode = PickingMode.Ignore;
-            var rank = K.Box(true); rank.pickingMode = PickingMode.Ignore; rank.style.backgroundColor = Mint; K.Radius(rank, 12f); K.Pad(rank, 3f, 12f, 3f, 12f);
+            var rank = K.Box(true); rank.pickingMode = PickingMode.Ignore; rank.style.backgroundColor = Mint; K.Radius(rank, 12f); K.Pad(rank, 3f, 12f, 3f, 12f); rankChip = rank;
             rankLabel = K.B("", 13f, Ink); rankLabel.style.letterSpacing = 1f; rank.Add(rankLabel); r1.Add(rank);
             var lvl = K.Box(true); lvl.pickingMode = PickingMode.Ignore; lvl.style.backgroundColor = Sky; K.Radius(lvl, 12f); K.Pad(lvl, 3f, 10f, 3f, 10f); lvl.style.marginLeft = 6f;
             levelLabel = K.B("", 13f, Ink); lvl.Add(levelLabel); r1.Add(lvl);
@@ -855,7 +855,7 @@ def deploy(env=""staging""):
             summaryCard.Add(StatRow("coin", "Монеты за обед", (r.lunchMoney >= 0 ? "+" : "") + r.lunchMoney + (r.kills > 0 ? "  (выбито " + r.kills + ")" : ""), Sun));
             if (r.fines > 0) summaryCard.Add(StatRow("warning", "Штрафы за простой", "−" + r.fines, Pink));
             if (r.debt > 0 || r.debtPaid > 0) summaryCard.Add(StatRow("coin", "Долг Гене", r.debt + (r.debtPaid > 0 ? "  (погашено сегодня " + r.debtPaid + ")" : ""), r.debt > 0 ? Pink : Mint));
-            summaryCard.Add(StatRow("monitor", "Рабочих часов", r.workHours + " из 8" + (r.idleHours > 0 ? "  (простой " + r.idleHours + ")" : ""), Text));
+            summaryCard.Add(StatRow("monitor", "Рабочих часов", r.workHours + " из " + Mathf.Max(8, r.workHours + r.idleHours) + (r.idleHours > 0 ? "  (простой " + r.idleHours + ")" : ""), Text));
             summaryCard.Add(StatRow("warning", "Выговоры", r.strikes + " из " + r.limit, r.strikes > 0 ? Pink : Text));
             string note = r.truancy ? "Гена: «Сегодня ты почти ничего не сделал. Это прогул, выговор.»"
                         : r.remark != null ? "Гена: «" + r.remark + "»"
@@ -1021,6 +1021,8 @@ def deploy(env=""staging""):
                 lastHud = key;
                 rankLabel.text = g.RankFull.ToUpperInvariant();
                 levelLabel.text = "УР. " + g.Level;
+                bool titled = g.PathComplete && Levels.TitleIndex(g.Level) >= 0;   // значок титула: золотой после Middle
+                rankChip.style.backgroundColor = titled ? Sun : Mint;
                 moneyLabel.text = g.Save.money.ToString();
                 taskCode.text = t != null && !sprintDone ? g.TaskCodeOf(t) : "ГОТОВО";
                 taskTitle.text = t != null && !sprintDone ? K.Esc(t.title) : dailyMode ? "Тикеты дня закрыты!" : "Направление пройдено!";
@@ -1029,7 +1031,7 @@ def deploy(env=""staging""):
                     // после конца пути полоса — тикеты дня
                     int dd = g.DailyDone, dt = Mathf.Max(1, g.DailyTotal);
                     progressFill.style.width = Length.Percent(100f * dd / dt);
-                    progressLabel.text = "день: " + dd + " / " + g.DailyTotal;
+                    progressLabel.text = "тикеты: " + dd + " / " + g.DailyTotal;
                 }
                 else
                 {

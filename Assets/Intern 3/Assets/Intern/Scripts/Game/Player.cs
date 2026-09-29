@@ -14,6 +14,7 @@ namespace Intern.Game
         // обед: оружие и эффекты
         public float speedMul = 1f;     // прицеливание, энергетик, «А зачем?», оглушение (0)
         public float fovScale = 1f;     // прицел и оптика
+        public bool scopeView;          // смотрим в оптику: камера на уровне глаз, голова скрыта (иначе в прицеле видно свою макушку)
         public bool faceCamera;         // с оружием в руках персонаж смотрит туда же, куда камера
 
         CharacterController cc;
@@ -163,11 +164,12 @@ namespace Intern.Game
 
         void UpdateCameraRaw(float dt)
         {
-            if (firstPerson)
+            if (firstPerson || scopeView)
             {
                 cam.transform.position = transform.position + Vector3.up * (Tall ? 1.8f : 1.58f) + transform.forward * 0.12f;
                 cam.transform.rotation = Quaternion.Euler(camPitch - kickPitch, camYaw + kickYaw, 0);
                 cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, FovFirst * fovScale, dt * 12f);
+                if (scopeView && !firstPerson) { avatar.SetHeadVisible(false); curDist = 0.6f; }   // после оптики камера плавно отъедет назад
                 return;
             }
             var pivot = transform.position + Vector3.up * (Tall ? 1.65f : 1.45f);

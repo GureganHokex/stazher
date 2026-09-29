@@ -235,6 +235,7 @@ namespace Intern.Game
                 if (t != null) return t;
                 var d = NextDaily();   // путь пройден — тикеты дня из генератора
                 if (d != null) return d;
+                if (Save.daily.Count > 0) { var last = GenTask(Save.daily[Save.daily.Count - 1]); if (last != null) return last; }   // все закрыты — последний тикет, не старая задача пути
                 return Tasks.tasks.Length > 0 ? Tasks.tasks[Tasks.tasks.Length - 1] : null;
             }
         }

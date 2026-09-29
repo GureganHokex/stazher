@@ -62,6 +62,7 @@ namespace Intern.Game
             { Say = Toast, Coupon = t => { Save.coupons++; Toast(t); } };
             player.Teleport(city.spawn.position, 0f); player.FaceCameraYaw(0f);
             player.cinematic = false; player.avatar.SetHeadVisible(!player.firstPerson);
+            WeaponModel.Golden = PathComplete && Levels.TitleIndex(Level) >= 3;   // перк Architect: золотое оружие
             combat.Begin(lunch);
             mode = Mode.Lunch; SetCursor(true); lastInput = Time.unscaledTime;
             Toast("Обед! " + Mathf.RoundToInt(lunch.duration / 60f) + " минут. Гуманитарий +10 монет, технарей не трогать: штраф 20.");
@@ -276,7 +277,13 @@ namespace Intern.Game
                 player.Teleport(best + Vector3.up * 0.1f, yaw); player.FaceCameraYaw(yaw);
                 Debug.Log("[Стажёр] F1: у прилавка " + s.title);
             }
-            if (InputX.DebugLead()) { Save.money += 3000; debugAllGrades = true; Toast("Отладка: +3000 монет, всё оружие открыто"); }
+            if (InputX.DebugLead())
+            {
+                Save.money += 3000; debugAllGrades = true;
+                foreach (var w in Save.arsenal) w.level = Mathf.Max(w.level, 5);   // уровень 5 — перки: метание ножа, длинный рывок катаны
+                if (combat != null) combat.Rebuild();
+                Toast("Отладка: +3000 монет, всё оружие открыто, купленное — уровень 5");
+            }
         }
 #else
         void DebugLunch() { }

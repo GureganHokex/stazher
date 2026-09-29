@@ -40,6 +40,16 @@ namespace Intern.Game
             if (def.Melee) s.meleeWeapon = id; else { s.gunWeapon = id; AddAmmo(def.ammo, def.mag * 2); }
         }
 
+        // Следующее купленное оружие того же вида (ближний бой или огнестрел) по порядку покупки; null — другого нет
+        public string NextOwned(bool melee, string current)
+        {
+            var list = new List<string>();
+            foreach (var w in s.arsenal) { var d = Balance.Weapon(w.id); if (d != null && d.Melee == melee) list.Add(w.id); }
+            if (list.Count < 2) return null;
+            int i = list.IndexOf(current);
+            return list[(i + 1) % list.Count];
+        }
+
         public void Equip(string id)
         {
             var def = Balance.Weapon(id); if (def == null || !Owns(id)) return;
@@ -137,6 +147,8 @@ namespace Intern.Game
         public bool melee, twoHanded;
 
         static readonly Color Metal = Pal.Hex("2B2D42"), Steel = Pal.Hex("8A8FA8"), Wood = Pal.Hex("8C6A4F"), Blade = Pal.Hex("D8DCE8");
+        static readonly Color GoldDark = Pal.Hex("A87B12"), Gold = Pal.Hex("FFD23F"), GoldWarm = Pal.Hex("D9A441");
+        public static bool Golden;   // включает GameRoot перед обедом, когда у игрока титул Architect
 
         static GameObject Box(Transform p, string n, Vector3 pos, Vector3 size, Color c, float r = 0.008f, float em = 0f)
         { var g = Look.RBox(n, p, pos, size, c, r, false, 0.6f, em, false); return g; }
@@ -148,6 +160,8 @@ namespace Intern.Game
 
         public static WeaponModel Build(WeaponDef def, WeaponSave save, Arsenal ars)
         {
+            // Architect: золотое оружие (перк титула)
+            Color metal = Golden ? GoldDark : Metal, steel = Golden ? Gold : Steel, wood = Golden ? GoldWarm : Wood;
             var go = new GameObject("Weapon_" + def.id);
             var m = go.AddComponent<WeaponModel>(); m.id = def.id; m.melee = def.Melee;
             var t = go.transform;
@@ -155,12 +169,12 @@ namespace Intern.Game
             switch (def.id)
             {
                 case "knife":
-                    Box(t, "Handle", new Vector3(0, 0, 0.02f), new Vector3(0.035f, 0.035f, 0.12f), Metal);
+                    Box(t, "Handle", new Vector3(0, 0, 0.02f), new Vector3(0.035f, 0.035f, 0.12f), metal);
                     Box(t, "Blade", new Vector3(0, 0.005f, 0.16f), new Vector3(0.012f, 0.045f, 0.17f), Blade, 0.004f, 0.15f);
                     m.muzzle = pt("Tip", new Vector3(0, 0, 0.25f)); break;
                 case "bat":
-                    Cyl(t, "Grip", new Vector3(0, 0, 0.05f), 0.02f, 0.26f, Metal);
-                    Cyl(t, "Barrel", new Vector3(0, 0, 0.42f), 0.042f, 0.55f, Wood);
+                    Cyl(t, "Grip", new Vector3(0, 0, 0.05f), 0.02f, 0.26f, metal);
+                    Cyl(t, "Barrel", new Vector3(0, 0, 0.42f), 0.042f, 0.55f, wood);
                     m.muzzle = pt("Tip", new Vector3(0, 0, 0.7f)); break;
                 case "katana":
                     Box(t, "Handle", new Vector3(0, 0, 0.03f), new Vector3(0.032f, 0.032f, 0.24f), Pal.Hex("2E2638"));
@@ -168,49 +182,49 @@ namespace Intern.Game
                     Box(t, "Blade", new Vector3(0, 0.005f, 0.6f), new Vector3(0.012f, 0.035f, 0.86f), Blade, 0.004f, 0.2f);
                     m.muzzle = pt("Tip", new Vector3(0, 0, 1.02f)); break;
                 case "pistol":
-                    Box(t, "Grip", new Vector3(0, -0.05f, -0.01f), new Vector3(0.032f, 0.11f, 0.05f), Metal).transform.localRotation = Quaternion.Euler(-12f, 0, 0);
-                    Box(t, "Slide", new Vector3(0, 0.03f, 0.06f), new Vector3(0.036f, 0.045f, 0.2f), Steel);
+                    Box(t, "Grip", new Vector3(0, -0.05f, -0.01f), new Vector3(0.032f, 0.11f, 0.05f), metal).transform.localRotation = Quaternion.Euler(-12f, 0, 0);
+                    Box(t, "Slide", new Vector3(0, 0.03f, 0.06f), new Vector3(0.036f, 0.045f, 0.2f), steel);
                     m.muzzle = pt("Muzzle", new Vector3(0, 0.03f, 0.17f)); m.sight = pt("Sight", new Vector3(0, 0.06f, 0.05f));
                     m.rail = pt("Rail", new Vector3(0, -0.005f, 0.11f)); m.magPoint = pt("Mag", new Vector3(0, -0.11f, -0.02f)); break;
                 case "smg":
-                    Box(t, "Body", new Vector3(0, 0.02f, 0.1f), new Vector3(0.05f, 0.08f, 0.3f), Metal);
-                    Box(t, "Grip", new Vector3(0, -0.05f, 0f), new Vector3(0.03f, 0.1f, 0.045f), Metal);
-                    Box(t, "Stock", new Vector3(0, 0.02f, -0.12f), new Vector3(0.03f, 0.05f, 0.14f), Steel);
-                    Cyl(t, "Barrel", new Vector3(0, 0.03f, 0.3f), 0.013f, 0.12f, Steel);
-                    Box(t, "Mag", new Vector3(0, -0.08f, 0.11f), new Vector3(0.03f, 0.14f, 0.04f), Metal);
+                    Box(t, "Body", new Vector3(0, 0.02f, 0.1f), new Vector3(0.05f, 0.08f, 0.3f), metal);
+                    Box(t, "Grip", new Vector3(0, -0.05f, 0f), new Vector3(0.03f, 0.1f, 0.045f), metal);
+                    Box(t, "Stock", new Vector3(0, 0.02f, -0.12f), new Vector3(0.03f, 0.05f, 0.14f), steel);
+                    Cyl(t, "Barrel", new Vector3(0, 0.03f, 0.3f), 0.013f, 0.12f, steel);
+                    Box(t, "Mag", new Vector3(0, -0.08f, 0.11f), new Vector3(0.03f, 0.14f, 0.04f), metal);
                     m.muzzle = pt("Muzzle", new Vector3(0, 0.03f, 0.37f)); m.sight = pt("Sight", new Vector3(0, 0.07f, 0.08f));
                     m.rail = pt("Rail", new Vector3(0, -0.03f, 0.22f)); m.magPoint = pt("Mag", new Vector3(0, -0.16f, 0.11f)); m.twoHanded = true; break;
                 case "shotgun":
-                    Box(t, "Receiver", new Vector3(0, 0.01f, 0.04f), new Vector3(0.05f, 0.08f, 0.2f), Metal);
-                    Box(t, "Grip", new Vector3(0, -0.06f, -0.02f), new Vector3(0.03f, 0.1f, 0.045f), Wood);
-                    Box(t, "Stock", new Vector3(0, 0f, -0.22f), new Vector3(0.045f, 0.09f, 0.28f), Wood);
-                    Cyl(t, "Barrel", new Vector3(0, 0.035f, 0.42f), 0.018f, 0.62f, Steel);
-                    Box(t, "Pump", new Vector3(0, -0.005f, 0.34f), new Vector3(0.05f, 0.045f, 0.18f), Wood);
+                    Box(t, "Receiver", new Vector3(0, 0.01f, 0.04f), new Vector3(0.05f, 0.08f, 0.2f), metal);
+                    Box(t, "Grip", new Vector3(0, -0.06f, -0.02f), new Vector3(0.03f, 0.1f, 0.045f), wood);
+                    Box(t, "Stock", new Vector3(0, 0f, -0.22f), new Vector3(0.045f, 0.09f, 0.28f), wood);
+                    Cyl(t, "Barrel", new Vector3(0, 0.035f, 0.42f), 0.018f, 0.62f, steel);
+                    Box(t, "Pump", new Vector3(0, -0.005f, 0.34f), new Vector3(0.05f, 0.045f, 0.18f), wood);
                     m.muzzle = pt("Muzzle", new Vector3(0, 0.035f, 0.74f)); m.sight = pt("Sight", new Vector3(0, 0.06f, 0.06f));
                     m.rail = pt("Rail", new Vector3(0, -0.035f, 0.5f)); m.magPoint = pt("Mag", new Vector3(0, -0.04f, 0.14f)); m.twoHanded = true; break;
                 case "rifle":
-                    Box(t, "Receiver", new Vector3(0, 0.02f, 0.1f), new Vector3(0.05f, 0.09f, 0.36f), Metal);
-                    Box(t, "Grip", new Vector3(0, -0.06f, 0f), new Vector3(0.03f, 0.1f, 0.045f), Metal);
-                    Box(t, "Stock", new Vector3(0, 0.01f, -0.2f), new Vector3(0.045f, 0.1f, 0.26f), Metal);
-                    Cyl(t, "Barrel", new Vector3(0, 0.035f, 0.44f), 0.013f, 0.32f, Steel);
-                    Box(t, "Mag", new Vector3(0, -0.1f, 0.14f), new Vector3(0.035f, 0.15f, 0.06f), Metal).transform.localRotation = Quaternion.Euler(12f, 0, 0);
+                    Box(t, "Receiver", new Vector3(0, 0.02f, 0.1f), new Vector3(0.05f, 0.09f, 0.36f), metal);
+                    Box(t, "Grip", new Vector3(0, -0.06f, 0f), new Vector3(0.03f, 0.1f, 0.045f), metal);
+                    Box(t, "Stock", new Vector3(0, 0.01f, -0.2f), new Vector3(0.045f, 0.1f, 0.26f), metal);
+                    Cyl(t, "Barrel", new Vector3(0, 0.035f, 0.44f), 0.013f, 0.32f, steel);
+                    Box(t, "Mag", new Vector3(0, -0.1f, 0.14f), new Vector3(0.035f, 0.15f, 0.06f), metal).transform.localRotation = Quaternion.Euler(12f, 0, 0);
                     m.muzzle = pt("Muzzle", new Vector3(0, 0.035f, 0.61f)); m.sight = pt("Sight", new Vector3(0, 0.08f, 0.08f));
                     m.rail = pt("Rail", new Vector3(0, -0.03f, 0.32f)); m.magPoint = pt("Mag", new Vector3(0, -0.18f, 0.15f)); m.twoHanded = true; break;
                 case "sniper":
-                    Box(t, "Receiver", new Vector3(0, 0.015f, 0.08f), new Vector3(0.05f, 0.08f, 0.36f), Metal);
-                    Box(t, "Grip", new Vector3(0, -0.06f, 0f), new Vector3(0.03f, 0.1f, 0.045f), Wood);
-                    Box(t, "Stock", new Vector3(0, 0f, -0.25f), new Vector3(0.05f, 0.11f, 0.32f), Wood);
-                    Cyl(t, "Barrel", new Vector3(0, 0.03f, 0.56f), 0.012f, 0.62f, Steel);
-                    Cyl(t, "Scope", new Vector3(0, 0.085f, 0.1f), 0.022f, 0.28f, Metal);
+                    Box(t, "Receiver", new Vector3(0, 0.015f, 0.08f), new Vector3(0.05f, 0.08f, 0.36f), metal);
+                    Box(t, "Grip", new Vector3(0, -0.06f, 0f), new Vector3(0.03f, 0.1f, 0.045f), wood);
+                    Box(t, "Stock", new Vector3(0, 0f, -0.25f), new Vector3(0.05f, 0.11f, 0.32f), wood);
+                    Cyl(t, "Barrel", new Vector3(0, 0.03f, 0.56f), 0.012f, 0.62f, steel);
+                    Cyl(t, "Scope", new Vector3(0, 0.085f, 0.1f), 0.022f, 0.28f, metal);
                     m.muzzle = pt("Muzzle", new Vector3(0, 0.03f, 0.88f)); m.sight = pt("Sight", new Vector3(0, 0.12f, 0.1f));
                     m.rail = pt("Rail", new Vector3(0, -0.03f, 0.35f)); m.magPoint = pt("Mag", new Vector3(0, -0.07f, 0.1f)); m.twoHanded = true; break;
                 default: // mg
-                    Box(t, "Body", new Vector3(0, 0.02f, 0.1f), new Vector3(0.08f, 0.12f, 0.46f), Metal);
-                    Box(t, "Grip", new Vector3(0, -0.07f, -0.02f), new Vector3(0.03f, 0.1f, 0.045f), Metal);
-                    Box(t, "Stock", new Vector3(0, 0.01f, -0.22f), new Vector3(0.05f, 0.1f, 0.24f), Metal);
-                    Cyl(t, "Barrel", new Vector3(0, 0.03f, 0.56f), 0.02f, 0.5f, Steel);
+                    Box(t, "Body", new Vector3(0, 0.02f, 0.1f), new Vector3(0.08f, 0.12f, 0.46f), metal);
+                    Box(t, "Grip", new Vector3(0, -0.07f, -0.02f), new Vector3(0.03f, 0.1f, 0.045f), metal);
+                    Box(t, "Stock", new Vector3(0, 0.01f, -0.22f), new Vector3(0.05f, 0.1f, 0.24f), metal);
+                    Cyl(t, "Barrel", new Vector3(0, 0.03f, 0.56f), 0.02f, 0.5f, steel);
                     Box(t, "BeltBox", new Vector3(-0.07f, -0.05f, 0.08f), new Vector3(0.07f, 0.1f, 0.13f), Pal.Hex("4A5A3A"));
-                    Box(t, "Handle", new Vector3(0, 0.1f, 0.12f), new Vector3(0.025f, 0.04f, 0.12f), Metal);
+                    Box(t, "Handle", new Vector3(0, 0.1f, 0.12f), new Vector3(0.025f, 0.04f, 0.12f), metal);
                     m.muzzle = pt("Muzzle", new Vector3(0, 0.03f, 0.82f)); m.sight = pt("Sight", new Vector3(0, 0.1f, 0.0f));
                     m.rail = pt("Rail", new Vector3(0, -0.05f, 0.36f)); m.magPoint = pt("Mag", new Vector3(-0.07f, -0.12f, 0.08f)); m.twoHanded = true; break;
             }
@@ -285,7 +299,7 @@ namespace Intern.Game
             if (meleeModel != null) Destroy(meleeModel.gameObject);
             if (gunModel != null) Destroy(gunModel.gameObject);
             meleeModel = gunModel = null;
-            if (player != null) { player.fovScale = 1f; player.faceCamera = false; player.speedMul = 1f; }
+            if (player != null) { player.fovScale = 1f; player.faceCamera = false; player.speedMul = 1f; player.scopeView = false; }
             if (Av != null) { Av.holdRight = false; Av.aimGun = false; Av.twoHanded = false; }
         }
 
@@ -316,7 +330,16 @@ namespace Intern.Game
 
         public void Switch(int to)
         {
-            if (to == slot) return;
+            if (to == slot)
+            {
+                // повторное нажатие 1 или 2 — следующее купленное оружие этого вида (нож ↔ бита ↔ катана)
+                var cur = Current; var next = ars.NextOwned(cur.Melee, cur.id);
+                if (next == null || Reloading) return;
+                ars.Equip(next); ads = false; nextAt = Mathf.Max(nextAt, Time.time + 0.3f);
+                Rebuild();
+                if (run != null && run.Say != null) run.Say("В руках: " + Current.name);
+                return;
+            }
             if (to == 1 && ars.Gun == null) { if (run != null && run.Say != null) run.Say("Огнестрела нет — купи в оружейной «Железо» на площади."); return; }
             slot = to; ads = false; nextAt = Mathf.Max(nextAt, Time.time + 0.25f);
             ApplySlot();
@@ -335,6 +358,7 @@ namespace Intern.Game
             var def = Current;
             ads = active && !def.Melee && InputX.AimHeld() && !Reloading;
             player.fovScale = ads ? 1f / ars.Zoom(def) : 1f;
+            player.scopeView = Scoped;
             float slow = ads ? 0.6f : 1f;
             player.speedMul = run.PlayerSpeedMul * slow;
             if (Av != null) Av.aimPitch = player.CamPitch;

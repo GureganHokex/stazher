@@ -1,0 +1,100 @@
+// Инструменты разработки в редакторе (меню «Стажёр»), чтобы работать с проектом без отдельной консоли:
+//  • «Git: коммит и пуш в GitLab» — берёт Temp/commit.txt: сначала пути файлов (по одному в строке), потом строка «---»,
+//    потом сообщение коммита. Добавляет только эти файлы, коммитит и пушит в origin (GitLab). На GitHub не пушит никогда.
+//  • «Selftest последней сборки» — запускает Builds/Stazher-*-win64/Stazher.exe -selftest в окне и, когда он закончит,
+//    копирует отчёт в Temp/selftest_build.txt.
+// Итог каждой команды — в Temp/devtools.txt.
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text;
+using UnityEditor;
+using UnityEngine;
+using Debug = UnityEngine.Debug;
+
+namespace Intern.EditorTools
+{
+    public static class DevTools
+    {
+        static string Root { get { return Path.GetFullPath(Path.Combine(Application.dataPath, "..")); } }
+        static string Out { get { return Path.Combine(Root, "Temp", "devtools.txt"); } }
+
+        static string Git(string args, StringBuilder log)
+        {
+            var psi = new ProcessStartInfo("git", args)
+            {
+                WorkingDirectory = Root, UseShellExecute = false, CreateNoWindow = true,
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8,
+            };
+            using (var p = Process.Start(psi))
+            {
+                string o = p.StandardOutput.ReadToEnd(), e = p.StandardError.ReadToEnd();
+                p.WaitForExit(120000);
+                log.AppendLine("$ git " + args + "  → " + p.ExitCode);
+                if (o.Length > 0) log.AppendLine(o.TrimEnd());
+                if (e.Length > 0) log.AppendLine(e.TrimEnd());
+                return p.ExitCode == 0 ? o : null;
+            }
+        }
+
+        static string Quote(string s) { return "\"" + s.Replace("\"", "\\\"") + "\""; }
+
+        [MenuItem("Стажёр/Git: коммит и пуш в GitLab", false, 20)]
+        public static void CommitPush()
+        {
+            var log = new StringBuilder("git " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\n");
+            try
+            {
+                string file = Path.Combine(Root, "Temp", "commit.txt");
+                if (!File.Exists(file)) { log.AppendLine("нет Temp/commit.txt"); return; }
+                var lines = File.ReadAllLines(file, Encoding.UTF8);
+                int sep = Array.IndexOf(lines, "---");
+                if (sep <= 0) { log.AppendLine("в Temp/commit.txt нет строки «---» после путей"); return; }
+                var paths = lines.Take(sep).Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+                string msgFile = Path.Combine(Root, "Temp", "commit_msg.txt");
+                File.WriteAllText(msgFile, string.Join("\n", lines.Skip(sep + 1).ToArray()).Trim() + "\n", new UTF8Encoding(false));
+                foreach (var p in paths)
+                    if (Git("add -- " + Quote(p), log) == null) { log.AppendLine("не добавился: " + p); return; }
+                if (Git("commit -F " + Quote(msgFile), log) == null) return;
+                Git("push origin main", log);   // только GitLab: релиз на GitHub — отдельно, в конце бэклога
+                Git("log --oneline -1", log);
+                File.Delete(file);
+            }
+            catch (Exception e) { log.AppendLine("ошибка: " + e.Message); }
+            finally { File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false)); Debug.Log("[Стажёр] " + log.ToString().Split('\n').Last(l => l.Length > 0)); }
+        }
+
+        [MenuItem("Стажёр/Selftest последней сборки", false, 21)]
+        public static void SelftestBuild()
+        {
+            var log = new StringBuilder("selftest " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\n");
+            try
+            {
+                var dir = Directory.GetDirectories(Path.Combine(Root, "Builds"), "Stazher-*-win64").OrderBy(Directory.GetLastWriteTime).LastOrDefault();
+                if (dir == null) { log.AppendLine("сборок нет"); return; }
+                string exe = Path.Combine(dir, "Stazher.exe");
+                string report = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "AppData", "LocalLow", "Codezilla Games", "Стажёр", "selftest.txt");
+                string copy = Path.Combine(Root, "Temp", "selftest_build.txt");
+                if (File.Exists(copy)) File.Delete(copy);
+                var p = Process.Start(new ProcessStartInfo(exe, "-selftest -screen-fullscreen 0 -screen-width 640 -screen-height 360") { WorkingDirectory = dir, UseShellExecute = false });
+                log.AppendLine("запущено: " + exe + " (pid " + p.Id + "), отчёт появится в Temp/selftest_build.txt");
+                var started = DateTime.Now;
+                new System.Threading.Thread(() =>
+                {
+                    try
+                    {
+                        p.WaitForExit(15 * 60 * 1000);
+                        var fresh = File.Exists(report) && File.GetLastWriteTime(report) >= started;
+                        File.WriteAllText(copy, "exit " + (p.HasExited ? p.ExitCode.ToString() : "timeout") + "\n" + (fresh ? File.ReadAllText(report) : "отчёт не обновился"), new UTF8Encoding(false));
+                    }
+                    catch (Exception e) { try { File.WriteAllText(copy, "ошибка: " + e.Message); } catch { } }
+                }) { IsBackground = true }.Start();
+            }
+            catch (Exception e) { log.AppendLine("ошибка: " + e.Message); }
+            finally { File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false)); }
+        }
+    }
+}

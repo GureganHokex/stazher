@@ -61,8 +61,16 @@ namespace Intern.Game
         }
         public static bool Attack() { return Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame; }
         public static bool AttackHeld() { return Mouse.current != null && Mouse.current.leftButton.isPressed; }
+#if UNITY_EDITOR
+        // в редакторе Z — прицел-переключатель вместо ПКМ: удалённое управление не умеет держать правую кнопку
+        static bool zAim; static int zFrame = -1;
+        static void ZToggle() { if (KD(Key.Z) && zFrame != Time.frameCount) { zFrame = Time.frameCount; zAim = !zAim; } }
+        public static bool AimHeld() { ZToggle(); return (Mouse.current != null && Mouse.current.rightButton.isPressed) || zAim; }
+        public static bool AimPressed() { ZToggle(); return (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame) || KD(Key.Z); }
+#else
         public static bool AimHeld() { return Mouse.current != null && Mouse.current.rightButton.isPressed; }
         public static bool AimPressed() { return Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame; }
+#endif
         public static bool Reload() { return KD(Key.R); }
         public static bool Slot1() { return KD(Key.Digit1); }
         public static bool Slot2() { return KD(Key.Digit2); }
@@ -228,6 +236,7 @@ namespace Intern.Game
         public List<string> genDone = new List<string>();          // сданные задачи из генератора (текущие тикеты и тренировки)
         public List<string> practice = new List<string>();         // открытые тренировочные задачи
         public int practiceNo, genSolved;
+        public int dailyBonusDay;                                  // день, за который уже дана премия за все тикеты
         public List<TopicStat> topicStats = new List<TopicStat>();
 
         public string GetCode(string id) { int i = codeIds.IndexOf(id); return i >= 0 ? codeTexts[i] : null; }
