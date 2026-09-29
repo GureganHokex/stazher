@@ -459,7 +459,7 @@ namespace Intern.Game
             var list = EnvContent.Parse(envJson);
             T(list.Count >= 4, "сценариев " + list.Count + ", ждали 4+");
             T(list.Count(s => s.mission) == 1 && list.Any(s => s.id == EnvContent.MissionId && s.mission), "миссия env-setup");
-            var kinds = new HashSet<string> { "sandbox", "host", "http", "last", "file", "ips" };
+            var kinds = new HashSet<string> { "sandbox", "host", "http", "last", "file", "ips", "github" };
             foreach (var s in list)
             {
                 var t = EnvContent.ToTask(s, 1);
@@ -499,6 +499,22 @@ namespace Intern.Game
             T(EnvCheck.Evaluate(new EnvCheckDef { kind = "ips", refCmd = "ref" }, fake, new ShellRecord { cmd = "x", output = "    173 10.0.0.7\n    151 192.168.1.4\n" }, out note), "ips: " + note);
             T(!EnvCheck.Evaluate(new EnvCheckDef { kind = "ips", refCmd = "ref" }, fake, new ShellRecord { cmd = "x", output = "192.168.1.4\n10.0.0.7\n" }, out note), "ips: неверный порядок прошёл");
             T(!EnvCheck.Evaluate(new EnvCheckDef { kind = "host", cmd = "ps", notExpect = "\\bsite\\b" }, new FakeEnv { hostAll = "site\n" }, null, out note), "not_expect не сработал");
+            // GitHub и ник игрока (спринт 11 «Свой форк»)
+            {
+                string saved = EnvCheck.Gh;
+                var gh = new EnvCheckDef { kind = "github", url = "repos/{gh}/stazher", expect = "(?s)\"fork\":\\s*true.*\"full_name\":\\s*\"" + EnvCheck.Upstream + "\"", fail = "нет форка {gh}/stazher" };
+                EnvCheck.Vars["gh"] = "";
+                T(!EnvCheck.Evaluate(gh, new FakeEnv(), null, out note) && note == EnvCheck.NoNick, "github без ника: " + note);
+                EnvCheck.Vars["gh"] = "Nick-1";
+                T(EnvCheck.Fill("github.com/{gh}/stazher") == "github.com/Nick-1/stazher" && EnvCheck.Fill("^intern/{gh}$", true) == "^intern/" + System.Text.RegularExpressions.Regex.Escape("Nick-1") + "$", "подстановка {gh}");
+                var fg = new FakeEnv { sandboxAll = "{\"full_name\": \"Nick-1/stazher\", \"fork\": true, \"parent\": {\"full_name\": \"" + EnvCheck.Upstream + "\"}}" };
+                T(EnvCheck.Evaluate(gh, fg, null, out note), "github: форк не засчитан: " + note);
+                T(!EnvCheck.Evaluate(gh, new FakeEnv { sandboxAll = "{\"message\": \"Not Found\"}" }, null, out note) && note == "нет форка Nick-1/stazher", "github 404: " + note);
+                T(!EnvCheck.Evaluate(gh, new FakeEnv { sandboxAll = "{\"message\": \"API rate limit exceeded for 1.2.3.4\"}" }, null, out note) && note.Contains("60"), "github лимит: " + note);
+                T(!EnvCheck.Evaluate(gh, new FakeEnv { sandboxAll = "{\"full_name\": \"Nick-1/stazher\", \"fork\": false}" }, null, out note), "github: не форк засчитан");
+                T(EnvCheck.GhNick.IsMatch("Nick-1") && !EnvCheck.GhNick.IsMatch("-bad") && !EnvCheck.GhNick.IsMatch("a--b") && !EnvCheck.GhNick.IsMatch("имя"), "проверка ника GitHub");
+                EnvCheck.Vars["gh"] = saved;
+            }
             // разбор go test -json (раннер языков, спринт 10)
             {
                 Func<string, string, string, string> J = (action, test, output) => "{\"Action\":\"" + action + "\"" + (test != null ? ",\"Test\":\"" + test + "\"" : "") + (output != null ? ",\"Output\":\"" + output + "\"" : "") + "}";
@@ -516,8 +532,8 @@ namespace Intern.Game
         public class FakeEnv : IEnvRunner
         {
             public Dictionary<string, string> sandbox = new Dictionary<string, string>(), host = new Dictionary<string, string>();
-            public string http, hostAll;
-            public ProcResult Sandbox(string c) { string o; return new ProcResult { Code = sandbox.TryGetValue(c, out o) ? 0 : 1, Out = o ?? "" }; }
+            public string http, hostAll, sandboxAll;
+            public ProcResult Sandbox(string c) { string o = sandboxAll; if (o == null) sandbox.TryGetValue(c, out o); return new ProcResult { Code = o != null ? 0 : 1, Out = o ?? "" }; }
             public ProcResult Host(string a) { string o = hostAll; if (o == null) host.TryGetValue(a, out o); return new ProcResult { Code = o != null ? 0 : 1, Out = o ?? "" }; }
             public string Http(string url, out int status) { status = http != null ? 200 : 0; return http; }
             public string HostPath(string p) { return p; }

@@ -914,8 +914,10 @@ namespace Intern.Game
         {
             if (fresh)
             {
-                Progress.Wipe(); Save = new SaveData { version = 7, profession = Career.CanPick(profession) && !string.IsNullOrEmpty(profession) ? profession : "backend" };
+                string gh = Save != null ? Save.ghUser ?? "" : "";   // ник на GitHub — настройка игрока, новая игра его не стирает
+                Progress.Wipe(); Save = new SaveData { version = 7, profession = Career.CanPick(profession) && !string.IsNullOrEmpty(profession) ? profession : "backend", ghUser = gh };
                 Save.language = Languages.Valid(Save.profession, newGameLang); newGameLang = null;
+                EnvCheck.Vars["gh"] = Save.ghUser;
                 WorkDay.Reset(Save);
                 LoadPath();
                 SetupWork();

@@ -13,8 +13,20 @@ namespace Intern.Game
     // ======================= модель =======================
     public class EnvCheckDef
     {
-        public string kind = "sandbox";   // sandbox | host | http | last | file | ips
+        public string kind = "sandbox";   // sandbox | host | http | last | file | ips | github
         public string cmd, url, path, expect, notExpect, refCmd, lastCmd;
+        public string when;   // сама после команды — только если команда подходит под эту регулярку (github: не тратить лимит запросов)
+        public string fail;   // что сказать, если шаг не выполнен
+
+        // Копия с подставленными переменными ({gh} — ник игрока на GitHub)
+        public EnvCheckDef Filled()
+        {
+            return new EnvCheckDef
+            {
+                kind = kind, cmd = EnvCheck.Fill(cmd), url = EnvCheck.Fill(url), path = EnvCheck.Fill(path), expect = EnvCheck.Fill(expect, true), notExpect = EnvCheck.Fill(notExpect, true),
+                refCmd = EnvCheck.Fill(refCmd), lastCmd = EnvCheck.Fill(lastCmd, true), when = EnvCheck.Fill(when, true), fail = EnvCheck.Fill(fail),
+            };
+        }
     }
 
     public class EnvStep
@@ -67,6 +79,7 @@ namespace Intern.Game
                             kind = Str(cd, "kind") ?? "sandbox", cmd = Str(cd, "cmd"), url = Str(cd, "url"), path = Str(cd, "path"),
                             expect = Str(cd, "expect"), notExpect = Str(cd, "not_expect") ?? Str(cd, "notExpect"),
                             refCmd = Str(cd, "ref_cmd") ?? Str(cd, "refCmd"), lastCmd = Str(cd, "last_cmd") ?? Str(cd, "lastCmd"),
+                            when = Str(cd, "when"), fail = Str(cd, "fail"),
                         };
                     s.steps.Add(st);
                 }
@@ -130,12 +143,48 @@ namespace Intern.Game
     {
         static readonly Regex Ip = new Regex(@"\b(?:\d{1,3}\.){3}\d{1,3}\b");
 
+        // ---------- переменные сценариев: {gh} — ник на GitHub (спринт 11 «Свой форк») ----------
+        public const string Upstream = "GureganHokex/stazher";
+        public static readonly Dictionary<string, string> Vars = new Dictionary<string, string>();
+        public static readonly Regex GhNick = new Regex(@"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$");
+        public static string Gh { get { string v; return Vars.TryGetValue("gh", out v) ? v ?? "" : ""; } }
+
+        // {gh} → ник (в регулярке — с экранированием); ника нет — остаётся «{gh}»
+        public static string Fill(string s, bool regex = false)
+        {
+            if (string.IsNullOrEmpty(s) || s.IndexOf('{') < 0) return s;
+            foreach (var kv in Vars)
+                if (!string.IsNullOrEmpty(kv.Value)) s = s.Replace("{" + kv.Key + "}", regex ? Regex.Escape(kv.Value) : kv.Value);
+            return s;
+        }
+        // Для игрока: {gh} → ник или «<твой ник>»
+        public static string Show(string s) { s = Fill(s); return string.IsNullOrEmpty(s) ? s : s.Replace("{gh}", "<твой ник>"); }
+        public static bool NeedsGh(EnvCheckDef c)
+        {
+            foreach (var f in new[] { c.cmd, c.url, c.path, c.expect, c.notExpect, c.refCmd, c.lastCmd }) if (f != null && f.Contains("{gh}")) return true;
+            return false;
+        }
+
+        public const string NoNick = "Сначала скажи игре свой ник на GitHub: stazher github <ник>";
+
         public static bool Evaluate(EnvCheckDef c, IEnvRunner run, ShellRecord last, out string note)
         {
             note = null;
+            if (NeedsGh(c) && Gh.Length == 0) { note = NoNick; return false; }
+            c = c.Filled();
             string text;
             switch (c.kind)
             {
+                case "github":
+                    {
+                        // публичный API GitHub без входа (60 запросов в час с одного IP), запрос — curl из песочницы
+                        var r = run.Sandbox("curl -s -m 15 -H 'Accept: application/vnd.github+json' -H 'User-Agent: stazher-game' " + Quote("https://api.github.com/" + (c.url ?? "").TrimStart('/')));
+                        text = r.Out ?? "";
+                        if (text.Trim().Length == 0) { note = "GitHub не ответил. Проверь интернет и нажми «Проверить шаг» ещё раз."; return false; }
+                        if (text.Contains("API rate limit exceeded")) { note = "GitHub ограничил проверки без входа: 60 запросов в час с одного компьютера. Подожди немного и нажми «Проверить шаг»."; return false; }
+                        if (Regex.IsMatch(text, "\"message\"\\s*:\\s*\"Not Found\"")) { note = c.fail ?? "GitHub такого не нашёл."; return false; }
+                        break;
+                    }
                 case "host":
                     {
                         var r = run.Host(c.cmd ?? "");
@@ -181,8 +230,8 @@ namespace Intern.Game
                     break;
             }
             text = (text ?? "").Replace("\r", "");
-            if (!string.IsNullOrEmpty(c.expect) && !Regex.IsMatch(text, c.expect, RegexOptions.Multiline)) { note = note ?? "Пока не выполнено."; return false; }
-            if (!string.IsNullOrEmpty(c.notExpect) && Regex.IsMatch(text, c.notExpect, RegexOptions.Multiline)) { note = note ?? "Пока не выполнено."; return false; }
+            if (!string.IsNullOrEmpty(c.expect) && !Regex.IsMatch(text, c.expect, RegexOptions.Multiline)) { note = note ?? c.fail ?? "Пока не выполнено."; return false; }
+            if (!string.IsNullOrEmpty(c.notExpect) && Regex.IsMatch(text, c.notExpect, RegexOptions.Multiline)) { note = note ?? c.fail ?? "Пока не выполнено."; return false; }
             return true;
         }
 

@@ -270,6 +270,7 @@ namespace Intern.Game
         public List<EnvProgress> envProgress = new List<EnvProgress>();
         public List<string> envImages = new List<string>();        // образы, скачанные в игре: их можно удалить из терминала
         public bool envAnnounced;                                  // Гена уже рассказал про миссию
+        public string ghUser = "";                                 // ник на GitHub для заданий с форком (спринт 11)
 
         public string GetCode(string id) { int i = codeIds.IndexOf(id); return i >= 0 ? codeTexts[i] : null; }
         public void SetCode(string id, string code)

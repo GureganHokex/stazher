@@ -24,6 +24,8 @@ namespace Intern.Game
             if (Save.envProgress == null) Save.envProgress = new List<EnvProgress>();
             if (Save.envImages == null) Save.envImages = new List<string>();
             if (string.IsNullOrEmpty(Save.language)) Save.language = Languages.Default(Save.profession);   // спринт 9: язык по профессии
+            if (Save.ghUser == null) Save.ghUser = "";
+            EnvCheck.Vars["gh"] = Save.ghUser;   // спринт 11: {gh} в заданиях с форком
             if (Save.version >= 7) return;
             Save.version = 7;
             if (Progress.HasSave()) Progress.Save(Save);
@@ -108,8 +110,11 @@ namespace Intern.Game
         public TaskData EnvNext(TaskData except = null)
         {
             if (!EnvVisible) return null;
-            return EnvTasks.FirstOrDefault(t => t != except && EnvOpen(t) && !EnvDone(t));
+            return EnvTasks.FirstOrDefault(t => t != except && EnvOpen(t) && !EnvDone(t) && (!EnvNeedsGitHub(t) || !string.IsNullOrEmpty(Save.ghUser)));
         }
+
+        // Сценарии с настоящим GitHub (форк): в спринт сами не попадают, пока игрок не назвал свой ник — аккаунт нужен не всем
+        public static bool EnvNeedsGitHub(TaskData t) { return t != null && t.id != null && t.id.StartsWith("env-gh-"); }
 
         // В спринте всегда одна карточка окружения: следующий непройденный сценарий (идёт в зачёт цели спринта)
         void EnsureSprintEnv()

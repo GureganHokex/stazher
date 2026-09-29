@@ -23,8 +23,8 @@ namespace Intern.Game
             new LangInfo { id = "javascript", name = "JavaScript", badge = "JS", runner = "js", ready = true, professions = new[] { "frontend" } },
             new LangInfo { id = "typescript", name = "TypeScript", badge = "TS", runner = "ts", ready = true, professions = new[] { "frontend" } },
             new LangInfo { id = "go", name = "Go", badge = "GO", runner = "docker", ready = true, professions = new[] { "backend", "devops" } },
-            new LangInfo { id = "java", name = "Java", badge = "JAVA", runner = "docker", soon = "спринт 11", professions = new[] { "backend" } },
-            new LangInfo { id = "csharp", name = "C#", badge = "C#", runner = "docker", soon = "спринт 12", professions = new[] { "backend" } },
+            new LangInfo { id = "java", name = "Java", badge = "JAVA", runner = "docker", soon = "спринт 12", professions = new[] { "backend" } },
+            new LangInfo { id = "csharp", name = "C#", badge = "C#", runner = "docker", soon = "спринт 13", professions = new[] { "backend" } },
             new LangInfo { id = "php", name = "PHP", badge = "PHP", runner = "docker", soon = "позже", professions = new[] { "backend" } },
         };
 

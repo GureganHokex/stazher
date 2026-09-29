@@ -179,7 +179,10 @@ namespace Intern.Game
             var c = st.check;
             bool needsCmd = c.kind == "last" || c.kind == "ips";
             if (needsCmd && cmdSeq <= stepStartSeq) { if (manual) EnvFail("Сначала выполни команду этого шага в терминале внизу.", false); return; }
-            bool needsSandbox = c.kind == "sandbox" || c.kind == "file" || c.kind == "ips";
+            bool needsSandbox = c.kind == "sandbox" || c.kind == "file" || c.kind == "ips" || c.kind == "github";
+            // сама после команды — только если команда подходит (github: у открытого API 60 запросов в час)
+            if (!manual && !string.IsNullOrEmpty(c.when) && (envLastRec == null || !System.Text.RegularExpressions.Regex.IsMatch(envLastRec.cmd ?? "", EnvCheck.Fill(c.when, true)))) return;
+            if (!manual && EnvCheck.NeedsGh(c) && EnvCheck.Gh.Length == 0) return;
             if (needsSandbox && !sh.CanRunCommands)
             {
                 if (manual) EnvFail(sh.State == EnvState.Ready ? "Песочница остановлена — запусти её справа («Запустить песочницу»)." : sh.StateText, false);
@@ -396,6 +399,8 @@ namespace Intern.Game
         {
             var sh = g.Env;
             if (sh.Busy) return "<color=#6E7681>выполняется…" + (termFocus ? "  Ctrl+C — прервать" : "") + "</color>";
+            if (termSecret) return "<color=#CCA700>токен GitHub (скрыт):</color> " + new string('•', Math.Min(termInput.Length, 60)) + (termFocus && Active && termBlink ? "<mark=#AEAFAD99> </mark>" : "") +
+                                   (termInput.Length == 0 ? "<color=#6E7681>  Ctrl+V — вставить, Enter — сохранить, Ctrl+C — отмена</color>" : "");
             var sb = new StringBuilder(PromptMarkup());
             string a = termInput.Substring(0, termCur), b = termInput.Substring(termCur);
             sb.Append(K.Esc(a));
@@ -434,6 +439,8 @@ namespace Intern.Game
             var sh = g.Env;
             if (e.keyCode == KeyCode.Escape) { escClosedAt = Time.frameCount; termFocus = false; ed.Active = Active; ed.Place(); TermUpdateIn(); return true; }
             if (ctrl && e.shift && e.keyCode == KeyCode.C) { TermCopyLast(); return true; }
+            if (termSecret && ctrl && !e.alt && e.keyCode == KeyCode.C) { termSecret = false; TermSet(""); g.EnvEcho("<color=#9D9D9D>Ввод токена отменён.</color>\n"); return true; }
+            if (termSecret && (e.keyCode == KeyCode.UpArrow || e.keyCode == KeyCode.DownArrow || e.keyCode == KeyCode.Tab)) return true;
             if (ctrl && !e.alt)
             {
                 switch (e.keyCode)
@@ -498,6 +505,7 @@ namespace Intern.Game
             var sh = g.Env;
             if (sh.Busy) { Notice("Команда ещё выполняется. Ctrl+C — прервать.", "clock", K.Muted); return; }
             string line = termInput;
+            if (termSecret) { termSecret = false; TermSet(""); GhSaveToken(line.Trim()); return; }   // токен: ни в историю, ни на экран
             g.EnvEcho(PromptMarkup() + K.Esc(line) + "\n");
             histPos = -1; TermSet("");
             string cmd = line.Trim();
@@ -512,6 +520,7 @@ namespace Intern.Game
         // Команды самого терминала IDE
         bool TermBuiltin(string cmd)
         {
+            if (cmd == "stazher" || cmd.StartsWith("stazher ")) { GhCommand(cmd); return true; }
             switch (cmd)
             {
                 case "clear": g.EnvClear(); return true;
@@ -520,7 +529,8 @@ namespace Intern.Game
                               "  Enter — выполнить, ↑/↓ — история, Tab — дополнить имя файла, Ctrl+C — прервать, Ctrl+L или clear — очистить.\n" +
                               "  Ctrl+Shift+C или copy — скопировать вывод последней команды, Ctrl+V — вставить.\n" +
                               "  docker … — идёт в Docker на твоём ПК через фильтр игры: только безопасные команды, порты — на 127.0.0.1.\n" +
-                              "  Интерактивные программы (vim, nano, top, less) здесь не открываются: файлы правь в IDE.</color>\n");
+                              "  Интерактивные программы (vim, nano, top, less) здесь не открываются: файлы правь в IDE.\n" +
+                              "  stazher — команды самой игры: ник на GitHub и токен для git push.</color>\n");
                     return true;
                 case "history":
                     {
@@ -535,6 +545,80 @@ namespace Intern.Game
                     return true;
             }
             return false;
+        }
+
+        // ======================= GitHub: ник и токен (спринт 11 «Свой форк») =======================
+        bool termSecret;   // следующая строка терминала — токен: скрыт, не попадает в историю
+
+        void GhCommand(string cmd)
+        {
+            var a = cmd.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            string sub = a.Length > 1 ? a[1] : "help";
+            switch (sub)
+            {
+                case "github":
+                    {
+                        if (a.Length < 3)
+                        {
+                            g.EnvEcho(EnvCheck.Gh.Length > 0 ? "Ник на GitHub: " + K.Esc(EnvCheck.Gh) + " — https://github.com/" + K.Esc(EnvCheck.Gh) + "\n" : "<color=#9D9D9D>Ник ещё не задан: stazher github <ник></color>\n");
+                            return;
+                        }
+                        if (a[2] == "forget" || a[2] == "--forget")
+                        {
+                            g.Save.ghUser = ""; EnvCheck.Vars["gh"] = ""; g.Persist(); RefreshSide();
+                            g.EnvEcho("Ник на GitHub забыт. Задания с форком снова ждут: stazher github <ник>\n");
+                            return;
+                        }
+                        string nick = a[2].TrimStart('@');
+                        if (!EnvCheck.GhNick.IsMatch(nick)) { g.EnvEcho("<color=#F48771>«" + K.Esc(nick) + "» не похоже на ник GitHub: латиница, цифры и дефис, до 39 символов.</color>\n"); return; }
+                        g.Save.ghUser = nick; EnvCheck.Vars["gh"] = nick; g.Persist();
+                        g.EnvEcho("Ник на GitHub: <b>" + K.Esc(nick) + "</b> — https://github.com/" + K.Esc(nick) + "\n<color=#9D9D9D>Ник хранится в сохранении игры; форк и всё, что ты в него пушишь, публичные.</color>\n");
+                        RefreshSide();
+                        envLastRec = new ShellRecord { cmd = cmd, output = "" };   // шаги с when «^stazher github» проверятся по цепочке
+                        if (IsScenario && g.EnvOpen(Task) && !EnvFinished) EnvCheckStep(true);
+                        return;
+                    }
+                case "token":
+                    {
+                        var sh = g.Env;
+                        if (a.Length > 2 && (a[2] == "forget" || a[2] == "--forget"))
+                        {
+                            if (!sh.CanRunCommands) { g.EnvEcho("<color=#F48771>Песочница не запущена.</color>\n"); return; }
+                            sh.Async(() => DevEnv.Exec("rm -f ~/.git-credentials && git config --global --unset credential.helper; echo ok", 20000),
+                                     r => { g.EnvEcho(r.Ok ? "Токен удалён из песочницы.\n" : "<color=#F48771>Не удалось удалить: " + K.Esc(r.Text) + "</color>\n"); RefreshBottom(); });
+                            return;
+                        }
+                        if (EnvCheck.Gh.Length == 0) { g.EnvEcho("<color=#F48771>" + EnvCheck.NoNick + "</color>\n"); return; }
+                        if (!sh.CanRunCommands) { g.EnvEcho("<color=#F48771>Песочница не запущена — токен некуда сохранить.</color>\n"); return; }
+                        termSecret = true; TermSet("");
+                        g.EnvEcho("<color=#9D9D9D>Вставь токен GitHub (Ctrl+V) и нажми Enter. Символы скрыты, токен уйдёт только в песочницу (git credential store), игра его не сохраняет.</color>\n");
+                        return;
+                    }
+                default:
+                    g.EnvEcho("<color=#9D9D9D>Команды игры:\n" +
+                              "  stazher github <ник>   — твой ник на GitHub (для заданий с форком); stazher github forget — забыть\n" +
+                              "  stazher token          — сохранить токен GitHub в песочнице для git push (ввод скрыт)\n" +
+                              "  stazher token forget   — удалить токен из песочницы</color>\n");
+                    return;
+            }
+        }
+
+        void GhSaveToken(string token)
+        {
+            if (token.Length == 0) { g.EnvEcho("<color=#9D9D9D>Пусто — токен не сохранён.</color>\n"); return; }
+            if (token.IndexOfAny(new[] { ' ', '\n', '\t' }) >= 0 || token.Length > 400) { g.EnvEcho("<color=#F48771>Это не похоже на токен: в нём не должно быть пробелов и переносов.</color>\n"); return; }
+            bool known = token.StartsWith("github_pat_") || token.StartsWith("ghp_");
+            g.EnvEcho("<color=#9D9D9D>токен: " + new string('•', 12) + (known ? "" : "  (обычно токен начинается с github_pat_ — проверь, что скопировал его целиком)") + "</color>\n");
+            string nick = EnvCheck.Gh;
+            string input = "protocol=https\nhost=github.com\nusername=" + nick + "\npassword=" + token + "\n\n";
+            g.Env.Async(() => DevEnv.Run(DevEnv.Docker, "exec -i " + DevEnv.Container + " sh -c \"git config --global credential.helper store && git credential-store store\"", 20000, input),
+                r =>
+                {
+                    g.EnvEcho(r.Ok ? "Токен сохранён в песочнице. Теперь git push в твой форк пройдёт без вопросов. Удалить: stazher token forget\n"
+                                   : "<color=#F48771>Не удалось сохранить токен: " + K.Esc(r.Text) + "</color>\n");
+                    RefreshBottom();
+                    if (r.Ok && IsScenario && g.EnvOpen(Task) && !EnvFinished) EnvCheckStep(false);
+                });
         }
 
         // Ctrl+Shift+C или copy: вывод последней команды — в буфер обмена (вставить в IDE, чат, заметки)
@@ -628,7 +712,7 @@ namespace Intern.Game
             {
                 var th = new Btn(() => { theoryOpen = !theoryOpen; RefreshSide(); }); th.style.marginTop = 16f; th.style.height = 26f; K.Radius(th, 3f);
                 th.Add(new Icon(theoryOpen ? "chevD" : "chevR", K.Muted, 16f)); var tl = K.T("ТЕОРИЯ · ОКРУЖЕНИЕ", 12f, K.Muted, false, true); tl.style.marginLeft = 4f; th.Add(tl); c.Add(th);
-                if (theoryOpen) TheoryText(c, t.theory);
+                if (theoryOpen) TheoryText(c, EnvCheck.Show(t.theory));
             }
         }
 
@@ -637,12 +721,12 @@ namespace Intern.Game
             var st = Sc.steps[i]; bool past = i < cur, now = i == cur;
             var row = K.Box(true); row.style.alignItems = Align.Center; row.style.marginTop = now ? 12f : 6f;
             row.Add(new Icon(past ? "check" : now ? "continue" : "ring", past ? K.Green : now ? K.Sun : K.Dim, 16f));
-            var l = K.T((i + 1) + ". " + K.Esc(st.title), now ? 16f : 14f, past ? K.Muted : now ? K.TextHi : K.Dim, false, now); l.style.marginLeft = 8f; l.style.flexShrink = 1f; row.Add(l);
+            var l = K.T((i + 1) + ". " + K.Esc(EnvCheck.Show(st.title)), now ? 16f : 14f, past ? K.Muted : now ? K.TextHi : K.Dim, false, now); l.style.marginLeft = 8f; l.style.flexShrink = 1f; row.Add(l);
             c.Add(row);
             if (past && i == cur - 1 && !string.IsNullOrEmpty(st.explain) && envPassedExplain == st.explain) { var ex = Para(c, K.Esc(st.explain), 13f, K.Green, 4f); ex.style.marginLeft = 24f; }
             if (!now) return;
             var box = K.Box(); box.style.marginLeft = 7f; box.style.marginTop = 6f; K.Pad(box, 2f, 0f, 6f, 14f); K.Line(box, K.Sun, 0f, 0f, 0f, 2f); c.Add(box);
-            Para(box, K.Esc(st.text), 15f, K.Text, 2f);
+            Para(box, K.Esc(EnvCheck.Show(st.text)), 15f, K.Text, 2f);
             string al = ActionLabel(st.action);
             if (al != null)
             {
@@ -652,7 +736,7 @@ namespace Intern.Game
             string hk = Task.id + ":" + i;
             if (!string.IsNullOrEmpty(st.hint))
             {
-                if (envHints.Contains(hk)) { var h = Para(box, "<color=#75BEFF>Подсказка.</color> " + K.Esc(st.hint), 14f, K.Text, 10f); K.Line(h, K.Blue, 0f, 0f, 0f, 3f); K.Pad(h, 4f, 0f, 4f, 10f); }
+                if (envHints.Contains(hk)) { var h = Para(box, "<color=#75BEFF>Подсказка.</color> " + K.Esc(EnvCheck.Show(st.hint)), 14f, K.Text, 10f); K.Line(h, K.Blue, 0f, 0f, 0f, 3f); K.Pad(h, 4f, 0f, 4f, 10f); }
                 else if (Diff == Difficulty.Easy) SmallBtn(box, "Подсказка", () => { g.ReportWork(WorkKind.Hint); envHints.Add(hk); RefreshSide(); }, "md", K.Blue);
                 else if (Diff == Difficulty.Medium)
                 {
@@ -666,8 +750,8 @@ namespace Intern.Game
                 if (envSolves.Contains(hk))
                 {
                     Section(box, "КОМАНДА");
-                    CodeBlock(box, st.solve, Pal.Hex("B5CEA8"));
-                    SmallBtn(box, "Вставить в терминал", () => { termFocus = true; ed.Active = false; ed.Place(); bottom = Bottom.Terminal; RefreshBottom(); TermSet(st.solve); }, "terminal", EnvColor);
+                    CodeBlock(box, EnvCheck.Show(st.solve), Pal.Hex("B5CEA8"));
+                    SmallBtn(box, "Вставить в терминал", () => { termFocus = true; ed.Active = false; ed.Place(); bottom = Bottom.Terminal; RefreshBottom(); TermSet(EnvCheck.Show(st.solve)); }, "terminal", EnvColor);
                 }
                 else if (Diff == Difficulty.Easy && fails >= 3)
                     SmallBtn(box, "Показать команду", () => { envSolves.Add(hk); RefreshSide(); }, "warning", Pal.Hex("FFB4B4"));
