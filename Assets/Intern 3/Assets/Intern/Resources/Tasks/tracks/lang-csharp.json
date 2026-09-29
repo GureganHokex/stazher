@@ -1,0 +1,1189 @@
+{
+ "track": "lang-csharp",
+ "roadmap": [
+  {
+   "topic_id": "cs-basics",
+   "lang": "csharp",
+   "replaces": [
+    "be-py-basics"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "C#: переменные и типы",
+   "grade": "junior",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "Класс Program и метод Main, Console.WriteLine, int/long/double/decimal/string/bool, var и const, целое деление, интерполяция строк.",
+   "theory": "C# — компилируемый язык платформы .NET со строгими типами. Компилятор проверяет весь код до запуска: опечатки и несовпадения типов видны сразу.\n\nПрограмма начинается с метода Main:\n\n    class Program\n    {\n        static void Main()\n        {\n            Console.WriteLine(\"Привет, Кодзилла!\");\n        }\n    }\n\n• В новых проектах можно писать и без класса — сразу Console.WriteLine(…). В задачах игры методы лежат в классе Program, чтобы их могли вызвать тесты.\n• Частые пространства имён (System, System.Linq, System.Collections.Generic) подключены сами, как в новом проекте dotnet.\n• Каждая инструкция заканчивается точкой с запятой, блоки — в фигурных скобках, скобка по традиции на отдельной строке.\n\nПеременные объявляются с типом:\n\n    int qty = 2;                  // целое\n    long views = 5_000_000_000;   // большое целое\n    double weight = 1.5;          // дробное\n    decimal price = 1990.99m;     // деньги — только decimal, суффикс m\n    string title = \"Лампа\";\n    bool inStock = true;\n    var total = qty * 1990;       // var: тип выводится сам (int)\n    const int Vat = 20;           // константа\n\nВажные мелочи:\n• int / int — целое деление: 7 / 2 == 3. Дробный результат даст 7 / 2.0 или (double)7 / 2.\n• double считает в двоичной системе: 0.1 + 0.2 == 0.3 даёт False. Для денег есть decimal — там 0.1m + 0.2m == 0.3m.\n• Интерполяция: $\"Итого: {total} ₽\" подставляет значения прямо в строку.\n• + со строкой склеивает: \"Итого: \" + 2 + 3 даёт \"Итого: 23\".\n\nМетод с параметрами и результатом:\n\n    public static int CartTotal(int price, int qty)\n    {\n        return price * qty;\n    }\n\npublic нужен, чтобы метод можно было вызвать из другого класса — например, из тестов в Tests.cs. В настоящем проекте код запускают командой dotnet run, а тесты — dotnet test; игра для скорости вызывает компилятор csc напрямую."
+  },
+  {
+   "topic_id": "cs-control",
+   "lang": "csharp",
+   "replaces": [
+    "be-py-control"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "C#: условия и циклы",
+   "grade": "junior",
+   "requires": [
+    "cs-basics"
+   ],
+   "description": "if/else, логические операторы, switch-выражения и шаблоны, циклы for, while и foreach, break и continue.",
+   "theory": "Условие — в круглых скобках, тело — в фигурных:\n\n    if (score >= 90)\n    {\n        return \"отлично\";\n    }\n    else if (score >= 75)\n    {\n        return \"хорошо\";\n    }\n\n• Логика: && — «и», || — «или», ! — «не». Тернарный оператор: qty > 0 ? \"в наличии\" : \"нет\".\n\nswitch-выражение выбирает значение по шаблону и не требует break:\n\n    string kind = day switch\n    {\n        6 or 7 => \"выходной\",\n        _ => \"будни\",       // _ — «всё остальное»\n    };\n\nМожно сравнивать сразу несколько значений через кортеж: (n % 3, n % 5) switch { (0, 0) => …, … }. Варианты проверяются сверху вниз.\n\nЦиклы:\n\n    for (int i = 0; i < 10; i++) { … }   // со счётчиком\n    while (total < 100) { … }             // пока условие верно\n    foreach (int price in prices) { … }   // по всем элементам\n\n• break выходит из цикла, continue переходит к следующему шагу.\n• Индексы массива — от 0 до Length - 1, условие цикла: i < prices.Length.\n• int вмещает до 2 147 483 647. Большие суммы считают в long: переполнение int не падает, а молча портит число."
+  },
+  {
+   "topic_id": "cs-collections",
+   "lang": "csharp",
+   "replaces": [
+    "be-py-collections"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "C#: массивы, List и Dictionary",
+   "grade": "junior",
+   "requires": [
+    "cs-control"
+   ],
+   "description": "Массивы, List<T>, Dictionary<TKey, TValue>, TryGetValue, инициализаторы коллекций, первые шаги в LINQ.",
+   "theory": "Массив — набор фиксированной длины:\n\n    int[] prices = { 1990, 500, 7500 };\n    prices[0] = 1890;\n    Console.WriteLine(prices.Length);   // 3\n\nСписок List<T> растёт сам:\n\n    var cart = new List<string> { \"лампа\", \"стол\" };\n    cart.Add(\"стул\");\n    cart.Insert(0, \"полка\");   // вставить в начало\n    cart.Remove(\"стол\");\n    Console.WriteLine(cart.Count);          // 3\n    Console.WriteLine(string.Join(\", \", cart));\n\nСловарь Dictionary хранит пары ключ → значение:\n\n    var stock = new Dictionary<string, int>\n    {\n        [\"лампа\"] = 3,\n        [\"стол\"] = 1,\n    };\n    stock[\"лампа\"] = 5;                          // тот же ключ — значение заменится\n    int n = stock[\"шкаф\"];                        // KeyNotFoundException — ключа нет!\n    if (stock.TryGetValue(\"шкаф\", out int left)) { … }   // безопасно: true и значение, или false\n    stock.GetValueOrDefault(\"шкаф\", 0);           // 0\n    foreach (var pair in stock) { … pair.Key … pair.Value … }\n\n• В угловых скобках — тип элементов: List<int>, Dictionary<string, decimal>. В отличие от Java, int можно писать как есть.\n• LINQ — запросы к коллекциям: prices.Where(p => p <= 1000).ToList(), prices.Sum(), tags.Count(t => t == \"sale\"). Удобно, но сначала полезно уметь то же самое циклом."
+  },
+  {
+   "topic_id": "cs-methods",
+   "lang": "csharp",
+   "replaces": [
+    "be-py-functions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "C#: методы и строки",
+   "grade": "junior",
+   "requires": [
+    "cs-collections"
+   ],
+   "description": "Методы, передача по значению, ref и out, параметры по умолчанию, перегрузка, params, рекурсия; строки, их методы и неизменяемость.",
+   "theory": "Метод объявляет доступ, тип результата, имя и параметры:\n\n    public static int Clamp(int value, int min, int max) => Math.Max(min, Math.Min(max, value));\n\n• => — короткое тело для метода из одного выражения.\n• Параметры передаются по значению: метод получает копию. Но у массива или объекта копируется ссылка — изменения внутри них видны снаружи.\n• ref передаёт саму переменную: Bump(ref total). out — способ вернуть второе значение: int.TryParse(\"42\", out int n).\n• Значение по умолчанию: static string Price(int rub, string currency = \"₽\"). Вызов Price(500) подставит «₽».\n• Перегрузка: одно имя, разные параметры — Print(int) и Print(string).\n• params int[] nums принимает любое число аргументов: Sum(1, 2, 3).\n• Рекурсия — метод вызывает сам себя; без базового случая программа упадёт с переполнением стека.\n\nСтроки:\n\n    string s = \"  Гена Петров \";\n    s.Trim();                                   // \"Гена Петров\"\n    s.Split(' ', StringSplitOptions.RemoveEmptyEntries);   // [\"Гена\", \"Петров\"]\n    s.Length;                                   // длина — свойство, без скобок\n    \"лампа\".ToUpper();                          // \"ЛАМПА\"\n    \"лампа\"[0];                                 // 'л' — символ, тип char\n    \"лампа\".Substring(0, 2);                    // \"ла\"\n\n• Строки неизменяемы: Trim, ToUpper, Replace не меняют строку, а возвращают новую. Результат нужно сохранить: s = s.Trim();\n• == у строк в C# сравнивает текст (в Java — ссылки)."
+  },
+  {
+   "topic_id": "cs-oop",
+   "lang": "csharp",
+   "replaces": [
+    "be-py-oop"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "C#: классы и объекты",
+   "grade": "junior",
+   "requires": [
+    "cs-methods"
+   ],
+   "description": "Классы, конструкторы, свойства get/set, ToString и override, static, интерфейсы, record.",
+   "theory": "Класс описывает данные и поведение, объект создают через new:\n\n    public class Product\n    {\n        public string Name { get; }             // свойство только для чтения\n        public int Price { get; private set; }  // менять можно только изнутри класса\n\n        public Product(string name, int price)  // конструктор\n        {\n            Name = name;\n            Price = price;\n        }\n\n        public override string ToString() => $\"{Name} — {Price} ₽\";\n    }\n\n    var lamp = new Product(\"Лампа\", 1990);\n    Console.WriteLine(lamp);   // вызовет ToString\n\n• Свойства — это поля с контролем доступа: снаружи читаем lamp.Price, а меняет цену только сам класс.\n• ToString определяет, как объект печатается. Без override печатается имя класса.\n• override обязателен при переопределении: C# не даст случайно «спрятать» метод родителя.\n• static — общее для класса, а не для объекта: Counter.Created.\n• Переменная класса хранит ссылку: var b = a — тот же объект. == у классов сравнивает ссылки.\n• record — класс для данных: record Point(int X, int Y). Сравнивается по значениям и сам печатается красиво.\n\nИнтерфейс — договор: какие методы обязан иметь класс. Наследование и интерфейсы пишутся через двоеточие:\n\n    interface IShape { double Area(); }\n\n    class Circle : IShape\n    {\n        public double R { get; }\n        public Circle(double r) { R = r; }\n        public double Area() => Math.PI * R * R;\n    }"
+  },
+  {
+   "topic_id": "cs-exceptions",
+   "lang": "csharp",
+   "replaces": [
+    "be-py-exceptions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "C#: исключения",
+   "grade": "junior",
+   "requires": [
+    "cs-methods"
+   ],
+   "description": "try/catch/finally, throw, стандартные исключения, TryParse вместо исключений, свой класс исключения.",
+   "theory": "Ошибку во время работы .NET сообщает исключением. Непойманное исключение останавливает программу и печатает трассировку со строкой, где всё случилось.\n\n    try\n    {\n        int port = int.Parse(text);\n    }\n    catch (FormatException e)\n    {\n        Console.WriteLine(\"не число: \" + e.Message);\n    }\n    finally\n    {\n        Console.WriteLine(\"выполнится в любом случае\");\n    }\n\nБросить исключение самому:\n\n    if (amount <= 0)\n        throw new ArgumentOutOfRangeException(nameof(amount), \"сумма должна быть больше нуля\");\n\nЧастые стандартные исключения:\n• ArgumentException и ArgumentOutOfRangeException — неверный аргумент.\n• InvalidOperationException — операция невозможна сейчас (например, не хватает денег).\n• NullReferenceException — обращение к null.\n• IndexOutOfRangeException и KeyNotFoundException — нет такого индекса или ключа.\n• FormatException — строка не превращается в число.\n\nВ C# нет проверяемых исключений, как в Java: throws писать не нужно, но и компилятор не напомнит поймать ошибку.\n\n• Если ошибка ожидаема (пользователь ввёл «80a»), лучше без исключений: int.TryParse(text, out int port) вернёт false.\n• Своё исключение — класс-наследник Exception с нужными данными:\n\n    public class StockException : Exception\n    {\n        public int Have { get; }\n        public StockException(int have) : base($\"на складе только {have}\") { Have = have; }\n    }\n\n• Ловят конкретные исключения: catch (Exception) спрячет и настоящие баги.\n• throw; внутри catch пробрасывает исключение дальше, сохраняя трассировку."
+  }
+ ],
+ "tasks": [
+  {
+   "task_id": "cs-basics-01",
+   "topic_id": "cs-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Итог корзины на C#",
+   "story": "Гена: «Биллинг у нас на .NET. Начнём с простого: стоимость позиции.»",
+   "content": {
+    "question": "Допиши метод CartTotal(int price, int qty) — стоимость позиции: цена × количество.",
+    "entry": "CartTotal",
+    "code": "class Program\n{\n    // стоимость позиции: цена × количество\n    public static int CartTotal(int price, int qty)\n    {\n        return 0;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(CartTotal(1990, 2));\n    }\n}",
+    "correct_answer": "class Program\n{\n    // стоимость позиции: цена × количество\n    public static int CartTotal(int price, int qty)\n    {\n        return price * qty;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(CartTotal(1990, 2));\n    }\n}",
+    "tests_code": "class Tests\n{\n    static void Main()\n    {\n        Check.Eq(\"1990 × 2\", () => Program.CartTotal(1990, 2), 3980);\n        Check.Eq(\"250 × 0\", () => Program.CartTotal(250, 0), 0);\n        Check.Eq(\"99 × 3\", () => Program.CartTotal(99, 3), 297);\n    }\n}",
+    "requirements": [
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Метод объявляется внутри класса: доступ (public), static, тип результата (int), имя и параметры с типами. public нужен, чтобы тесты из другого класса могли вызвать Program.CartTotal. Результат возвращают через return.",
+   "hints": [
+    "Верни произведение через return.",
+    "Умножение — звёздочка: price * qty."
+   ]
+  },
+  {
+   "task_id": "cs-basics-02",
+   "topic_id": "cs-basics",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Где потерялась половина",
+   "story": "Ира: «В отчёте то цены круглые, то сумма не сходится на копейку. Разберись, что печатает этот код.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "class Program\n{\n    static void Main()\n    {\n        int price = 7;\n        Console.WriteLine(price / 2);\n        Console.WriteLine(price / 2.0);\n        Console.WriteLine(\"Итого: \" + price + 3);\n        Console.WriteLine($\"Итого: {price + 3}\");\n        Console.WriteLine(0.1 + 0.2 == 0.3);\n        Console.WriteLine(0.1m + 0.2m == 0.3m);\n    }\n}",
+    "language": "csharp",
+    "output": "3\n3.5\nИтого: 73\nИтого: 10\nFalse\nTrue"
+   },
+   "explanation": "7 / 2 — деление двух int, оно целое: 3. С 2.0 деление дробное — 3.5. Строка + число даёт строку, поэтому «Итого: 73»; в интерполяции {price + 3} сначала считается сумма. double хранит 0.1 и 0.2 неточно, и их сумма не равна 0.3 — False. decimal считает в десятичной системе — True: поэтому деньги хранят в decimal.",
+   "hints": [
+    "Деление двух int отбрасывает дробную часть.",
+    "double и decimal по-разному хранят 0.1."
+   ]
+  },
+  {
+   "task_id": "cs-basics-03",
+   "topic_id": "cs-basics",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Цена по шаблону",
+   "story": "Гена: «Допиши пропуски — компилятор без них не соберёт программу.»",
+   "content": {
+    "question": "Заполни пропуски: тип строки, суффикс decimal и интерполяцию.",
+    "code": "class Program\n{\n    static void Main()\n    {\n        [[1]] title = \"Лампа\";\n        decimal price = 1990.50[[2]];\n        Console.WriteLine([[3]]\"{title} стоит {price} ₽\");\n    }\n}",
+    "blanks": [
+     {
+      "answer": [
+       "string",
+       "var"
+      ]
+     },
+     {
+      "answer": [
+       "m",
+       "M"
+      ]
+     },
+     {
+      "answer": [
+       "$"
+      ]
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Строковый тип — string (можно var). Число с точкой по умолчанию double, и в decimal его без суффикса m не положить — компилятор откажется. $ перед кавычкой включает интерполяцию: значения в фигурных скобках подставятся в строку.",
+   "hints": [
+    "Литерал decimal помечают буквой после числа.",
+    "Интерполяция начинается со знака доллара."
+   ]
+  },
+  {
+   "task_id": "cs-basics-04",
+   "topic_id": "cs-basics",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Средний чек без копеек",
+   "story": "Ира: «Средний чек всегда круглый: 2 вместо 2.5. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "class Program\n{\n    static double Average(int sum, int count)\n    {\n        return sum / count;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(Average(5, 2));\n    }\n}",
+    "bug_line": 5,
+    "options": [
+     "Деление двух int целое — дробная часть теряется ещё до превращения в double",
+     "Метод не может возвращать double",
+     "Параметры должны быть long",
+     "Console.WriteLine не печатает дробные числа"
+    ],
+    "correct_answer": 0,
+    "language": "csharp"
+   },
+   "explanation": "sum / count — деление двух int, результат 2. Только потом C# превращает 2 в double — потерянная половина уже не вернётся. Нужно сделать дробным хотя бы одно число до деления: (double)sum / count.",
+   "hints": [
+    "Что происходит раньше: деление или превращение в double?",
+    "Приведи sum к double перед делением."
+   ]
+  },
+  {
+   "task_id": "cs-basics-05",
+   "topic_id": "cs-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Цена с НДС",
+   "story": "Стас: «На витрине цены с НДС 20 %. Посчитай — и никаких копеечных хвостов.»",
+   "content": {
+    "question": "Напиши WithVat(decimal price): цена × 1.2, округлённая до копеек (2 знака).",
+    "entry": "WithVat",
+    "code": "class Program\n{\n    // цена с НДС 20 %, до копеек\n    public static decimal WithVat(decimal price)\n    {\n        return price;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(WithVat(1990.99m));\n    }\n}",
+    "correct_answer": "class Program\n{\n    // цена с НДС 20 %, до копеек\n    public static decimal WithVat(decimal price)\n    {\n        return Math.Round(price * 1.2m, 2);\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(WithVat(1990.99m));\n    }\n}",
+    "tests_code": "class Tests\n{\n    static void Main()\n    {\n        Check.Eq(\"100 ₽\", () => Program.WithVat(100m), 120m);\n        Check.Eq(\"1990.99 ₽\", () => Program.WithVat(1990.99m), 2389.19m);\n        Check.Eq(\"1 копейка\", () => Program.WithVat(0.01m), 0.01m);\n        Check.Eq(\"бесплатно\", () => Program.WithVat(0m), 0m);\n    }\n}",
+    "requirements": [
+     {
+      "input": "умножает на 1.2m (decimal)",
+      "expected": {
+       "regex": "1\\.20?m|/\\s*100m|\\*\\s*120m?\\s*/"
+      }
+     },
+     {
+      "input": "округляет до двух знаков",
+      "expected": {
+       "regex": "Math\\.Round\\s*\\([^;]*,\\s*2"
+      }
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Деньги считают в decimal: 1.2m — decimal-литерал, а 1.2 без m — double, и компилятор не даст их перемножить. 1990.99 × 1.2 = 2389.188 — копейку дробят только на бумаге, поэтому Math.Round(…, 2) округляет до 2389.19.",
+   "hints": [
+    "price * 1.2m",
+    "Math.Round(значение, 2)"
+   ]
+  },
+  {
+   "task_id": "cs-control-01",
+   "topic_id": "cs-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Оценка за код-ревью",
+   "story": "Гена: «Бот код-ревью ставит оценку по баллам. Перенеси правило на C#.»",
+   "content": {
+    "question": "Напиши ReviewGrade(int score): от 90 — «отлично», от 75 — «хорошо», от 50 — «зачёт», иначе «на доработку».",
+    "entry": "ReviewGrade",
+    "code": "class Program\n{\n    // оценка за код-ревью по баллам\n    public static string ReviewGrade(int score)\n    {\n        return \"\";\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(ReviewGrade(80));\n    }\n}",
+    "correct_answer": "class Program\n{\n    // оценка за код-ревью по баллам\n    public static string ReviewGrade(int score)\n    {\n        if (score >= 90)\n        {\n            return \"отлично\";\n        }\n        else if (score >= 75)\n        {\n            return \"хорошо\";\n        }\n        else if (score >= 50)\n        {\n            return \"зачёт\";\n        }\n        return \"на доработку\";\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(ReviewGrade(80));\n    }\n}",
+    "tests_code": "class Tests\n{\n    static void Main()\n    {\n        Check.Eq(\"95\", () => Program.ReviewGrade(95), \"отлично\");\n        Check.Eq(\"ровно 90\", () => Program.ReviewGrade(90), \"отлично\");\n        Check.Eq(\"80\", () => Program.ReviewGrade(80), \"хорошо\");\n        Check.Eq(\"ровно 75\", () => Program.ReviewGrade(75), \"хорошо\");\n        Check.Eq(\"50\", () => Program.ReviewGrade(50), \"зачёт\");\n        Check.Eq(\"12\", () => Program.ReviewGrade(12), \"на доработку\");\n    }\n}",
+    "requirements": [
+     {
+      "input": "сравнивает с 90",
+      "expected": {
+       "regex": ">=?\\s*(90|89)\\b|\\b(90|89)\\s*<=?"
+      }
+     },
+     {
+      "input": "сравнивает с 75",
+      "expected": {
+       "regex": ">=?\\s*(75|74)\\b|\\b(75|74)\\s*<=?"
+      }
+     },
+     {
+      "input": "сравнивает с 50",
+      "expected": {
+       "regex": ">=?\\s*(50|49)\\b|\\b(50|49)\\s*<=?"
+      }
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Условия проверяются сверху вниз, первое сработавшее возвращает результат, поэтому начинают с самого высокого порога. Границы включительные — нужен >=. Можно и switch-выражением: score switch { >= 90 => \"отлично\", >= 75 => \"хорошо\", >= 50 => \"зачёт\", _ => \"на доработку\" }.",
+   "hints": [
+    "Начни с порога 90 и спускайся вниз.",
+    "Ровно 90 — это «отлично»: используй >=."
+   ]
+  },
+  {
+   "task_id": "cs-control-02",
+   "topic_id": "cs-control",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "continue, break и switch",
+   "story": "Ира: «Цикл выгрузки обрывается раньше, чем я ждала, а в конце ещё и switch. Что напечатается?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "class Program\n{\n    static void Main()\n    {\n        int total = 0;\n        for (int i = 1; i <= 10; i++)\n        {\n            if (i % 2 == 0) continue;\n            if (i > 7) break;\n            total += i;\n            Console.WriteLine($\"i = {i}\");\n        }\n        Console.WriteLine($\"total = {total}\");\n\n        int day = 6;\n        string kind = day switch\n        {\n            6 or 7 => \"выходной\",\n            _ => \"будни\",\n        };\n        Console.WriteLine(kind);\n    }\n}",
+    "language": "csharp",
+    "output": "i = 1\ni = 3\ni = 5\ni = 7\ntotal = 16\nвыходной"
+   },
+   "explanation": "continue пропускает чётные i, нечётные 1, 3, 5, 7 печатаются и копятся: 1 + 3 + 5 + 7 = 16. На i = 9 срабатывает break. switch-выражение находит первый подходящий вариант: 6 подходит под «6 or 7».",
+   "hints": [
+    "continue сразу переходит к следующему i.",
+    "break — на первом нечётном больше 7."
+   ]
+  },
+  {
+   "task_id": "cs-control-03",
+   "topic_id": "cs-control",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "FizzBuzz одним switch",
+   "story": "Гена: «Классика собеседований, но по-современному — switch по кортежу. Собери метод.»",
+   "content": {
+    "question": "Собери Label(int n): кратно 15 — FizzBuzz, кратно 3 — Fizz, кратно 5 — Buzz, иначе само число строкой.",
+    "lines": [
+     "public static string Label(int n) => (n % 3, n % 5) switch",
+     "{",
+     "    (0, 0) => \"FizzBuzz\",",
+     "    (0, _) => \"Fizz\",",
+     "    (_, 0) => \"Buzz\",",
+     "    _ => n.ToString(),",
+     "};"
+    ],
+    "alternatives": [
+     [
+      "public static string Label(int n) => (n % 3, n % 5) switch",
+      "{",
+      "    (0, 0) => \"FizzBuzz\",",
+      "    (_, 0) => \"Buzz\",",
+      "    (0, _) => \"Fizz\",",
+      "    _ => n.ToString(),",
+      "};"
+     ]
+    ],
+    "distractors": [
+     "    _ => n,",
+     "    default => n.ToString(),"
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Кортеж (n % 3, n % 5) проверяется по шаблонам сверху вниз: (0, 0) — кратно обоим, поэтому он первый. _ внутри шаблона значит «что угодно», а отдельный _ — «всё остальное», он последний. «_ => n» не соберётся: метод возвращает string. default — слово для switch-инструкции, в switch-выражении его нет.",
+   "hints": [
+    "Самый частный случай — первым.",
+    "«Всё остальное» — последним."
+   ]
+  },
+  {
+   "task_id": "cs-control-04",
+   "topic_id": "cs-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма до n",
+   "story": "Гена: «Для отчёта нужна сумма 1 + 2 + … + n. Осторожно: n бывает большим.»",
+   "content": {
+    "question": "Напиши SumTo(int n) — сумму чисел от 1 до n включительно. Для n ≤ 0 — 0. Сумма может не влезть в int.",
+    "entry": "SumTo",
+    "code": "class Program\n{\n    // сумма 1 + 2 + ... + n\n    public static long SumTo(int n)\n    {\n        return 0;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(SumTo(10));\n    }\n}",
+    "correct_answer": "class Program\n{\n    // сумма 1 + 2 + ... + n\n    public static long SumTo(int n)\n    {\n        long total = 0;\n        for (int i = 1; i <= n; i++)\n        {\n            total += i;\n        }\n        return total;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(SumTo(10));\n    }\n}",
+    "tests_code": "class Tests\n{\n    static void Main()\n    {\n        Check.Eq(\"n = 1\", () => Program.SumTo(1), 1);\n        Check.Eq(\"n = 10\", () => Program.SumTo(10), 55);\n        Check.Eq(\"n = 0\", () => Program.SumTo(0), 0);\n        Check.Eq(\"n = -5\", () => Program.SumTo(-5), 0);\n        Check.Eq(\"n = 100000 (не влезает в int)\", () => Program.SumTo(100000), 5000050000L);\n    }\n}",
+    "requirements": [
+     {
+      "input": "копит сумму в переменной long",
+      "expected": {
+       "regex": "long\\s+\\w+\\s*="
+      }
+     },
+     {
+      "input": "обходит числа циклом",
+      "expected": {
+       "regex": "\\b(for|while|foreach)\\s*\\("
+      }
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Сумма до 100 000 — 5 000 050 000, больше максимума int. Переменная int молча переполнилась бы и дала отрицательное число, поэтому копим в long. Цикл с условием i <= n для n ≤ 0 не выполнится ни разу — отдельная проверка не нужна.",
+   "hints": [
+    "long total = 0; и цикл for от 1 до n.",
+    "Условие цикла — i <= n, включительно."
+   ]
+  },
+  {
+   "task_id": "cs-control-05",
+   "topic_id": "cs-control",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Сумма заказа падает",
+   "story": "Ира: «Подсчёт суммы заказа падает с IndexOutOfRangeException. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "class Program\n{\n    static int OrderSum(int[] prices)\n    {\n        int sum = 0;\n        for (int i = 0; i <= prices.Length; i++)\n        {\n            sum += prices[i];\n        }\n        return sum;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(OrderSum(new[] { 100, 250, 40 }));\n    }\n}",
+    "bug_line": 6,
+    "options": [
+     "Условие i <= prices.Length заходит за последний индекс",
+     "Счётчик должен начинаться с 1",
+     "sum нужно объявить как decimal",
+     "Length у массива пишется со скобками: Length()"
+    ],
+    "correct_answer": 0,
+    "language": "csharp"
+   },
+   "explanation": "У массива из трёх элементов индексы 0, 1 и 2, а Length равно 3. С условием <= цикл делает лишний шаг с i = 3 и падает. Нужно i < prices.Length — или foreach (int p in prices) sum += p;, где индексов нет вовсе.",
+   "hints": [
+    "Какой последний индекс у массива длины 3?",
+    "Поменяй <= на <."
+   ]
+  },
+  {
+   "task_id": "cs-collections-01",
+   "topic_id": "cs-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Частота тегов",
+   "story": "Стас: «Хочу видеть, какие теги у товаров встречаются чаще. Посчитай их.»",
+   "content": {
+    "question": "Напиши TagCounts(List<string> tags) — Dictionary, где у каждого тега записано, сколько раз он встретился.",
+    "entry": "TagCounts",
+    "code": "class Program\n{\n    // сколько раз встретился каждый тег\n    public static Dictionary<string, int> TagCounts(List<string> tags)\n    {\n        var counts = new Dictionary<string, int>();\n        return counts;\n    }\n\n    static void Main()\n    {\n        foreach (var pair in TagCounts(new List<string> { \"sale\", \"new\", \"sale\" }))\n            Console.WriteLine($\"{pair.Key}: {pair.Value}\");\n    }\n}",
+    "correct_answer": "class Program\n{\n    // сколько раз встретился каждый тег\n    public static Dictionary<string, int> TagCounts(List<string> tags)\n    {\n        var counts = new Dictionary<string, int>();\n        foreach (string tag in tags)\n        {\n            counts[tag] = counts.GetValueOrDefault(tag) + 1;\n        }\n        return counts;\n    }\n\n    static void Main()\n    {\n        foreach (var pair in TagCounts(new List<string> { \"sale\", \"new\", \"sale\" }))\n            Console.WriteLine($\"{pair.Key}: {pair.Value}\");\n    }\n}",
+    "tests_code": "class Tests\n{\n    static void Main()\n    {\n        Check.Eq(\"sale, new, sale\", () => Program.TagCounts(new List<string> { \"sale\", \"new\", \"sale\" }), new Dictionary<string, int> { [\"sale\"] = 2, [\"new\"] = 1 });\n        Check.Eq(\"один тег\", () => Program.TagCounts(new List<string> { \"hit\" }), new Dictionary<string, int> { [\"hit\"] = 1 });\n        Check.Eq(\"пустой список\", () => Program.TagCounts(new List<string>()), new Dictionary<string, int>());\n        Check.Eq(\"регистр важен\", () => Program.TagCounts(new List<string> { \"New\", \"new\", \"new\" }), new Dictionary<string, int> { [\"New\"] = 1, [\"new\"] = 2 });\n    }\n}",
+    "requirements": [
+     {
+      "input": "обходит список тегов",
+      "expected": {
+       "regex": "\\b(foreach|for)\\s*\\("
+      }
+     },
+     {
+      "input": "берёт текущее значение через GetValueOrDefault, TryGetValue или ContainsKey",
+      "expected": {
+       "regex": "GetValueOrDefault|TryGetValue|ContainsKey"
+      }
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Для каждого тега берём текущее число (GetValueOrDefault вернёт 0, если тега ещё нет) и записываем на единицу больше. Индексатор counts[tag] = … и добавляет новый ключ, и перезаписывает старый. На LINQ то же самое: tags.GroupBy(t => t).ToDictionary(g => g.Key, g => g.Count()).",
+   "hints": [
+    "foreach (string tag in tags) — обход списка.",
+    "counts[tag] = counts.GetValueOrDefault(tag) + 1;"
+   ]
+  },
+  {
+   "task_id": "cs-collections-02",
+   "topic_id": "cs-collections",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Список и словарь",
+   "story": "Гена: «Прежде чем писать склад, проверь, как ведут себя List и Dictionary.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "class Program\n{\n    static void Main()\n    {\n        var cart = new List<string> { \"лампа\", \"стол\" };\n        cart.Insert(0, \"стул\");\n        cart.Remove(\"стол\");\n        Console.WriteLine(string.Join(\", \", cart));\n        Console.WriteLine($\"{cart.Count} {cart[1]}\");\n\n        var stock = new Dictionary<string, int>();\n        stock[\"лампа\"] = 3;\n        stock[\"лампа\"] = 5;\n        Console.WriteLine(stock[\"лампа\"]);\n        Console.WriteLine(stock.TryGetValue(\"шкаф\", out int n) + \" \" + n);\n        Console.WriteLine(stock.GetValueOrDefault(\"шкаф\", -1));\n    }\n}",
+    "language": "csharp",
+    "output": "стул, лампа\n2 лампа\n5\nFalse 0\n-1"
+   },
+   "explanation": "Insert(0, …) вставляет в начало, Remove убирает «стол»: остаются «стул, лампа», индекс 1 — «лампа». Запись по тому же ключу заменяет значение — 5. TryGetValue для отсутствующего ключа возвращает false, а в out кладёт значение по умолчанию — 0. GetValueOrDefault отдаёт запасное значение.",
+   "hints": [
+    "Insert(0, x) вставляет в начало списка.",
+    "TryGetValue не бросает исключение — он возвращает bool."
+   ]
+  },
+  {
+   "task_id": "cs-collections-03",
+   "topic_id": "cs-collections",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Цены из справочника",
+   "story": "Гена: «Справочник цен почти готов. Заполни пропуски.»",
+   "content": {
+    "question": "Заполни пропуски: тип словаря, безопасное чтение по ключу и обход пар.",
+    "code": "class Program\n{\n    static void Main()\n    {\n        var prices = new [[1]]<string, int>\n        {\n            [\"лампа\"] = 1990,\n            [\"стол\"] = 7500,\n        };\n        if (prices.[[2]](\"шкаф\", out int wardrobe))\n            Console.WriteLine(wardrobe);\n        [[3]] (var pair in prices)\n            Console.WriteLine($\"{pair.Key}: {pair.Value}\");\n    }\n}",
+    "blanks": [
+     {
+      "answer": [
+       "Dictionary"
+      ]
+     },
+     {
+      "answer": [
+       "TryGetValue"
+      ]
+     },
+     {
+      "answer": [
+       "foreach"
+      ]
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Словарь с ключами-строками и значениями-числами — Dictionary<string, int>. TryGetValue не падает на отсутствующем ключе: вернёт false, и if не выполнится. foreach обходит пары KeyValuePair с полями Key и Value.",
+   "hints": [
+    "Словарь в C# — Dictionary.",
+    "Безопасное чтение — Try…"
+   ]
+  },
+  {
+   "task_id": "cs-collections-04",
+   "topic_id": "cs-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товары по бюджету",
+   "story": "Стас: «Покупатель ввёл бюджет. Оставь цены, которые в него укладываются, в том же порядке.»",
+   "content": {
+    "question": "Напиши Affordable(List<int> prices, int budget) — новый список цен не дороже бюджета, в исходном порядке.",
+    "entry": "Affordable",
+    "code": "class Program\n{\n    // цены, которые укладываются в бюджет\n    public static List<int> Affordable(List<int> prices, int budget)\n    {\n        var result = new List<int>();\n        return result;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(string.Join(\", \", Affordable(new List<int> { 500, 1500, 999, 2000 }, 1000)));\n    }\n}",
+    "correct_answer": "class Program\n{\n    // цены, которые укладываются в бюджет\n    public static List<int> Affordable(List<int> prices, int budget)\n    {\n        var result = new List<int>();\n        foreach (int price in prices)\n        {\n            if (price <= budget)\n            {\n                result.Add(price);\n            }\n        }\n        return result;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(string.Join(\", \", Affordable(new List<int> { 500, 1500, 999, 2000 }, 1000)));\n    }\n}",
+    "tests_code": "class Tests\n{\n    static void Main()\n    {\n        Check.Eq(\"бюджет 1000\", () => Program.Affordable(new List<int> { 500, 1500, 999, 2000 }, 1000), new List<int> { 500, 999 });\n        Check.Eq(\"ровно бюджет\", () => Program.Affordable(new List<int> { 1000, 1001 }, 1000), new List<int> { 1000 });\n        Check.Eq(\"всё дорого\", () => Program.Affordable(new List<int> { 3000, 4000 }, 100), new List<int>());\n        Check.Eq(\"пустой список\", () => Program.Affordable(new List<int>(), 500), new List<int>());\n    }\n}",
+    "requirements": [
+     {
+      "input": "сравнивает цену с бюджетом",
+      "expected": {
+       "regex": "<=\\s*budget|budget\\s*>="
+      }
+     },
+     {
+      "input": "собирает подходящие цены (Add или Where)",
+      "expected": {
+       "regex": "\\.Add\\s*\\(|\\.Where\\s*\\("
+      }
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Обходим список, подходящие цены добавляем в новый List — исходный не трогаем. «Не дороже» — это <=, иначе цена ровно в бюджет потеряется. То же на LINQ: prices.Where(p => p <= budget).ToList().",
+   "hints": [
+    "foreach (int price in prices) и if (price <= budget).",
+    "Подходящие — в result.Add(price)."
+   ]
+  },
+  {
+   "task_id": "cs-collections-05",
+   "topic_id": "cs-collections",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Остаток на складе падает",
+   "story": "Ира: «Запрос остатка по товару, которого нет, роняет сервис с KeyNotFoundException. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "class Program\n{\n    static int StockOf(Dictionary<string, int> stock, string item)\n    {\n        int n = stock[item];\n        return n;\n    }\n\n    static void Main()\n    {\n        var stock = new Dictionary<string, int> { [\"лампа\"] = 3 };\n        Console.WriteLine(StockOf(stock, \"шкаф\"));\n    }\n}",
+    "bug_line": 5,
+    "options": [
+     "Индексатор словаря бросает KeyNotFoundException, если ключа нет",
+     "Словарь нельзя передавать в метод",
+     "Ключи Dictionary не могут быть строками",
+     "Метод должен возвращать long"
+    ],
+    "correct_answer": 0,
+    "language": "csharp"
+   },
+   "explanation": "stock[item] для отсутствующего ключа не возвращает 0, а бросает KeyNotFoundException. Когда товара может не быть, читают безопасно: stock.GetValueOrDefault(item) или stock.TryGetValue(item, out int n).",
+   "hints": [
+    "Что делает индексатор, если ключа нет?",
+    "Нужно безопасное чтение — GetValueOrDefault."
+   ]
+  },
+  {
+   "task_id": "cs-methods-01",
+   "topic_id": "cs-methods",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Инициалы в карточке",
+   "story": "Гена: «В карточке сотрудника нужны инициалы: из „Гена Петров“ — „Г. П.“. Имена приходят как попало.»",
+   "content": {
+    "question": "Напиши Initials(string fullName): первые буквы имени и фамилии заглавными, через точку и пробел — «Г. П.». Лишние пробелы вокруг и между словами бывают.",
+    "entry": "Initials",
+    "code": "class Program\n{\n    // \"Гена Петров\" -> \"Г. П.\"\n    public static string Initials(string fullName)\n    {\n        return \"\";\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(Initials(\"Гена Петров\"));\n    }\n}",
+    "correct_answer": "class Program\n{\n    // \"Гена Петров\" -> \"Г. П.\"\n    public static string Initials(string fullName)\n    {\n        string[] parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);\n        char first = char.ToUpper(parts[0][0]);\n        char last = char.ToUpper(parts[1][0]);\n        return $\"{first}. {last}.\";\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(Initials(\"Гена Петров\"));\n    }\n}",
+    "tests_code": "class Tests\n{\n    static void Main()\n    {\n        Check.Eq(\"Гена Петров\", () => Program.Initials(\"Гена Петров\"), \"Г. П.\");\n        Check.Eq(\"строчные буквы\", () => Program.Initials(\"ира смирнова\"), \"И. С.\");\n        Check.Eq(\"лишние пробелы\", () => Program.Initials(\"  Стас   Волков \"), \"С. В.\");\n    }\n}",
+    "requirements": [
+     {
+      "input": "разбивает имя на слова",
+      "expected": {
+       "regex": "Split\\s*\\("
+      }
+     },
+     {
+      "input": "делает буквы заглавными",
+      "expected": {
+       "regex": "ToUpper"
+      }
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Split(' ', StringSplitOptions.RemoveEmptyEntries) режет по пробелам и выбрасывает пустые куски — без этого флага между «Стас» и «Волков» появились бы пустые слова. parts[0][0] — первый символ первого слова, char.ToUpper делает его заглавным.",
+   "hints": [
+    "fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)",
+    "Первая буква: char.ToUpper(parts[0][0])."
+   ]
+  },
+  {
+   "task_id": "cs-methods-02",
+   "topic_id": "cs-methods",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Копия, ref и параметр по умолчанию",
+   "story": "Гена: «Одни методы меняют переменные, другие — нет. Проверь себя.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "class Program\n{\n    static void Bump(int x) { x += 10; }\n    static void BumpRef(ref int x) { x += 10; }\n    static void Bump(int[] xs) { xs[0] += 10; }\n\n    static string Price(int rub, string currency = \"₽\") => $\"{rub} {currency}\";\n\n    static void Main()\n    {\n        int a = 1, b = 1;\n        int[] c = { 1 };\n        Bump(a);\n        BumpRef(ref b);\n        Bump(c);\n        Console.WriteLine($\"{a} {b} {c[0]}\");\n        Console.WriteLine(Price(500));\n        Console.WriteLine(Price(7, \"$\"));\n        Console.WriteLine(int.TryParse(\"12a\", out int n) + \" \" + n);\n    }\n}",
+    "language": "csharp",
+    "output": "1 11 11\n500 ₽\n7 $\nFalse 0"
+   },
+   "explanation": "Bump(int) получает копию числа — a остаётся 1. ref передаёт саму переменную — b становится 11. У массива копируется ссылка на тот же массив — c[0] тоже 11. Параметр currency по умолчанию «₽», если его не передали. «12a» — не число: TryParse возвращает False и кладёт в n ноль.",
+   "hints": [
+    "Без ref метод меняет только свою копию.",
+    "TryParse не падает — он возвращает bool."
+   ]
+  },
+  {
+   "task_id": "cs-methods-03",
+   "topic_id": "cs-methods",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма любых чисел",
+   "story": "Гена: «Нужен метод, который сложит сколько угодно чисел: Sum(1, 2), Sum(5, 10, 20)… Собери его.»",
+   "content": {
+    "question": "Собери Sum(params int[] nums) — сумму всех переданных чисел.",
+    "lines": [
+     "public static int Sum(params int[] nums)",
+     "{",
+     "    int total = 0;",
+     "    foreach (int n in nums)",
+     "        total += n;",
+     "    return total;",
+     "}"
+    ],
+    "distractors": [
+     "    return nums;",
+     "    foreach (int n in total)"
+    ],
+    "language": "csharp"
+   },
+   "explanation": "params позволяет писать числа через запятую, а внутри метода nums — обычный массив int[]. Его обходят foreach и копят сумму. return nums не соберётся: метод возвращает int, а не массив.",
+   "hints": [
+    "Сначала total = 0, потом цикл.",
+    "Обходим nums, а не total."
+   ]
+  },
+  {
+   "task_id": "cs-methods-04",
+   "topic_id": "cs-methods",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Сумма цифр артикула",
+   "story": "Стас: «Контрольная цифра артикула — сумма его цифр. Минус в начале бывает у возвратов, его не считаем.»",
+   "content": {
+    "question": "Напиши DigitSum(long n) — сумму цифр числа. Знак не учитывается: DigitSum(-1990) == 19. Можно рекурсией.",
+    "entry": "DigitSum",
+    "code": "class Program\n{\n    // сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\n    public static int DigitSum(long n)\n    {\n        return 0;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(DigitSum(1990));\n    }\n}",
+    "correct_answer": "class Program\n{\n    // сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\n    public static int DigitSum(long n)\n    {\n        n = Math.Abs(n);\n        if (n < 10)\n        {\n            return (int)n;\n        }\n        return (int)(n % 10) + DigitSum(n / 10);\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(DigitSum(1990));\n    }\n}",
+    "tests_code": "class Tests\n{\n    static void Main()\n    {\n        Check.Eq(\"0\", () => Program.DigitSum(0), 0);\n        Check.Eq(\"7\", () => Program.DigitSum(7), 7);\n        Check.Eq(\"1990\", () => Program.DigitSum(1990), 19);\n        Check.Eq(\"123456789\", () => Program.DigitSum(123456789), 45);\n        Check.Eq(\"возврат -1990\", () => Program.DigitSum(-1990), 19);\n        Check.Eq(\"длинный 9999999999\", () => Program.DigitSum(9999999999L), 90);\n    }\n}",
+    "requirements": [
+     {
+      "input": "берёт последнюю цифру остатком от деления на 10",
+      "expected": {
+       "regex": "%\\s*10"
+      }
+     },
+     {
+      "input": "отбрасывает последнюю цифру делением на 10",
+      "expected": {
+       "regex": "/\\s*10"
+      }
+     },
+     {
+      "input": "убирает знак",
+      "expected": {
+       "regex": "Math\\.Abs|<\\s*0|-\\s*n\\b"
+      }
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Последняя цифра — n % 10, остальное число — n / 10. Рекурсия: сумма цифр = последняя цифра + сумма цифр остального, базовый случай — однозначное число. Для отрицательного n остаток тоже отрицательный (-199 % 10 == -9), поэтому знак убирают сразу: Math.Abs(n). (int) нужен потому, что n — long, а метод возвращает int.",
+   "hints": [
+    "n % 10 — последняя цифра, n / 10 — число без неё.",
+    "Сначала n = Math.Abs(n)."
+   ]
+  },
+  {
+   "task_id": "cs-methods-05",
+   "topic_id": "cs-methods",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Email не чистится",
+   "story": "Ира: «Email сохраняется с пробелами и заглавными буквами, хотя мы его „нормализуем“. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "class Program\n{\n    static string Normalize(string email)\n    {\n        email.Trim().ToLower();\n        return email;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine($\"[{Normalize(\"  Gena@Kodzilla.RU \")}]\");\n    }\n}",
+    "bug_line": 5,
+    "options": [
+     "Строки неизменяемы: Trim и ToLower возвращают новую строку, а её результат выброшен",
+     "ToLower не работает с латиницей",
+     "Trim удаляет только пробелы в середине",
+     "Метод должен быть void"
+    ],
+    "correct_answer": 0,
+    "language": "csharp"
+   },
+   "explanation": "Trim и ToLower не меняют строку email — они возвращают новую, а здесь её никуда не сохранили. Нужно return email.Trim().ToLower(); или email = email.Trim().ToLower();.",
+   "hints": [
+    "Что возвращают методы строк?",
+    "Сохрани результат Trim().ToLower()."
+   ]
+  },
+  {
+   "task_id": "cs-oop-01",
+   "topic_id": "cs-oop",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Корзина-объект",
+   "story": "Гена: «Хватит считать корзину отдельными методами — пусть объект Cart сам копит сумму.»",
+   "content": {
+    "question": "Допиши класс Cart: метод Add(int price, int qty) добавляет позицию, свойство Total хранит сумму всех позиций.",
+    "entry": "Cart",
+    "code": "public class Cart\n{\n    public int Total { get; private set; }\n\n    // добавить позицию: цена × количество\n    public void Add(int price, int qty)\n    {\n    }\n}\n\nclass Program\n{\n    static void Main()\n    {\n        var cart = new Cart();\n        cart.Add(1990, 2);\n        cart.Add(500, 1);\n        Console.WriteLine(cart.Total);\n    }\n}",
+    "correct_answer": "public class Cart\n{\n    public int Total { get; private set; }\n\n    // добавить позицию: цена × количество\n    public void Add(int price, int qty)\n    {\n        Total += price * qty;\n    }\n}\n\nclass Program\n{\n    static void Main()\n    {\n        var cart = new Cart();\n        cart.Add(1990, 2);\n        cart.Add(500, 1);\n        Console.WriteLine(cart.Total);\n    }\n}",
+    "tests_code": "class Tests\n{\n    static void Main()\n    {\n        Check.Eq(\"пустая корзина\", () => new Cart().Total, 0);\n        Check.Eq(\"1990 × 2 + 500\", () =>\n        {\n            var c = new Cart();\n            c.Add(1990, 2);\n            c.Add(500, 1);\n            return c.Total;\n        }, 4480);\n        Check.Eq(\"позиция с количеством 0\", () =>\n        {\n            var c = new Cart();\n            c.Add(700, 0);\n            c.Add(100, 3);\n            return c.Total;\n        }, 300);\n        Check.Eq(\"у каждой корзины своя сумма\", () =>\n        {\n            var a = new Cart();\n            var b = new Cart();\n            a.Add(100, 1);\n            b.Add(5, 2);\n            return $\"{a.Total}/{b.Total}\";\n        }, \"100/10\");\n    }\n}",
+    "requirements": [
+     {
+      "input": "накапливает сумму в свойстве Total",
+      "expected": {
+       "regex": "\\bTotal\\s*\\+=|Total\\s*=\\s*Total\\s*\\+"
+      }
+     },
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Свойство Total живёт внутри объекта: у каждой корзины своё. private set значит, что снаружи сумму не испортить — только через Add. Если сделать Total static, все корзины делили бы одну сумму — последний тест это ловит.",
+   "hints": [
+    "В Add: Total += price * qty;",
+    "Свойство меняется изнутри класса, как обычная переменная."
+   ]
+  },
+  {
+   "task_id": "cs-oop-02",
+   "topic_id": "cs-oop",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Класс или record",
+   "story": "Гена: «Я поменял один счётчик, а изменились два. А точки почему-то равны. Что напечатает этот код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "class Counter\n{\n    public static int Created;\n    public int Value;\n\n    public Counter()\n    {\n        Created++;\n    }\n}\n\nrecord Point(int X, int Y);\n\nclass Program\n{\n    static void Main()\n    {\n        var a = new Counter();\n        var b = a;\n        b.Value = 5;\n        var c = new Counter { Value = a.Value + 1 };\n        Console.WriteLine($\"{a.Value} {b.Value} {c.Value}\");\n        Console.WriteLine(Counter.Created);\n        Console.WriteLine(a == b);\n        Console.WriteLine(new Point(1, 2) == new Point(1, 2));\n        Console.WriteLine(new Point(1, 2));\n    }\n}",
+    "language": "csharp",
+    "output": "5 5 6\n2\nTrue\nTrue\nPoint { X = 1, Y = 2 }"
+   },
+   "explanation": "var b = a копирует ссылку: a и b — один объект, поэтому у обоих 5. new вызывался дважды — общее static-поле Created равно 2. == у классов сравнивает ссылки: a и b — один объект, True. record сравнивается по значениям, поэтому две точки (1, 2) равны, и печатается он сам — с именами свойств.",
+   "hints": [
+    "var b = a — это не новый объект.",
+    "record сравнивает содержимое, класс — ссылки."
+   ]
+  },
+  {
+   "task_id": "cs-oop-03",
+   "topic_id": "cs-oop",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Фигуры для конструктора витрины",
+   "story": "Гена: «Конструктор витрины считает площадь блоков. Прямоугольник должен выполнять договор IShape и красиво печататься.»",
+   "content": {
+    "question": "Заполни пропуски: класс реализует интерфейс, переопределяет ToString, переменная — тип интерфейса.",
+    "code": "interface IShape\n{\n    double Area();\n}\n\nclass Rect [[1]] IShape\n{\n    public double W { get; }\n    public double H { get; }\n\n    public Rect(double w, double h)\n    {\n        W = w;\n        H = h;\n    }\n\n    public double Area() => W * H;\n\n    public [[2]] string ToString() => $\"Прямоугольник {W}×{H}\";\n}\n\nclass Program\n{\n    static void Main()\n    {\n        [[3]] s = new Rect(2, 3);\n        Console.WriteLine($\"{s}: {s.Area()}\");\n    }\n}",
+    "blanks": [
+     {
+      "answer": [
+       ":"
+      ]
+     },
+     {
+      "answer": [
+       "override"
+      ]
+     },
+     {
+      "answer": [
+       "IShape",
+       "var",
+       "Rect"
+      ]
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "И интерфейсы, и наследование в C# пишутся через двоеточие: class Rect : IShape. ToString есть у любого объекта, и чтобы заменить его, нужен override. Переменную можно объявить типом интерфейса — IShape s: тогда код работает с любой фигурой.",
+   "hints": [
+    "В C# нет слов implements и extends.",
+    "Переопределение метода родителя — override."
+   ]
+  },
+  {
+   "task_id": "cs-oop-04",
+   "topic_id": "cs-oop",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товар печатает себя сам",
+   "story": "Стас: «В логах вместо товаров пишется просто Product. Пусть товар печатается по-человечески.»",
+   "content": {
+    "question": "Переопредели в Product метод ToString: «Лампа — 1990 ₽» (название, пробел, длинное тире, пробел, цена, пробел, ₽).",
+    "entry": "Product",
+    "code": "public class Product\n{\n    public string Name { get; }\n    public int Price { get; }\n\n    public Product(string name, int price)\n    {\n        Name = name;\n        Price = price;\n    }\n}\n\nclass Program\n{\n    static void Main()\n    {\n        Console.WriteLine(new Product(\"Лампа\", 1990));\n    }\n}",
+    "correct_answer": "public class Product\n{\n    public string Name { get; }\n    public int Price { get; }\n\n    public Product(string name, int price)\n    {\n        Name = name;\n        Price = price;\n    }\n\n    public override string ToString() => $\"{Name} — {Price} ₽\";\n}\n\nclass Program\n{\n    static void Main()\n    {\n        Console.WriteLine(new Product(\"Лампа\", 1990));\n    }\n}",
+    "tests_code": "class Tests\n{\n    static void Main()\n    {\n        Check.Eq(\"Лампа\", () => new Product(\"Лампа\", 1990).ToString(), \"Лампа — 1990 ₽\");\n        Check.Eq(\"бесплатный товар\", () => $\"{new Product(\"Стол\", 0)}\", \"Стол — 0 ₽\");\n        Check.Eq(\"склейка со строкой\", () => \"Хит: \" + new Product(\"Кресло\", 12500), \"Хит: Кресло — 12500 ₽\");\n    }\n}",
+    "requirements": [
+     {
+      "input": "объявляет public override string ToString()",
+      "expected": {
+       "regex": "public\\s+override\\s+string\\s+ToString\\s*\\(\\s*\\)"
+      }
+     },
+     {
+      "input": "добавляет знак ₽",
+      "expected": {
+       "regex": "₽"
+      }
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Console.WriteLine, интерполяция и склейка со строкой вызывают ToString объекта. Без своего ToString работает унаследованный от object — он печатает имя класса. override обязателен: без него компилятор предупредит, что метод прячет родительский, и печать его не вызовет.",
+   "hints": [
+    "public override string ToString() => …;",
+    "$\"{Name} — {Price} ₽\""
+   ]
+  },
+  {
+   "task_id": "cs-oop-05",
+   "topic_id": "cs-oop",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Баланс всегда ноль",
+   "story": "Ира: «Открываем счёт с 500 ₽, а баланс показывает 0. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "class Account\n{\n    private int balance;\n\n    public Account(int balance)\n    {\n        balance = balance;\n    }\n\n    public int Balance => balance;\n}\n\nclass Program\n{\n    static void Main()\n    {\n        var acc = new Account(500);\n        Console.WriteLine(acc.Balance);\n    }\n}",
+    "bug_line": 7,
+    "options": [
+     "Параметр присваивается сам себе — полю нужно this.balance = balance",
+     "private-поле нельзя менять в конструкторе",
+     "Конструктор должен возвращать Account",
+     "Свойство Balance должно быть static"
+    ],
+    "correct_answer": 0,
+    "language": "csharp"
+   },
+   "explanation": "Внутри конструктора имя balance означает параметр — он закрывает поле. balance = balance присваивает параметр сам себе, поле остаётся 0 (компилятор даже предупреждает CS1717). Нужно this.balance = balance — или называть поля с подчёркиванием: _balance = balance.",
+   "hints": [
+    "Какой balance слева: поле или параметр?",
+    "Поле объекта — через this."
+   ]
+  },
+  {
+   "task_id": "cs-exceptions-01",
+   "topic_id": "cs-exceptions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Списание со счёта",
+   "story": "Гена: «Списание должно явно отказывать, а не уводить счёт в минус.»",
+   "content": {
+    "question": "Напиши Withdraw(int balance, int amount): сумма ≤ 0 — ArgumentOutOfRangeException; сумма больше баланса — InvalidOperationException; иначе верни новый баланс.",
+    "entry": "Withdraw",
+    "code": "class Program\n{\n    // списание со счёта: новый баланс или исключение\n    public static int Withdraw(int balance, int amount)\n    {\n        return balance - amount;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(Withdraw(1000, 300));\n    }\n}",
+    "correct_answer": "class Program\n{\n    // списание со счёта: новый баланс или исключение\n    public static int Withdraw(int balance, int amount)\n    {\n        if (amount <= 0)\n            throw new ArgumentOutOfRangeException(nameof(amount), \"сумма должна быть больше нуля\");\n        if (amount > balance)\n            throw new InvalidOperationException($\"недостаточно средств: {balance} < {amount}\");\n        return balance - amount;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(Withdraw(1000, 300));\n    }\n}",
+    "tests_code": "class Tests\n{\n    static void Main()\n    {\n        Check.Eq(\"1000 - 300\", () => Program.Withdraw(1000, 300), 700);\n        Check.Eq(\"списать всё\", () => Program.Withdraw(500, 500), 0);\n        Check.Throws<InvalidOperationException>(\"не хватает денег\", () => Program.Withdraw(100, 500));\n        Check.Throws<ArgumentOutOfRangeException>(\"сумма 0\", () => Program.Withdraw(100, 0));\n        Check.Throws<ArgumentOutOfRangeException>(\"сумма -5\", () => Program.Withdraw(100, -5));\n    }\n}",
+    "requirements": [
+     {
+      "input": "бросает ArgumentOutOfRangeException",
+      "expected": {
+       "regex": "throw\\s+new\\s+ArgumentOutOfRangeException"
+      }
+     },
+     {
+      "input": "бросает InvalidOperationException",
+      "expected": {
+       "regex": "throw\\s+new\\s+InvalidOperationException"
+      }
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Неверный аргумент (сумма ≤ 0) — ArgumentOutOfRangeException, невозможная сейчас операция — InvalidOperationException. nameof(amount) подставляет имя параметра: переименуешь параметр — строка обновится сама. Проверки ставят в начало метода, до вычислений.",
+   "hints": [
+    "throw new ArgumentOutOfRangeException(nameof(amount), \"…\");",
+    "Сначала проверь amount <= 0, потом amount > balance."
+   ]
+  },
+  {
+   "task_id": "cs-exceptions-02",
+   "topic_id": "cs-exceptions",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "finally после return",
+   "story": "Гена: «В разборе конфига срабатывает finally. В каком порядке всё печатается?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "class Program\n{\n    static int Parse(string s)\n    {\n        try\n        {\n            Console.WriteLine(\"разбираю \" + s);\n            return int.Parse(s);\n        }\n        catch (FormatException)\n        {\n            Console.WriteLine(\"не число\");\n            return -1;\n        }\n        finally\n        {\n            Console.WriteLine(\"готово\");\n        }\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(Parse(\"42\"));\n        Console.WriteLine(Parse(\"4x\"));\n    }\n}",
+    "language": "csharp",
+    "output": "разбираю 42\nготово\n42\nразбираю 4x\nне число\nготово\n-1"
+   },
+   "explanation": "finally выполняется всегда — даже когда try или catch уже сделали return: значение вычислено, печатается «готово», и только потом Main получает результат. «4x» не число — int.Parse бросает FormatException, catch печатает «не число» и возвращает -1.",
+   "hints": [
+    "finally срабатывает и после return.",
+    "Main печатает результат уже после «готово»."
+   ]
+  },
+  {
+   "task_id": "cs-exceptions-03",
+   "topic_id": "cs-exceptions",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Порт без лишних исключений",
+   "story": "Гена: «Кривой порт в конфиге — ожидаемая ситуация. Разбери его без try/catch, а понятное исключение брось сам.»",
+   "content": {
+    "question": "Заполни пропуски: безопасный разбор числа, выходной параметр и исключение с понятным текстом.",
+    "code": "class Program\n{\n    static int Port(string s)\n    {\n        if (!int.[[1]](s, [[2]] int port))\n            [[3]] new ArgumentException($\"порт \\\"{s}\\\" — не число\");\n        return port;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(Port(\"8080\"));\n    }\n}",
+    "blanks": [
+     {
+      "answer": [
+       "TryParse"
+      ]
+     },
+     {
+      "answer": [
+       "out"
+      ]
+     },
+     {
+      "answer": [
+       "throw"
+      ]
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "int.TryParse не бросает исключение, а возвращает true или false; само число кладёт в out-параметр — его можно объявить прямо в вызове. Если разбор не удался, бросаем ArgumentException с текстом, из которого сразу ясно, что не так.",
+   "hints": [
+    "Безопасный разбор — Try…",
+    "Второе возвращаемое значение — через out."
+   ]
+  },
+  {
+   "task_id": "cs-exceptions-04",
+   "topic_id": "cs-exceptions",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Своё исключение для склада",
+   "story": "Гена: «Фронту нужно знать, сколько товара не хватает. Собери класс исключения с данными.»",
+   "content": {
+    "question": "Собери класс StockException: наследник Exception со свойствами Want и Have и понятным сообщением.",
+    "lines": [
+     "public class StockException : Exception",
+     "{",
+     "    public int Want { get; }",
+     "    public int Have { get; }",
+     "    public StockException(int want, int have)",
+     "        : base($\"не хватает товара: нужно {want}, есть {have}\")",
+     "    {",
+     "        Want = want;",
+     "        Have = have;",
+     "    }",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "public class StockException : Exception",
+      "{",
+      "    public int Have { get; }",
+      "    public int Want { get; }",
+      "    public StockException(int want, int have)",
+      "        : base($\"не хватает товара: нужно {want}, есть {have}\")",
+      "    {",
+      "        Want = want;",
+      "        Have = have;",
+      "    }",
+      "}"
+     ],
+     [
+      "public class StockException : Exception",
+      "{",
+      "    public int Want { get; }",
+      "    public int Have { get; }",
+      "    public StockException(int want, int have)",
+      "        : base($\"не хватает товара: нужно {want}, есть {have}\")",
+      "    {",
+      "        Have = have;",
+      "        Want = want;",
+      "    }",
+      "}"
+     ],
+     [
+      "public class StockException : Exception",
+      "{",
+      "    public int Have { get; }",
+      "    public int Want { get; }",
+      "    public StockException(int want, int have)",
+      "        : base($\"не хватает товара: нужно {want}, есть {have}\")",
+      "    {",
+      "        Have = have;",
+      "        Want = want;",
+      "    }",
+      "}"
+     ]
+    ],
+    "distractors": [
+     "public class StockException extends Exception",
+     "        : super($\"не хватает товара\")"
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Наследование — через двоеточие, как и интерфейсы (extends — это Java). Сообщение передают конструктору родителя через : base(…) — в Java это было бы super(…). Свойства только для чтения задаются в конструкторе, их порядок не важен.",
+   "hints": [
+    "Родитель — после двоеточия.",
+    "Конструктор родителя вызывается через base."
+   ]
+  },
+  {
+   "task_id": "cs-exceptions-05",
+   "topic_id": "cs-exceptions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Резерв на складе",
+   "story": "Стас: «Если товара не хватает, фронт должен показать, сколько есть. Исключение с данными уже готово — осталось им воспользоваться.»",
+   "content": {
+    "question": "Допиши Reserve(int have, int want): want ≤ 0 — ArgumentOutOfRangeException; want > have — брось StockException(want, have); иначе верни остаток have - want.",
+    "entry": "Reserve",
+    "code": "public class StockException : Exception\n{\n    public int Want { get; }\n    public int Have { get; }\n\n    public StockException(int want, int have)\n        : base($\"не хватает товара: нужно {want}, есть {have}\")\n    {\n        Want = want;\n        Have = have;\n    }\n}\n\nclass Program\n{\n    // резерв товара: остаток или исключение\n    public static int Reserve(int have, int want)\n    {\n        return have - want;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(Reserve(10, 3));\n    }\n}",
+    "correct_answer": "public class StockException : Exception\n{\n    public int Want { get; }\n    public int Have { get; }\n\n    public StockException(int want, int have)\n        : base($\"не хватает товара: нужно {want}, есть {have}\")\n    {\n        Want = want;\n        Have = have;\n    }\n}\n\nclass Program\n{\n    // резерв товара: остаток или исключение\n    public static int Reserve(int have, int want)\n    {\n        if (want <= 0)\n            throw new ArgumentOutOfRangeException(nameof(want), \"количество должно быть больше нуля\");\n        if (want > have)\n            throw new StockException(want, have);\n        return have - want;\n    }\n\n    static void Main()\n    {\n        Console.WriteLine(Reserve(10, 3));\n    }\n}",
+    "tests_code": "class Tests\n{\n    // ловим StockException, чтобы тест увидел его данные\n    static object Call(int have, int want)\n    {\n        try\n        {\n            return Program.Reserve(have, want);\n        }\n        catch (StockException e)\n        {\n            return $\"StockException(want={e.Want}, have={e.Have})\";\n        }\n    }\n\n    static void Main()\n    {\n        Check.Eq(\"резерв 3 из 10\", () => Call(10, 3), 7);\n        Check.Eq(\"забрать всё\", () => Call(4, 4), 0);\n        Check.Eq(\"не хватает: нужно 5, есть 2\", () => Call(2, 5), \"StockException(want=5, have=2)\");\n        Check.Throws<ArgumentOutOfRangeException>(\"количество 0\", () => Call(10, 0));\n    }\n}",
+    "requirements": [
+     {
+      "input": "проверяет количество ≤ 0",
+      "expected": {
+       "regex": "want\\s*<=\\s*0|want\\s*<\\s*1"
+      }
+     },
+     {
+      "input": "бросает StockException с данными",
+      "expected": {
+       "regex": "throw\\s+new\\s+StockException\\s*\\("
+      }
+     }
+    ],
+    "language": "csharp"
+   },
+   "explanation": "Своё исключение несёт данные: фронт ловит StockException и показывает «есть только 2» из e.Have. Неверное количество — ошибка вызывающего кода, для неё хватает стандартного ArgumentOutOfRangeException. В C# throws писать не нужно — но и компилятор не напомнит поймать исключение.",
+   "hints": [
+    "throw new StockException(want, have);",
+    "Проверку want <= 0 поставь первой."
+   ]
+  }
+ ]
+}

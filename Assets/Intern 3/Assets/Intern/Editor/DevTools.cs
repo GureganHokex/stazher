@@ -125,6 +125,16 @@ namespace Intern.EditorTools
                 }
                 catch (Exception e) { log.AppendLine("ошибка: " + e); }
                 log.AppendLine("итог: " + ok + " ок, " + bad + " ошибок, " + sw.Elapsed.TotalSeconds.ToString("0") + " с");
+                try   // сколько места занимают образы компиляторов — сверить с тем, что обещает игра
+                {
+                    var imgs = Intern.Game.DevEnv.Run(Intern.Game.DevEnv.Docker, "image ls --format \"{{.Repository}}:{{.Tag}} {{.Size}}\"", 20000);
+                    foreach (var spec in Intern.Game.LangBox.All)
+                    {
+                        var line = (imgs.Out ?? "").Replace("\r", "").Split('\n').FirstOrDefault(l => l.StartsWith(spec.image + " "));
+                        log.AppendLine("образ " + spec.image + ": " + (line != null ? line.Substring(spec.image.Length + 1).Trim() : "не скачан") + " (в игре: " + spec.size + ")");
+                    }
+                }
+                catch (Exception e) { log.AppendLine("размеры образов: " + e.Message); }
                 try { File.WriteAllText(outFile, log.ToString(), new UTF8Encoding(false)); } catch (Exception) { }
             }) { IsBackground = true }.Start();
         }

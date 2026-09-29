@@ -17,7 +17,7 @@ namespace Intern.Game
 {
     public class LangSpec
     {
-        public string id, name, image, container, cacheVolume, cachePath, src, test, runCmd, testCmd, size;
+        public string id, name, image, container, cacheVolume, cachePath, src, test, runCmd, testCmd, size;   // size — место на диске после docker pull
         public string parser = "go";     // go — go test -json; check — строки ##TEST|имя|PASS/FAIL (свой набор проверок языка)
         public string testShow, runShow; // что показать игроку в терминале вместо полной команды
         public string testMarker;        // без этого в файле тестов задача считается сломанной (selftest)
@@ -76,7 +76,7 @@ namespace Intern.Game
         {
             id = "go", name = "Go", image = "golang:1.24-alpine", container = "stazher-go",
             cacheVolume = "stazher-go-cache", cachePath = "/root/.cache",
-            src = "main.go", test = "main_test.go", runCmd = "go run .", testCmd = "go test -json -count=1 .", size = "около 100 МБ",
+            src = "main.go", test = "main_test.go", runCmd = "go run .", testCmd = "go test -json -count=1 .", size = "около 400 МБ",
             testShow = "go test -v", runShow = "go run .", testMarker = "func Test",
             env = new[] { "GOTOOLCHAIN=local", "GOFLAGS=-mod=mod", "GOPROXY=off", "CGO_ENABLED=0" },
             extraFiles = new Dictionary<string, string> { { "go.mod", "module stazher\n\ngo 1.24\n" } },
@@ -86,7 +86,7 @@ namespace Intern.Game
         public static readonly LangSpec Java = new LangSpec
         {
             id = "java", name = "Java", image = "eclipse-temurin:21-jdk-alpine", container = "stazher-java",
-            src = "Main.java", test = "MainTest.java", parser = "check", size = "около 200 МБ",
+            src = "Main.java", test = "MainTest.java", parser = "check", size = "около 550 МБ",
             runCmd = "sh -c \"rm -rf out && javac -J-Xmx256m -encoding UTF-8 -d out Main.java && java -Xmx256m -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp out Main\"",
             testCmd = "sh -c \"rm -rf out && javac -J-Xmx256m -encoding UTF-8 -d out *.java && java -Xmx256m -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp out MainTest\"",
             testShow = "javac *.java && java MainTest", runShow = "javac Main.java && java Main", testMarker = "Check.",
@@ -94,8 +94,155 @@ namespace Intern.Game
             extraFiles = new Dictionary<string, string> { { "Check.java", CheckJava } },
         };
 
-        public static LangSpec For(string lang) { return lang == "go" ? Go : lang == "java" ? Java : null; }
-        public static IEnumerable<LangSpec> All { get { yield return Go; yield return Java; } }
+        // Спринт 13: C#. Компилятор Roslyn (csc) из SDK вызывается напрямую — без msbuild и NuGet сборка занимает пару секунд и не требует сети.
+        // Тесты — Tests.cs на своём наборе проверок Check.cs; частые using подключены через Usings.cs, как в новом проекте dotnet
+        public static readonly LangSpec CSharp = new LangSpec
+        {
+            id = "csharp", name = "C#", image = "mcr.microsoft.com/dotnet/sdk:10.0-alpine", container = "stazher-csharp",
+            src = "Program.cs", test = "Tests.cs", parser = "check", size = "около 1,1 ГБ",
+            runCmd = "sh stazher-cs.sh run", testCmd = "sh stazher-cs.sh test",
+            testShow = "csc Program.cs Tests.cs && dotnet Tests.dll", runShow = "csc Program.cs && dotnet Program.dll", testMarker = "Check.",
+            env = new[] { "LANG=C.UTF-8", "DOTNET_CLI_TELEMETRY_OPTOUT=1", "DOTNET_NOLOGO=1", "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1" },
+            extraFiles = new Dictionary<string, string> { { "Check.cs", CheckCs }, { "Usings.cs", UsingsCs }, { "stazher-cs.sh", CsScript } },
+        };
+
+        public static LangSpec For(string lang) { return lang == "go" ? Go : lang == "java" ? Java : lang == "csharp" ? CSharp : null; }
+        public static IEnumerable<LangSpec> All { get { yield return Go; yield return Java; yield return CSharp; } }
+
+        // Tools/s13/Check.cs — набор проверок для Tests.cs
+        public const string CheckCs =
+            "// Проверки «Стажёра» для задач на C#: каждая проверка печатает строку ##TEST|имя|PASS или ##TEST|имя|FAIL|почему.\n" +
+            "// Исключение в проверяемом коде ловится внутри проверки — остальные тесты всё равно выполнятся.\n" +
+            "using System.Collections;\n" +
+            "using System.Diagnostics;\n" +
+            "using System.Globalization;\n" +
+            "using System.Text;\n" +
+            "\n" +
+            "public static class Check\n" +
+            "{\n" +
+            "    public static void Eq(string name, Func<object> got, object want)\n" +
+            "    {\n" +
+            "        object g;\n" +
+            "        try { g = got(); } catch (Exception e) { Fail(name, \"исключение \" + Ex(e)); return; }\n" +
+            "        if (Same(g, want)) Pass(name); else Fail(name, \"получено \" + Show(g) + \", ожидалось \" + Show(want));\n" +
+            "    }\n" +
+            "\n" +
+            "    public static void Near(string name, Func<double> got, double want)\n" +
+            "    {\n" +
+            "        double g;\n" +
+            "        try { g = got(); } catch (Exception e) { Fail(name, \"исключение \" + Ex(e)); return; }\n" +
+            "        if (Math.Abs(g - want) < 1e-9) Pass(name); else Fail(name, \"получено \" + Show(g) + \", ожидалось \" + Show(want));\n" +
+            "    }\n" +
+            "\n" +
+            "    public static void Ok(string name, Func<bool> cond, string why)\n" +
+            "    {\n" +
+            "        try { if (cond()) Pass(name); else Fail(name, why); }\n" +
+            "        catch (Exception e) { Fail(name, \"исключение \" + Ex(e)); }\n" +
+            "    }\n" +
+            "\n" +
+            "    public static void Throws<T>(string name, Action act) where T : Exception\n" +
+            "    {\n" +
+            "        try { act(); Fail(name, \"исключения не было, ожидалось \" + typeof(T).Name); }\n" +
+            "        catch (Exception e)\n" +
+            "        {\n" +
+            "            if (e is T) Pass(name);\n" +
+            "            else Fail(name, \"исключение \" + e.GetType().Name + \", ожидалось \" + typeof(T).Name + Where(e));\n" +
+            "        }\n" +
+            "    }\n" +
+            "\n" +
+            "    static bool Integral(object o) { return o is int || o is long || o is short || o is byte || o is sbyte || o is uint || o is ushort; }\n" +
+            "    static bool Real(object o) { return o is double || o is float || o is decimal; }\n" +
+            "\n" +
+            "    static bool Same(object a, object b)\n" +
+            "    {\n" +
+            "        if (a == null || b == null) return a == b;\n" +
+            "        if (Integral(a) && Integral(b)) return Convert.ToInt64(a) == Convert.ToInt64(b);\n" +
+            "        if ((Real(a) || Integral(a)) && (Real(b) || Integral(b)) && (Real(a) || Real(b)))\n" +
+            "            return Math.Abs(Convert.ToDouble(a) - Convert.ToDouble(b)) < 1e-9;\n" +
+            "        if (a is string || b is string) return Equals(a, b);\n" +
+            "        if (a is IDictionary da && b is IDictionary db)\n" +
+            "        {\n" +
+            "            if (da.Count != db.Count) return false;\n" +
+            "            foreach (DictionaryEntry e in da) { if (!db.Contains(e.Key) || !Same(e.Value, db[e.Key])) return false; }\n" +
+            "            return true;\n" +
+            "        }\n" +
+            "        if (a is IEnumerable ea && b is IEnumerable eb && !(a is IDictionary) && !(b is IDictionary))\n" +
+            "        {\n" +
+            "            var la = ea.Cast<object>().ToList(); var lb = eb.Cast<object>().ToList();\n" +
+            "            if (la.Count != lb.Count) return false;\n" +
+            "            for (int i = 0; i < la.Count; i++) if (!Same(la[i], lb[i])) return false;\n" +
+            "            return true;\n" +
+            "        }\n" +
+            "        return Equals(a, b);\n" +
+            "    }\n" +
+            "\n" +
+            "    static string Show(object o)\n" +
+            "    {\n" +
+            "        if (o == null) return \"null\";\n" +
+            "        if (o is string s) return \"\\\"\" + s + \"\\\"\";\n" +
+            "        if (o is char c) return \"'\" + c + \"'\";\n" +
+            "        if (o is bool bo) return bo ? \"true\" : \"false\";\n" +
+            "        if (o is double d) return d.ToString(\"R\", CultureInfo.InvariantCulture);\n" +
+            "        if (o is float f) return f.ToString(\"R\", CultureInfo.InvariantCulture);\n" +
+            "        if (o is decimal m) return m.ToString(CultureInfo.InvariantCulture);\n" +
+            "        if (o is IDictionary dict)\n" +
+            "        {\n" +
+            "            var parts = new List<string>();\n" +
+            "            foreach (DictionaryEntry e in dict) parts.Add(Show(e.Key) + \": \" + Show(e.Value));\n" +
+            "            parts.Sort(StringComparer.Ordinal);\n" +
+            "            return \"{\" + string.Join(\", \", parts) + \"}\";\n" +
+            "        }\n" +
+            "        if (o is IEnumerable en) return \"[\" + string.Join(\", \", en.Cast<object>().Select(Show)) + \"]\";\n" +
+            "        return Convert.ToString(o, CultureInfo.InvariantCulture);\n" +
+            "    }\n" +
+            "\n" +
+            "    static string Ex(Exception e) { return e.GetType().Name + \": \" + e.Message + Where(e); }\n" +
+            "\n" +
+            "    static string Where(Exception e)\n" +
+            "    {\n" +
+            "        var st = new StackTrace(e, true);\n" +
+            "        foreach (var fr in st.GetFrames() ?? new StackFrame[0])\n" +
+            "        {\n" +
+            "            var file = fr.GetFileName();\n" +
+            "            if (file != null && Path.GetFileName(file) == \"Program.cs\" && fr.GetFileLineNumber() > 0) return \" (Program.cs:\" + fr.GetFileLineNumber() + \")\";\n" +
+            "        }\n" +
+            "        return \"\";\n" +
+            "    }\n" +
+            "\n" +
+            "    static void Pass(string n) { Console.WriteLine(\"##TEST|\" + Clean(n) + \"|PASS\"); }\n" +
+            "    static void Fail(string n, string m) { Console.WriteLine(\"##TEST|\" + Clean(n) + \"|FAIL|\" + Clean(m)); }\n" +
+            "    static string Clean(string s) { return (s ?? \"\").Replace(\"|\", \"/\").Replace(\"\\r\", \"\").Replace(\"\\n\", \" ⏎ \"); }\n" +
+            "}\n";
+
+        // Tools/s13/Usings.cs — global using, как ImplicitUsings в проекте dotnet
+        public const string UsingsCs =
+            "// Как в новом проекте dotnet (ImplicitUsings): частые пространства имён подключены сами\n" +
+            "global using System;\n" +
+            "global using System.Collections.Generic;\n" +
+            "global using System.IO;\n" +
+            "global using System.Linq;\n" +
+            "global using System.Net.Http;\n" +
+            "global using System.Threading;\n" +
+            "global using System.Threading.Tasks;\n";
+
+        // Tools/s13/stazher-cs.sh — сборка csc без msbuild и NuGet (сети в контейнере нет) и запуск через dotnet
+        public const string CsScript =
+            "#!/bin/sh\n" +
+            "# «Стажёр»: сборка и запуск C# без msbuild и NuGet — компилятор Roslyn (csc) из .NET SDK, запуск через dotnet.\n" +
+            "# sh stazher-cs.sh run  — Program.cs;  sh stazher-cs.sh test — Program.cs + Tests.cs + Check.cs\n" +
+            "D=${DOTNET_ROOT:-$(dirname \"$(readlink -f \"$(command -v dotnet)\")\")}\n" +
+            "CSC=$(ls -d \"$D\"/sdk/*/Roslyn/bincore/csc.dll 2>/dev/null | tail -n 1)\n" +
+            "REF=$(ls -d \"$D\"/packs/Microsoft.NETCore.App.Ref/*/ref/net* 2>/dev/null | tail -n 1)\n" +
+            "[ -n \"$CSC\" ] && [ -n \"$REF\" ] || { echo \"stazher: не найден компилятор csc или сборки .NET в $D\" >&2; exit 2; }\n" +
+            "rm -rf out && mkdir out || exit 2\n" +
+            "if [ \"$1\" = test ]; then NAME=Tests; SRC=\"Program.cs Tests.cs Check.cs Usings.cs\"; MAIN=-main:Tests; else NAME=Program; SRC=\"Program.cs Usings.cs\"; MAIN=; fi\n" +
+            "for f in \"$REF\"/*.dll; do echo \"-r:$f\"; done > out/refs.rsp\n" +
+            "dotnet \"$CSC\" -nologo -noconfig -langversion:latest -nullable:disable -debug:portable -target:exe -nowarn:CS8933 $MAIN -out:out/$NAME.dll @out/refs.rsp $SRC >out/csc.txt 2>&1\n" +
+            "code=$?\n" +
+            "grep -v \"^$\" out/csc.txt | grep -v \"warning CS\" >&2\n" +
+            "[ $code -eq 0 ] || exit 1\n" +
+            "printf '{\"runtimeOptions\":{\"tfm\":\"net10.0\",\"framework\":{\"name\":\"Microsoft.NETCore.App\",\"version\":\"10.0.0\"}}}' > out/$NAME.runtimeconfig.json\n" +
+            "exec dotnet out/$NAME.dll\n";
 
         public const string CheckJava =
             "// Проверки «Стажёра» для задач на Java: каждая проверка печатает строку ##TEST|имя|PASS или ##TEST|имя|FAIL|почему.\n" +
@@ -191,7 +338,7 @@ namespace Intern.Game
             pulled = false;
             if (!HasImage(s))
             {
-                if (note != null) note("docker pull " + s.image + " — первый запуск " + s.name + ": скачиваю образ компилятора (" + s.size + "), это один раз.");
+                if (note != null) note("docker pull " + s.image + " — первый запуск " + s.name + ": скачиваю образ компилятора (на диске займёт " + s.size + "), это один раз.");
                 var p = DevEnv.DockerCmd("pull " + s.image, 20 * 60 * 1000);
                 if (!p.Ok) return "Не удалось скачать образ " + s.image + ": " + FirstLine(p.Text) + ". Проверь интернет и что Docker Desktop запущен.";
                 pulled = true;
@@ -213,7 +360,7 @@ namespace Intern.Game
             Directory.CreateDirectory(dir);
             foreach (var f in Directory.GetFiles(dir)) { try { File.Delete(f); } catch (Exception) { } }
             var enc = new UTF8Encoding(false);
-            foreach (var kv in s.extraFiles) File.WriteAllText(Path.Combine(dir, kv.Key), kv.Value, enc);
+            foreach (var kv in s.extraFiles) File.WriteAllText(Path.Combine(dir, kv.Key), kv.Value.Replace("\r\n", "\n"), enc);   // CRLF сломал бы sh-скрипт
             foreach (var kv in files) File.WriteAllText(Path.Combine(dir, kv.Key), (kv.Value ?? "").Replace("\r\n", "\n"), enc);
         }
 
@@ -234,7 +381,7 @@ namespace Intern.Game
             WriteFiles(s, id, new Dictionary<string, string> { { s.src, code }, { s.test, testCode } });
             if (note != null) note(s.testShow + "   # в контейнере " + s.image);
             var r = Exec(s, id, s.testCmd, RunTimeoutSec + 10);
-            rep = s.parser == "check" ? ParseCheck(r.Out, r.Err, s.src) : ParseGoTest(r.Out + "\n" + r.Err, s.src);
+            rep = s.parser == "check" ? ParseCheck(r.Out, r.Err, s.src, r.TimedOut ? 0 : r.Code) : ParseGoTest(r.Out + "\n" + r.Err, s.src);
             rep.pulled = pulled; rep.ms = r.Ms;
             if (r.TimedOut && !rep.buildFailed)
             {
@@ -360,11 +507,48 @@ namespace Intern.Game
             return rep;
         }
 
-        // ---------- разбор ##TEST (Java и дальше) ----------
+        // ---------- разбор ##TEST (Java, C# и дальше) ----------
         static readonly Regex JavacErr = new Regex(@"^(\w+\.java):(\d+): error: (.*)$");
-        static readonly Regex JavaAt = new Regex(@"\((\w+\.java):(\d+)\)");
+        static readonly Regex CscErr = new Regex(@"^(\w+\.cs)\((\d+),(\d+)\): error (CS\d+): (.*)$");
+        static readonly Regex SrcAt = new Regex(@"\((\w+\.(?:java|cs)):(\d+)\)");   // (Main.java:4), (Program.cs:5) — из Check и трассировок Java
+        static readonly Regex CsAt = new Regex(@"(\w+\.cs):line (\d+)");            // трассировка .NET: in /work/…/Program.cs:line 5
 
-        public static BoxReport ParseCheck(string stdout, string stderr, string srcName)
+        public class CompileError { public string file, text; public int line; }
+
+        // Ошибки компилятора javac или csc по порядку, с переводом
+        public static List<CompileError> CompileErrors(string err)
+        {
+            var list = new List<CompileError>();
+            var lines = (err ?? "").Replace("\r", "").Split('\n');
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string l = lines[i].Trim();
+                var m = JavacErr.Match(l);
+                if (m.Success)
+                {
+                    string text = Explain(m.Groups[3].Value);
+                    for (int j = i + 1; j < Math.Min(lines.Length, i + 5); j++)
+                    {
+                        string sym = lines[j].Trim();
+                        if (sym.StartsWith("symbol:")) { text += " — " + sym.Substring(7).Trim(); break; }
+                        if (JavacErr.IsMatch(sym)) break;
+                    }
+                    list.Add(new CompileError { file = m.Groups[1].Value, line = int.Parse(m.Groups[2].Value), text = text });
+                    continue;
+                }
+                m = CscErr.Match(l);
+                if (m.Success)
+                {
+                    string msg = m.Groups[5].Value, code = m.Groups[4].Value, text = Explain(msg);
+                    text = text == msg ? code + ": " + msg : text.Replace("(" + msg + ")", "(" + code + ": " + msg + ")");
+                    list.Add(new CompileError { file = m.Groups[1].Value, line = int.Parse(m.Groups[2].Value), text = text });
+                }
+            }
+            return list;
+        }
+
+        // code — код выхода процесса тестов: не 0 при уже напечатанных проверках значит, что тесты оборвались посередине
+        public static BoxReport ParseCheck(string stdout, string stderr, string srcName, int code = 0)
         {
             var rep = new BoxReport();
             var log = new StringBuilder();
@@ -379,35 +563,37 @@ namespace Intern.Game
                 rep.results.Add(new CheckResult { Passed = ok, InputsText = p[1], Expected = "", Actual = "", Note = ok ? null : note ?? "Тест не прошёл." });
                 if (!ok && rep.errLine < 0 && note != null)
                 {
-                    var m = JavaAt.Match(note);
+                    var m = SrcAt.Match(note);
                     if (m.Success && m.Groups[1].Value == srcName) { rep.errLine = int.Parse(m.Groups[2].Value); rep.errText = "Ошибка в строке " + rep.errLine + ": " + note; }
                 }
             }
             string err = string.Join("\n", (stderr ?? "").Replace("\r", "").Split('\n').Where(l => !l.StartsWith("Picked up ") && !l.StartsWith("NOTE: Picked up")).ToArray()).Trim();
-            if (err.Length > 0) log.AppendLine(err);
+            if (err.Length > 0) log.AppendLine(err.Length > 4000 ? err.Substring(0, 4000) + "\n…" : err);
             rep.log = CleanPaths(log.ToString());
-            if (rep.results.Count > 0) return rep;
-            // тестов нет: не собралось или упало до первой проверки
-            var lines = err.Split('\n');
-            var nice = new List<string>();
-            for (int i = 0; i < lines.Length && nice.Count < 8; i++)
+            if (rep.results.Count > 0)
             {
-                var m = JavacErr.Match(lines[i].Trim());
-                if (!m.Success) continue;
-                string text = Explain(m.Groups[3].Value);
-                for (int j = i + 1; j < Math.Min(lines.Length, i + 5); j++)
+                // процесс оборвался посреди проверок (переполнение стека, выход из программы) — остальные тесты не выполнились
+                if (code != 0 && code != 137)
                 {
-                    string sym = lines[j].Trim();
-                    if (sym.StartsWith("symbol:")) { text += " — " + sym.Substring(7).Trim(); break; }
-                    if (JavacErr.IsMatch(sym)) break;
+                    string cx; int cl = RuntimeError(err, srcName, out cx);
+                    string why = "Тесты оборвались на середине (код выхода " + code + ")" + (cx != null ? ": " + cx : "") + ". Остальные проверки не выполнились.";
+                    rep.panicked = true;
+                    if (rep.errLine < 0 && cl > 0) { rep.errLine = cl; rep.errText = why; }
+                    rep.results.Add(new CheckResult { Passed = false, InputsText = "запуск", Expected = "", Actual = "", Note = why });
                 }
-                int ln = int.Parse(m.Groups[2].Value);
-                if (m.Groups[1].Value == srcName)
+                return rep;
+            }
+            // тестов нет: не собралось или упало до первой проверки
+            var nice = new List<string>();
+            foreach (var e in CompileErrors(err))
+            {
+                if (nice.Count >= 8) break;
+                if (e.file == srcName)
                 {
-                    if (rep.errLine < 0) { rep.errLine = ln; rep.errText = "Ошибка компиляции в строке " + ln + ": " + text; }
-                    nice.Add("строка " + ln + ": " + text);
+                    if (rep.errLine < 0) { rep.errLine = e.line; rep.errText = "Ошибка компиляции в строке " + e.line + ": " + e.text; }
+                    nice.Add("строка " + e.line + ": " + e.text);
                 }
-                else nice.Add("тесты (" + m.Groups[1].Value + ", строка " + ln + "): " + text + (text.Contains("cannot find symbol") || text.Contains("не найдено") ? " — не переименовывай методы и классы из задания." : ""));
+                else nice.Add("тесты (" + e.file + ", строка " + e.line + "): " + e.text + " — не меняй имена и параметры методов и классов из задания" + (e.file.EndsWith(".cs") ? " и оставь их public." : "."));
             }
             if (nice.Count > 0)
             {
@@ -415,7 +601,7 @@ namespace Intern.Game
                 rep.results.Add(new CheckResult { Passed = false, InputsText = "сборка", Expected = "", Actual = "", Note = "Код не компилируется, тесты не запускались.\n" + string.Join("\n", nice.ToArray()) });
                 return rep;
             }
-            string ex; int exLine = JavaException(err, srcName, out ex);
+            string ex; int exLine = RuntimeError(err, srcName, out ex);
             if (ex != null)
             {
                 rep.panicked = true; rep.errLine = exLine; rep.errText = "Программа упала: " + ex + (exLine > 0 ? " (строка " + exLine + ")" : "");
@@ -424,34 +610,42 @@ namespace Intern.Game
             return rep;
         }
 
-        // «Exception in thread "main" java.lang.X: сообщение» и строка из Main.java в трассировке
-        static int JavaException(string err, string srcName, out string ex)
+        // Падение программы: «Exception in thread "main" java.lang.X: …» (Java), «Unhandled exception. System.X: …» и «Stack overflow.» (.NET);
+        // строка — из трассировки исходника игрока (Main.java:4 / Program.cs:line 5), -1 если её нет
+        static int RuntimeError(string err, string srcName, out string ex)
         {
-            ex = null;
-            int i = (err ?? "").IndexOf("Exception in thread", StringComparison.Ordinal);
-            if (i < 0) { i = (err ?? "").IndexOf("Error: ", StringComparison.Ordinal); if (i < 0) return -1; }
-            int end = err.IndexOf('\n', i); ex = (end > 0 ? err.Substring(i, end - i) : err.Substring(i)).Replace("Exception in thread \"main\" ", "").Trim();
-            var m = JavaAt.Matches(err).Cast<Match>().FirstOrDefault(x => x.Groups[1].Value == srcName);
-            return m != null ? int.Parse(m.Groups[2].Value) : -1;
+            ex = null; err = err ?? "";
+            Func<int, string> lineAt = i => { int end = err.IndexOf('\n', i); return (end > 0 ? err.Substring(i, end - i) : err.Substring(i)).Trim(); };
+            int k = err.IndexOf("Unhandled exception. ", StringComparison.Ordinal);
+            if (k >= 0)
+            {
+                ex = lineAt(k).Substring("Unhandled exception. ".Length).Trim();
+                var m = CsAt.Matches(err).Cast<Match>().FirstOrDefault(x => x.Groups[1].Value == srcName);
+                return m != null ? int.Parse(m.Groups[2].Value) : -1;
+            }
+            if (err.Contains("Stack overflow."))
+            {
+                ex = "переполнение стека (Stack overflow) — похоже на бесконечную рекурсию";
+                return -1;
+            }
+            k = err.IndexOf("Exception in thread", StringComparison.Ordinal);
+            if (k < 0) k = err.IndexOf("Error: ", StringComparison.Ordinal);
+            if (k < 0) return -1;
+            ex = lineAt(k).Replace("Exception in thread \"main\" ", "").Trim();
+            if (ex.Contains("StackOverflowError")) ex += " — похоже на бесконечную рекурсию";
+            var j = SrcAt.Matches(err).Cast<Match>().FirstOrDefault(x => x.Groups[1].Value == srcName);
+            return j != null ? int.Parse(j.Groups[2].Value) : -1;
         }
 
-        // Строка ошибки из вывода go run / go build (компиляция или паника); 0 — нет
+        // Строка ошибки из вывода запуска (компиляция или падение); 0 — ошибки нет
         public static int ErrorLine(string stderr, string srcName, out string msg)
         {
             msg = null;
-            if (srcName.EndsWith(".java"))
+            if (srcName.EndsWith(".java") || srcName.EndsWith(".cs"))
             {
-                var lines = (stderr ?? "").Replace("\r", "").Split('\n');
-                for (int i = 0; i < lines.Length; i++)
-                {
-                    var m = JavacErr.Match(lines[i].Trim());
-                    if (!m.Success || m.Groups[1].Value != srcName) continue;
-                    string text = Explain(m.Groups[3].Value);
-                    for (int j = i + 1; j < Math.Min(lines.Length, i + 5); j++) if (lines[j].Trim().StartsWith("symbol:")) { text += " — " + lines[j].Trim().Substring(7).Trim(); break; }
-                    msg = "Ошибка компиляции в строке " + m.Groups[2].Value + ": " + text;
-                    return int.Parse(m.Groups[2].Value);
-                }
-                string ex; int ln = JavaException(stderr, srcName, out ex);
+                var ce = CompileErrors(stderr).FirstOrDefault(e => e.file == srcName);
+                if (ce != null) { msg = "Ошибка компиляции в строке " + ce.line + ": " + ce.text; return ce.line; }
+                string ex; int ln = RuntimeError(stderr, srcName, out ex);
                 if (ex != null) { msg = "Программа упала: " + ex; return ln; }
                 return 0;
             }
@@ -493,6 +687,23 @@ namespace Intern.Game
             if (e == "unreachable statement") return "до этой строки выполнение никогда не дойдёт (" + e + ")";
             if (e.StartsWith("class ") && e.Contains("is public, should be declared in a file named")) return "публичный класс должен называться как файл — Main (" + e + ")";
             if (e.Contains("unreported exception")) return "проверяемое исключение нужно поймать или объявить в throws (" + e + ")";
+            // csc (C#)
+            if ((m = Regex.Match(e, @"^The name '(\w+)' does not exist in the current context$")).Success) return "имя " + m.Groups[1].Value + " не найдено: опечатка или не объявлено (" + e + ")";
+            if ((m = Regex.Match(e, @"^([;{}()\[\],]|\w+) expected$")).Success) return "не хватает «" + m.Groups[1].Value + "» (" + e + ")";
+            if (e.EndsWith("not all code paths return a value")) return "не все ветки метода возвращают значение: не хватает return (" + e + ")";
+            if ((m = Regex.Match(e, @"^Cannot implicitly convert type '(.+?)' to '(.+?)'")).Success) return "нельзя просто так превратить " + m.Groups[1].Value + " в " + m.Groups[2].Value + (e.Contains("explicit conversion exists") ? " — нужно явное приведение, например (" + m.Groups[2].Value + ")" : "") + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^Use of unassigned local variable '(\w+)'")).Success) return "переменной " + m.Groups[1].Value + " не присвоено значение (" + e + ")";
+            if ((m = Regex.Match(e, @"^A local variable or function named '(\w+)' is already defined")).Success) return m.Groups[1].Value + " уже объявлена (" + e + ")";
+            if (e.EndsWith("is inaccessible due to its protection level")) return "член класса закрыт (private) — снаружи его не видно, нужен public (" + e + ")";
+            if ((m = Regex.Match(e, @"^'(.+?)' does not contain a definition for '(\w+)'")).Success) return "у " + m.Groups[1].Value + " нет члена " + m.Groups[2].Value + ": опечатка в имени? (" + e + ")";
+            if ((m = Regex.Match(e, @"^No overload for method '(\w+)' takes (\d+) arguments$")).Success) return "у метода " + m.Groups[1].Value + " нет варианта с таким числом аргументов: " + m.Groups[2].Value + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^Operator '(.+?)' cannot be applied to operands of type '(.+?)' and '(.+?)'$")).Success) return "оператор " + m.Groups[1].Value + " не работает с " + m.Groups[2].Value + " и " + m.Groups[3].Value + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^Argument (\d+): cannot convert from '(.+?)' to '(.+?)'$")).Success) return "аргумент " + m.Groups[1].Value + ": нужен " + m.Groups[3].Value + ", а передан " + m.Groups[2].Value + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^The type or namespace name '(\w+)' could not be found")).Success) return "тип " + m.Groups[1].Value + " не найден: опечатка или не подключён using (" + e + ")";
+            if ((m = Regex.Match(e, @"^Invalid expression term '(.+)'$")).Success) return "здесь не может стоять «" + m.Groups[1].Value + "» (" + e + ")";
+            if (e.StartsWith("Only assignment, call, increment, decrement")) return "это выражение ничего не делает — пропущено присваивание или вызов? (" + e + ")";
+            if (e.StartsWith("Cannot assign to") && e.Contains("readonly")) return "поле readonly можно задать только в конструкторе (" + e + ")";
+            if (e.EndsWith("unassigned local variable") || e.Contains("must be assigned")) return "значение не присвоено до использования (" + e + ")";
             return e;
         }
 

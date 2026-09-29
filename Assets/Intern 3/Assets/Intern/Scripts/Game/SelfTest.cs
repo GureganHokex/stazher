@@ -537,6 +537,18 @@ namespace Intern.Game
                 T(jx.panicked && jx.errLine == 6 && jx.results.Count == 1, "java: исключение до проверок " + jx.errLine + " " + jx.errText);
                 string je; T(LangBox.ErrorLine("Main.java:7: error: ';' expected\n        int x = 1\n                 ^\n1 error\n", "Main.java", out je) == 7 && je.Contains(";"), "javac: строка ошибки " + je);
                 T(LangBox.ErrorLine("Exception in thread \"main\" java.lang.ArithmeticException: / by zero\n\tat Main.div(Main.java:3)\n\tat Main.main(Main.java:9)\n", "Main.java", out je) == 3 && je.Contains("by zero"), "java: строка исключения " + je);
+                // C# (спринт 13): ошибки csc, исключения .NET, оборванный процесс тестов
+                var cc = LangBox.ParseCheck("", "Program.cs(5,16): error CS0103: The name 'prce' does not exist in the current context\n", "Program.cs", 1);
+                T(cc.buildFailed && cc.errLine == 5 && cc.errText.Contains("prce") && cc.errText.Contains("CS0103"), "c#: ошибка csc " + cc.errLine + " " + cc.errText);
+                var cp = LangBox.ParseCheck("", "Tests.cs(5,37): error CS0122: 'Program.CartTotal(int, int)' is inaccessible due to its protection level\n", "Program.cs", 1);
+                T(cp.buildFailed && cp.errLine < 0 && cp.results[0].Note.Contains("public"), "c#: private метод " + (cp.results.Count > 0 ? cp.results[0].Note : "-"));
+                var cs = LangBox.ParseCheck("##TEST|1990 × 2|PASS\n", "Stack overflow.\nRepeated 261383 times:\n   at Program.Down(Int64)\n", "Program.cs", 134);
+                T(cs.results.Count == 2 && cs.results[0].Passed && !cs.results[1].Passed && cs.results[1].Note.Contains("рекурси"), "c#: тесты оборвались " + cs.results.Count);
+                var cx = LangBox.ParseCheck("", "Unhandled exception. System.DivideByZeroException: Attempted to divide by zero.\n   at Program.Main() in /work/.stazher/run/x/Program.cs:line 12\n", "Program.cs", 134);
+                T(cx.panicked && cx.errLine == 12 && cx.errText.Contains("DivideByZero"), "c#: исключение " + cx.errLine + " " + cx.errText);
+                string ce; T(LangBox.ErrorLine("Program.cs(16,33): error CS0266: Cannot implicitly convert type 'double' to 'int'. An explicit conversion exists (are you missing a cast?)\n", "Program.cs", out ce) == 16 && ce.Contains("(int)"), "c#: строка ошибки " + ce);
+                var csharp = LangBox.For("csharp");
+                T(csharp != null && csharp.extraFiles.ContainsKey("stazher-cs.sh") && csharp.extraFiles["Check.cs"].Contains("##TEST|") && !csharp.extraFiles["stazher-cs.sh"].Contains("\r"), "c#: раннер, Check.cs и скрипт сборки");
                 var java = LangBox.For("java");
                 T(java != null && java.extraFiles.ContainsKey("Check.java") && java.extraFiles["Check.java"].Contains("##TEST|") && java.testMarker == "Check.", "java: раннер и Check.java");
             }

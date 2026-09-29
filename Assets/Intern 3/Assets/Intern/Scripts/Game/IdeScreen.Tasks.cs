@@ -528,7 +528,7 @@ namespace Intern.Game
             var spec = BoxSpec;
             if (spec == null) return;
             Section(c, "КАК ПРОВЕРЯЕТСЯ", hasExpl ? 18f : 4f);
-            Para(c, "Тесты лежат в " + spec.test + " и запускаются по-настоящему (" + (spec.testShow ?? spec.testCmd) + ") в контейнере " + spec.image + " (Docker). Первый запуск скачает образ — " + spec.size + ".", 14f, K.Text, 6f);
+            Para(c, "Тесты лежат в " + spec.test + " и запускаются по-настоящему (" + (spec.testShow ?? spec.testCmd) + ") в контейнере " + spec.image + " (Docker). Первый запуск скачает образ компилятора, на диске он займёт " + spec.size + ". Убрать его потом можно в заданиях окружения: «Уборка» → «Удалить всё, что создала игра».", 14f, K.Text, 6f);
             var st = g.Env != null ? g.Env.State : EnvState.Unknown;
             if (st == EnvState.Unknown) Para(c, "Docker проверится при первом «Запустить» или «Проверить».", 13f, K.Muted, 4f);
             else Para(c, DockerUp ? "Docker работает: «Проверить» запустит тесты, «Запустить» — " + (spec.runShow ?? spec.runCmd) + "." : "Docker сейчас не запущен: «Проверить» сверит решение с требованиями ниже, без запуска.", 13f, DockerUp ? K.Green : K.Orange, 4f);
