@@ -74,12 +74,15 @@ namespace Intern.Game
             cols.Add(todo.Item1); cols.Add(doing.Item1); cols.Add(done.Item1);
             var cur = g.CurrentTaskPublic;
             int nTodo = 0, nDone = 0;
-            foreach (var id in daily ? g.Save.daily : S.Tasks)
+            var ids = new List<string>(daily ? g.Save.daily : S.Tasks);
+            if (daily) foreach (var id in S.Tasks) if (id.StartsWith("env-") && !ids.Contains(id)) ids.Add(id);   // карточка окружения идёт и в режиме тикетов дня
+            foreach (var id in ids)
             {
                 var t = g.TaskById(id); if (t == null) continue;
                 bool isDone = g.IsDone(t), isCur = cur != null && cur.id == id;
                 var target = isDone ? done.Item2 : isCur ? doing.Item2 : todo.Item2;
-                target.Add(Ticket(t, isDone, isCur, !isDone && !isCur && !t.generated && !g.IsOpen(t)));
+                bool locked = t.scenario != null ? !g.EnvOpen(t) : !t.generated && !g.IsOpen(t);
+                target.Add(Ticket(t, isDone, isCur, !isDone && !isCur && locked));
                 if (isDone) nDone++; else if (!isCur) nTodo++;
             }
             // текущая задача вне спринта (например, дошли дальше плана) — тоже в «В работе»

@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -128,9 +129,17 @@ namespace Intern.Game
                 Finish(line, "", 1);
                 return;
             }
-            if (first == "docker") { RunDocker(line); return; }
-            if (!CanRunCommands) { Emit(1, "Песочница не запущена. Пройди миссию «Настрой окружение» — она в проводнике IDE, раздел «ОКРУЖЕНИЕ»."); return; }
-            RunSandbox(line);
+            // цепочка через && || ; — команды docker идут на ПК, остальные — в песочницу, по очереди
+            var chain = SplitChain(line);
+            bool hasDocker = chain.Any(c => IsDocker(c.Value));
+            if (!hasDocker) chain = new List<KeyValuePair<string, string>> { new KeyValuePair<string, string>("", line) };
+            foreach (var c in chain)
+                if (!IsDocker(c.Value) && Regex.IsMatch(c.Value, @"\|\s*docker\b"))
+                { Emit(1, "docker в середине конвейера здесь не работает: docker должен стоять первым (docker logs site | grep GET)."); Finish(line, "", 1); return; }
+            if (hasDocker && (State == EnvState.NoDocker || State == EnvState.DockerStopped)) { Emit(1, "Docker не запущен: " + StateText); Finish(line, "", 1); return; }
+            if (chain.Any(c => !IsDocker(c.Value) || PipeAt(c.Value) >= 0) && !CanRunCommands)
+            { Emit(1, "Песочница не запущена. Пройди миссию «Настрой окружение» — она в проводнике IDE, раздел «ОКРУЖЕНИЕ»."); Finish(line, "", 1); return; }
+            RunChain(line, chain);
         }
 
         void Finish(string cmd, string output, int code)
@@ -139,58 +148,122 @@ namespace Intern.Game
             Main(() => { Last = rec; if (Finished != null) Finished(rec); });
         }
 
-        void RunSandbox(string line)
+        static bool IsDocker(string seg) { var t = (seg ?? "").TrimStart(); return t == "docker" || t.StartsWith("docker ") || t.StartsWith("docker\t"); }
+
+        // Строка → команды с оператором перед каждой ("", "&&", "||", ";"); кавычки и \ учитываются, | и & остаются внутри команды
+        public static List<KeyValuePair<string, string>> SplitChain(string line)
+        {
+            var res = new List<KeyValuePair<string, string>>();
+            var cur = new StringBuilder(); string op = ""; char q = '\0';
+            line = line ?? "";
+            for (int i = 0; i < line.Length; i++)
+            {
+                char c = line[i];
+                if (q != '\0') { cur.Append(c); if (c == q) q = '\0'; else if (c == '\\' && q == '"' && i + 1 < line.Length) cur.Append(line[++i]); continue; }
+                if (c == '\'' || c == '"') { q = c; cur.Append(c); continue; }
+                if (c == '\\' && i + 1 < line.Length) { cur.Append(c).Append(line[++i]); continue; }
+                string next = null;
+                if ((c == '&' || c == '|') && i + 1 < line.Length && line[i + 1] == c) { next = new string(c, 2); i++; }
+                else if (c == ';' || c == '\n') next = ";";
+                if (next == null) { cur.Append(c); continue; }
+                if (cur.ToString().Trim().Length > 0) res.Add(new KeyValuePair<string, string>(op, cur.ToString().Trim()));
+                cur.Length = 0; op = next;
+            }
+            if (cur.ToString().Trim().Length > 0) res.Add(new KeyValuePair<string, string>(op, cur.ToString().Trim()));
+            return res;
+        }
+
+        // Позиция первого | конвейера (не ||) вне кавычек, −1 — нет
+        public static int PipeAt(string seg)
+        {
+            char q = '\0';
+            for (int i = 0; i < seg.Length; i++)
+            {
+                char c = seg[i];
+                if (q != '\0') { if (c == q) q = '\0'; else if (c == '\\' && q == '"') i++; continue; }
+                if (c == '\'' || c == '"') { q = c; continue; }
+                if (c == '\\') { i++; continue; }
+                if (c == '|' && (i + 1 >= seg.Length || seg[i + 1] != '|') && (i == 0 || seg[i - 1] != '|')) return i;
+            }
+            return -1;
+        }
+
+        void RunChain(string line, List<KeyValuePair<string, string>> chain)
         {
             busy = true; cancelled = false;
-            string id = (++jobNo).ToString() + "_" + Environment.TickCount;
-            jobId = id;
-            string cwd = Cwd;
+            string cwd0 = Cwd;
             Bg(() =>
             {
-                var sb = new StringBuilder(); int code = -1; string newCwd = null; bool heldEmpty = false;
-                var r = RunStream(DevEnv.Docker, "exec -i " + DevEnv.Container + " stazher-run " + id + " " + DevEnv.ShellQuote(cwd), CommandTimeoutMs, line, true,
-                    l =>
-                    {
-                        var m = Marker.Match(l);
-                        if (m.Success) { code = int.Parse(m.Groups[1].Value); newCwd = m.Groups[2].Value; heldEmpty = false; return false; }
-                        // пустую строку придерживаем: если за ней маркер — это служебный перевод строки, не показываем
-                        if (l.Length == 0 && !heldEmpty) { heldEmpty = true; return false; }
-                        if (heldEmpty) { heldEmpty = false; Emit(0, ""); sb.Append('\n'); }
-                        sb.Append(l).Append('\n'); return true;
-                    },
-                    l => { sb.Append(l).Append('\n'); return true; });
-                if (r.TimedOut) Emit(1, "Команда шла дольше " + (CommandTimeoutMs / 1000) + " с и была остановлена.");
+                var sb = new StringBuilder(); int code = 0; string cwd = cwd0;
+                foreach (var kv in chain)
+                {
+                    if (cancelled) { code = 130; break; }
+                    if (kv.Key == "&&" && code != 0) continue;
+                    if (kv.Key == "||" && code == 0) continue;
+                    code = IsDocker(kv.Value) ? DockerSegment(kv.Value, ref cwd, sb) : SandboxSegment(kv.Value, ref cwd, sb);
+                }
                 if (cancelled) Emit(1, "^C");
-                if (newCwd != null && newCwd.StartsWith("/")) { var nc = newCwd; Main(() => Cwd = nc); }
+                if (cwd != cwd0 && cwd.StartsWith("/")) { var nc = cwd; Main(() => Cwd = nc); }
                 busy = false; proc = null; jobId = null;
-                Finish(line, sb.ToString(), code >= 0 ? code : r.Code);
+                Finish(line, sb.ToString(), code);
             });
         }
 
-        void RunDocker(string line)
+        // bash в песочнице (вызывается в фоне): stazher-run запоминает папку и код выхода
+        int SandboxSegment(string cmd, ref string cwd, StringBuilder sb)
         {
-            if (State == EnvState.NoDocker || State == EnvState.DockerStopped) { Emit(1, "Docker не запущен: " + StateText); return; }
-            var plan = DockerGuard.Plan(line, Cwd, DevEnv.WorkDir);
-            if (plan.Error != null) { Emit(1, plan.Error); Finish(line, plan.Error, 1); return; }
-            busy = true; cancelled = false;
-            Bg(() =>
-            {
-                // трогать можно только своё: контейнеры с меткой stazher и образы, скачанные в игре
-                foreach (var c in plan.Targets)
+            string id = (++jobNo).ToString() + "_" + Environment.TickCount;
+            jobId = id;
+            int code = -1; string newCwd = null; bool heldEmpty = false;
+            var r = RunStream(DevEnv.Docker, "exec -i " + DevEnv.Container + " stazher-run " + id + " " + DevEnv.ShellQuote(cwd), CommandTimeoutMs, cmd, true,
+                l =>
                 {
-                    var r = DevEnv.DockerCmd("inspect --format \"{{index .Config.Labels \\\"stazher\\\"}}\" " + c, 10000);
-                    if (r.Ok && r.Out.Trim() != "1") { busy = false; var msg = "Контейнер «" + c + "» создан не в игре — его не трогаем."; Emit(1, msg); Finish(line, msg, 1); return; }
-                }
-                foreach (var im in plan.ImageTargets)
-                    if (!OwnsImage(im)) { busy = false; var msg = "Образ «" + im + "» скачан не в игре — удалять его отсюда нельзя."; Emit(1, msg); Finish(line, msg, 1); return; }
-                var sb = new StringBuilder();
-                var res = RunStream(DevEnv.Docker, plan.ArgLine, CommandTimeoutMs, null, false,
-                    l => { sb.Append(l).Append('\n'); return true; }, l => { sb.Append(l).Append('\n'); return true; });
-                if (res.TimedOut) Emit(1, "Команда шла дольше " + (CommandTimeoutMs / 1000) + " с и была остановлена. Сервер в контейнере лучше запускать с -d.");
-                if (res.Ok && plan.PulledImage != null && ImagePulled != null) { var img = plan.PulledImage; Main(() => ImagePulled(img)); }
-                busy = false; proc = null;
-                Finish(line, sb.ToString(), res.Code);
-            });
+                    var m = Marker.Match(l);
+                    if (m.Success) { code = int.Parse(m.Groups[1].Value); newCwd = m.Groups[2].Value; heldEmpty = false; return false; }
+                    // пустую строку придерживаем: если за ней маркер — это служебный перевод строки, не показываем
+                    if (l.Length == 0 && !heldEmpty) { heldEmpty = true; return false; }
+                    if (heldEmpty) { heldEmpty = false; Emit(0, ""); sb.Append('\n'); }
+                    sb.Append(l).Append('\n'); return true;
+                },
+                l => { sb.Append(l).Append('\n'); return true; });
+            if (r.TimedOut) Emit(1, "Команда шла дольше " + (CommandTimeoutMs / 1000) + " с и была остановлена.");
+            if (newCwd != null && newCwd.StartsWith("/")) cwd = newCwd;
+            jobId = null;
+            return code >= 0 ? code : (r.Code != 0 ? r.Code : 1);
+        }
+
+        // docker на ПК через фильтр (вызывается в фоне); «docker … | grep …» — вывод docker уходит в песочницу
+        int DockerSegment(string seg, ref string cwd, StringBuilder sb)
+        {
+            int pipe = PipeAt(seg);
+            string dockerPart = pipe >= 0 ? seg.Substring(0, pipe).Trim() : seg, tail = pipe >= 0 ? seg.Substring(pipe + 1).Trim() : null;
+            var plan = DockerGuard.Plan(dockerPart, cwd, DevEnv.WorkDir);
+            if (plan.Error != null) { Emit(1, plan.Error); sb.Append(plan.Error).Append('\n'); return 1; }
+            // трогать можно только своё: контейнеры с меткой stazher и образы, скачанные или собранные в игре
+            foreach (var c in plan.Targets)
+            {
+                var r = DevEnv.DockerCmd("inspect --format \"{{index .Config.Labels \\\"stazher\\\"}}\" " + c, 10000);
+                if (r.Ok && r.Out.Trim() != "1") { var msg = "Контейнер «" + c + "» создан не в игре — его не трогаем."; Emit(1, msg); sb.Append(msg).Append('\n'); return 1; }
+            }
+            foreach (var im in plan.ImageTargets)
+            {
+                if (OwnsImage(im)) continue;
+                var r = DevEnv.DockerCmd("image inspect --format \"{{index .Config.Labels \\\"stazher\\\"}}\" " + im, 10000);
+                if (r.Ok && r.Out.Trim() == "1") continue;
+                var msg = r.Ok ? "Образ «" + im + "» скачан не в игре — удалять его отсюда нельзя." : "Образа «" + im + "» нет (docker images покажет, какие есть).";
+                Emit(1, msg); sb.Append(msg).Append('\n'); return 1;
+            }
+            var piped = new StringBuilder();
+            var res = RunStream(DevEnv.Docker, plan.ArgLine, CommandTimeoutMs, null, false,
+                l => { if (tail != null) { piped.Append(l).Append('\n'); return false; } sb.Append(l).Append('\n'); return true; },
+                l => { sb.Append(l).Append('\n'); return true; });
+            if (res.TimedOut) Emit(1, "Команда шла дольше " + (CommandTimeoutMs / 1000) + " с и была остановлена. Сервер в контейнере лучше запускать с -d.");
+            if (res.Ok && plan.PulledImage != null && ImagePulled != null) { var img = plan.PulledImage; Main(() => ImagePulled(img)); }
+            if (tail == null || cancelled) return res.Code == 0 ? 0 : (res.Code > 0 ? res.Code : 1);
+            // вывод docker → файл в песочнице → остаток конвейера
+            var w = DevEnv.Run(DevEnv.Docker, "exec -i " + DevEnv.Container + " sh -c \"cat > /tmp/stazher-pipe\"", 20000, piped.ToString());
+            if (!w.Ok) { var msg = "Не удалось передать вывод docker в песочницу: " + w.Text; Emit(1, msg); sb.Append(msg).Append('\n'); return 1; }
+            return SandboxSegment("cat /tmp/stazher-pipe | " + tail, ref cwd, sb);
         }
 
         public void Interrupt()

@@ -113,6 +113,7 @@ namespace Intern.Game
             var upcoming = new List<string>();
             foreach (var t in Path.Tasks) if (!Save.done.Contains(t.id)) upcoming.Add(t.id);
             Sprint.Plan(Save.day, Mathf.Min(GradeIdx, 3), upcoming);
+            EnsureSprintEnv();
             Persist(); UpdateBoard();
             Toast("Спринт " + Sprint.Number + ": цель — " + Sprint.Goal + " задач до пятницы. Доска задач — у Гены.");
         }
@@ -136,11 +137,11 @@ namespace Intern.Game
             if (!Sprint.Planned || (WeekSprint.Monday(Save.day) && Sprint.StartDay != Save.day)) PlanSprint();
         }
 
-        public string TopicTitleOf(TaskData t) { var tp = TopicOfAny(t); return tp != null ? tp.title : ""; }
+        public string TopicTitleOf(TaskData t) { if (t != null && t.scenario != null) return "Окружение · терминал"; var tp = TopicOfAny(t); return tp != null ? tp.title : ""; }
         public TaskData TaskById(string id)
         {
             if (TaskGen.IsSpec(id)) return GenTask(id);
-            return PathTask(id);
+            return PathTask(id) ?? EnvTaskById(id);
         }
 
         // ================== доска задач ==================

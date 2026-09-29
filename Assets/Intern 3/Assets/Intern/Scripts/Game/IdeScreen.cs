@@ -1786,7 +1786,10 @@ namespace Intern.Game
             {
                 switch (e.keyCode)
                 {
-                    case KeyCode.S: SaveCode(); RefreshStatus(); Notice("Сохранено: " + FileName(Task), "check", K.Green); return true;
+                    case KeyCode.S:
+                        SaveCode(); RefreshStatus(); Notice("Сохранено: " + FileName(Task), "check", K.Green);
+                        if (IsScenario && !EnvFileReadOnly) EnvCheckStep(false);   // файл сценария сохранён — может, шаг уже выполнен
+                        return true;
                     case KeyCode.Return: case KeyCode.KeypadEnter: CheckTask(); return true;
                     case KeyCode.B: rightBar.style.display = rightBar.style.display == DisplayStyle.None ? DisplayStyle.Flex : DisplayStyle.None; return true;
                 }

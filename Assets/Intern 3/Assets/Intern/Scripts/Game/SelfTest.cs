@@ -435,6 +435,11 @@ namespace Intern.Game
             T(DevEnv.ShellQuote("echo \"a b\"") == "\"echo \\\"a b\\\"\"", "ShellQuote: " + DevEnv.ShellQuote("echo \"a b\""));
             T(Shell.Marker.IsMatch("__STAZHER__0|/work/shop"), "маркер stazher-run");
             var df = DevEnv.SandboxDockerfile(); T(df.Contains("FROM ubuntu:24.04") && df.Contains("/usr/local/bin/stazher-run"), "Dockerfile песочницы");
+            // цепочки команд: docker — на ПК, остальное — в песочнице
+            var ch = Shell.SplitChain("cd /work && docker build -t x ./x || echo \"a && b\"; ls");
+            T(ch.Count == 4 && ch[0].Key == "" && ch[1].Key == "&&" && ch[2].Key == "||" && ch[3].Key == ";" && ch[2].Value == "echo \"a && b\"", "SplitChain: " + string.Join(" / ", ch.Select(c => c.Key + "[" + c.Value + "]").ToArray()));
+            T(Shell.PipeAt("docker logs site | grep GET") == 17 && Shell.PipeAt("echo 'a|b'") == -1 && Shell.PipeAt("a || b") == -1, "PipeAt");
+            T(P("docker rm -f stazher-sandbox").Error != null, "песочницу можно удалить командой");
             // «Что произошло»
             var exl = ShellExplain.Explain("cut -d' ' -f1 logs/access.log | sort | uniq -c | sort -rn | head -5");
             T(exl.Any(x => x.Contains("конвейер")) && exl.Any(x => x.Contains("uniq")) && exl.Any(x => x.Contains("-rn")), "объяснение конвейера: " + string.Join(" / ", exl.ToArray()));
@@ -462,7 +467,14 @@ namespace Intern.Game
                     T((st.check.kind != "last" && st.check.kind != "ips") || !string.IsNullOrEmpty(st.solve), w + "нет команды-решения");
                     if (st.check.kind == "last" && !string.IsNullOrEmpty(st.check.lastCmd) && st.solve != null)
                         T(System.Text.RegularExpressions.Regex.IsMatch(st.solve.Trim(), st.check.lastCmd), w + "решение не проходит last_cmd " + st.check.lastCmd);
-                    if (st.solve != null && st.solve.StartsWith("docker")) { var sp = P(st.solve); T(sp.Error == null, w + "фильтр не пропускает решение: " + sp.Error); }
+                    if (st.solve != null)
+                        foreach (var seg in Shell.SplitChain(st.solve))
+                            if (seg.Value.StartsWith("docker"))
+                            {
+                                int pi = Shell.PipeAt(seg.Value);
+                                var sp = P(pi >= 0 ? seg.Value.Substring(0, pi).Trim() : seg.Value);
+                                T(sp.Error == null, w + "фильтр не пропускает решение «" + seg.Value + "»: " + sp.Error);
+                            }
                     if (st.action != null) T(new[] { "docker-site", "docker-start", "build", "start" }.Contains(st.action), w + "неизвестное действие " + st.action);
                 }
             }

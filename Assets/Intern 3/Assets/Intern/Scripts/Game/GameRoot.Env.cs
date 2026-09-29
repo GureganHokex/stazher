@@ -101,6 +101,24 @@ namespace Intern.Game
         public bool EnvVisible { get { return EnvTasks.Count > 0 && (Tutorial == null || !Tutorial.Active || Tutorial.Step >= Tut.WorkTillEvening); } }
         public int EnvDoneCount { get { return EnvTasks.Count(EnvDone); } }
 
+        public TaskData EnvTaskById(string id) { return id != null && id.StartsWith("env-") ? EnvTasks.FirstOrDefault(t => t.id == id) : null; }
+
+        // Следующий сценарий, который стоит сделать: сначала миссия, потом по порядку
+        public TaskData EnvNext(TaskData except = null)
+        {
+            if (!EnvVisible) return null;
+            return EnvTasks.FirstOrDefault(t => t != except && EnvOpen(t) && !EnvDone(t));
+        }
+
+        // В спринте всегда одна карточка окружения: следующий непройденный сценарий (идёт в зачёт цели спринта)
+        void EnsureSprintEnv()
+        {
+            if (Sprint == null || !Sprint.Planned) return;
+            if (Sprint.Tasks.Any(id => { var t = EnvTaskById(id); return t != null && !EnvDone(t); })) return;
+            var nx = EnvNext();
+            if (nx != null && !Sprint.Tasks.Contains(nx.id)) Sprint.Tasks.Add(nx.id);
+        }
+
         public EnvProgress EnvProg(TaskData t, bool create)
         {
             foreach (var p in Save.envProgress) if (p.id == t.id) return p;
@@ -160,6 +178,8 @@ namespace Intern.Game
             Save.envDone.Add(t.id);
             Save.dayTasks++; Save.dayXp += xp; Save.dayMoney += reward;
             if (Work != null) Work.Activity(WorkKind.Solved);
+            if (Sprint != null && Sprint.Tasks.Contains(t.id)) Sprint.TaskDone(t.id);
+            EnsureSprintEnv();
             Persist(); UpdateBoard();
             Toast((t.scenario.mission ? "Окружение настроено! " : "Сценарий пройден! ") + "+" + xp + " XP" + (sated ? " (сытый +10%)" : "") + ", +" + reward + " монет" +
                   (got < reward ? ", из них " + (reward - got) + " в счёт долга Гене" : ""));
@@ -171,6 +191,7 @@ namespace Intern.Game
                 else Toast("Гена: " + line);
             }
             else if (EnvDoneCount == EnvTasks.Count) Toast("Все задачи окружения пройдены. Новые сценарии появятся в следующих обновлениях.");
+            else { var nx = EnvNext(t); if (nx != null) Toast("Гена: следующий сценарий — «" + nx.title + "». Он уже на доске спринта."); }
             AfterXp(oldLevel, oldRank);
         }
 
@@ -178,7 +199,8 @@ namespace Intern.Game
         void EnvAnnounce()
         {
             if (Save.envAnnounced || !EnvVisible || EnvMissionDone || (Tutorial != null && Tutorial.Active)) return;
-            Save.envAnnounced = true; Persist();
+            Save.envAnnounced = true;
+            EnsureSprintEnv(); UpdateBoard(); Persist();
             if (ideUi != null) ideUi.GameNotice("Гена: пора настроить окружение — терминал, Docker, песочница. Миссия «Настрой окружение» в проводнике IDE, раздел «Окружение».");
         }
 

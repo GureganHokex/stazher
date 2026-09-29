@@ -20,7 +20,7 @@ namespace Intern.Game
         string termInput = ""; int termCur, histPos = -1; string histDraft = "";
         Label termOut, termIn;
         int termShownVersion = -1;
-        bool termBlink = true, lastShellBusy; float termBlinkAt;
+        bool termBlink = true, lastShellBusy; float termBlinkAt, termOutAt;
         // сценарий
         string envFilePath; bool envFileMissing;
         bool envChecking, envPreparing, envViewBusy;
@@ -30,6 +30,7 @@ namespace Intern.Game
         float envProbeAt, dockerWaitUntil, cleanupConfirmUntil;
         int cleanupConfirm;                     // 1 — «Убрать за собой», 2 — «Удалить всё»: ждём второго нажатия
         EnvState seenState = (EnvState)(-1); bool seenUp;
+        float envRetryAt; int envRetrySeq;       // проверка Docker/HTTP сразу после команды бывает рано (контейнер ещё не упал/не поднялся) — повторим
         readonly HashSet<string> envHints = new HashSet<string>();    // «id:шаг» — подсказка открыта
         readonly HashSet<string> envSolves = new HashSet<string>();   // «id:шаг» — команда показана
         readonly Dictionary<string, int> envFails = new Dictionary<string, int>();
@@ -105,10 +106,12 @@ namespace Intern.Game
         void EnvUpdate()
         {
             var sh = g.Env; float now = Time.unscaledTime;
-            if (bottom == Bottom.Terminal && termOut != null && termShownVersion != g.EnvTermVersion) TermUpdateOut();
+            // большой вывод (сборка образа) перерисовываем не чаще 10 раз в секунду
+            if (bottom == Bottom.Terminal && termOut != null && termShownVersion != g.EnvTermVersion && now >= termOutAt) { TermUpdateOut(); termOutAt = now + 0.1f; }
             if (sh.Busy != lastShellBusy) { lastShellBusy = sh.Busy; TermUpdateIn(); RefreshStatus(); RefreshEditorFlags(); if (side == Side.Task) RefreshSide(); }
             if (termFocus && Active && now > termBlinkAt) { termBlink = !termBlink; termBlinkAt = now + 0.53f; TermUpdateIn(); }
             if (cleanupConfirm != 0 && now > cleanupConfirmUntil) { cleanupConfirm = 0; RefreshRight(); }
+            if (envRetryAt > 0f && now > envRetryAt) { envRetryAt = 0f; if (cmdSeq == envRetrySeq && !envChecking) EnvCheckStep(false, false, true); }
             if (!g.EnvOpen(Task)) return;
             // Docker запустился, песочница собрана или упала — перерисовать и сделать следующий шаг сам
             if (!sh.Probing && (sh.State != seenState || sh.ContainerUp != seenUp)) { seenState = sh.State; seenUp = sh.ContainerUp; EnvStateChanged(); }
@@ -166,7 +169,7 @@ namespace Intern.Game
         }
 
         // ======================= проверка шага =======================
-        void EnvCheckStep(bool manual)
+        void EnvCheckStep(bool manual, bool fromCommand = false, bool retry = false)
         {
             var t = Task; var st = CurStep; var sh = g.Env;
             if (t == null || Sc == null) return;
@@ -192,8 +195,9 @@ namespace Intern.Game
                 bool same = t == Task && CurStep == st;
                 if (same)
                 {
-                    if (ok) EnvStepPassed(st);
+                    if (ok) EnvStepPassed(st, fromCommand);
                     else if (manual) EnvFail(note ?? "Пока не выполнено.", true);
+                    else if (!retry && (c.kind == "host" || c.kind == "http")) { envRetryAt = Time.unscaledTime + 2.5f; envRetrySeq = cmdSeq; }
                     else if (c.kind == "ips" && note != null && !note.StartsWith("В выводе")) { envNote = note; RefreshSide(); }   // IP в выводе есть, но не те — подскажем сразу
                 }
                 RefreshEditorFlags(); RefreshStatus(); if (side == Side.Task && !ok) RefreshSide();
@@ -209,18 +213,21 @@ namespace Intern.Game
             if (side == Side.Task) RefreshSide();
         }
 
-        void EnvStepPassed(EnvStep st)
+        // fromCommand: шаг засчитала только что выполненная команда — следующий шаг может засчитать её же
+        // (docker logs после запуска упавшего контейнера закрывает и «запусти», и «почитай логи»)
+        void EnvStepPassed(EnvStep st, bool fromCommand = false)
         {
             int no = EnvStepNo, total = Sc.steps.Count;
             bool wasDone = g.IsDone(Task);
             envPassedExplain = st.explain; envNote = null;
             g.EnvAdvance(Task, envHints.Any(h => h.StartsWith(Task.id + ":")), Spent);
-            stepStartSeq = cmdSeq;
+            stepStartSeq = fromCommand ? cmdSeq - 1 : cmdSeq;
+            EnvRefreshView();
             if (no + 1 >= total)
                 Notice(wasDone ? "Сценарий пройден ещё раз — хорошая тренировка!" : Sc.mission ? "Миссия выполнена: окружение настроено!" : "Сценарий пройден!", "check", K.Green);
             else Notice("Шаг " + (no + 1) + " из " + total + " выполнен: " + st.title, "check", K.Green);
             RefreshAll();
-            if (no + 1 < total) EnvCheckStep(false);   // следующий шаг, может быть, уже сделан (Docker стоит, файл есть)
+            if (no + 1 < total) EnvCheckStep(false, fromCommand);   // следующий шаг, может быть, уже сделан (Docker стоит, файл есть)
         }
 
         // Команда в терминале закончилась (зовёт GameRoot, в главном потоке)
@@ -236,7 +243,7 @@ namespace Intern.Game
             EnvRefreshView();
             TermUpdateIn();
             RefreshRight(); RefreshStatus();
-            if (g.EnvOpen(Task) && !EnvFinished) EnvCheckStep(false);
+            if (g.EnvOpen(Task) && !EnvFinished) EnvCheckStep(false, true);
         }
 
         // ======================= действия шагов =======================
@@ -426,6 +433,7 @@ namespace Intern.Game
             bool ctrl = e.control || e.command;
             var sh = g.Env;
             if (e.keyCode == KeyCode.Escape) { escClosedAt = Time.frameCount; termFocus = false; ed.Active = Active; ed.Place(); TermUpdateIn(); return true; }
+            if (ctrl && e.shift && e.keyCode == KeyCode.C) { TermCopyLast(); return true; }
             if (ctrl && !e.alt)
             {
                 switch (e.keyCode)
@@ -510,6 +518,7 @@ namespace Intern.Game
                 case "help":
                     g.EnvEcho("<color=#9D9D9D>Это bash в песочнице (Ubuntu в Docker). Папка /work = Документы\\Стажёр\\work на твоём ПК, её же видит IDE.\n" +
                               "  Enter — выполнить, ↑/↓ — история, Tab — дополнить имя файла, Ctrl+C — прервать, Ctrl+L или clear — очистить.\n" +
+                              "  Ctrl+Shift+C или copy — скопировать вывод последней команды, Ctrl+V — вставить.\n" +
                               "  docker … — идёт в Docker на твоём ПК через фильтр игры: только безопасные команды, порты — на 127.0.0.1.\n" +
                               "  Интерактивные программы (vim, nano, top, less) здесь не открываются: файлы правь в IDE.</color>\n");
                     return true;
@@ -520,11 +529,21 @@ namespace Intern.Game
                         g.EnvEcho(sb.ToString());
                         return true;
                     }
+                case "copy": TermCopyLast(); return true;
                 case "exit": case "logout":
                     g.EnvEcho("<color=#9D9D9D>Терминал закрывать не нужно: выйти из-за компьютера — Esc (сначала кликни в редактор).</color>\n");
                     return true;
             }
             return false;
+        }
+
+        // Ctrl+Shift+C или copy: вывод последней команды — в буфер обмена (вставить в IDE, чат, заметки)
+        void TermCopyLast()
+        {
+            var last = g.Env.Last;
+            if (last == null || string.IsNullOrEmpty(last.cmd)) { Notice("Ещё нечего копировать: выполни команду.", "md"); return; }
+            GUIUtility.systemCopyBuffer = "$ " + last.cmd + "\n" + (last.output ?? "").TrimEnd('\n');
+            Notice("Вывод «" + (last.cmd.Length > 40 ? last.cmd.Substring(0, 40) + "…" : last.cmd) + "» скопирован в буфер обмена.", "check", K.Green);
         }
 
         // Tab: дополнить имя файла или команды (compgen в песочнице)
