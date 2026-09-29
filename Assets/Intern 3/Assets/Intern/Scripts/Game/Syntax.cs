@@ -12,10 +12,10 @@ using UnityEngine;
 
 namespace Intern.Game
 {
-    public static class Syntax
+    public static partial class Syntax
     {
         // ================= языки =================
-        public static readonly string[] Languages = { "python", "javascript", "typescript", "jsx", "tsx", "sql", "yaml", "bash", "dockerfile", "html", "css", "nginx", "hcl", "promql", "text" };
+        public static readonly string[] Languages = { "python", "javascript", "typescript", "jsx", "tsx", "sql", "yaml", "bash", "dockerfile", "html", "css", "nginx", "hcl", "promql", "java", "csharp", "go", "cpp", "rust", "kotlin", "swift", "php", "text" };
 
         // Каноническое имя языка: «js» → javascript, «tf» → hcl…; null, пустое и неизвестное — «text» (без подсветки)
         public static string Norm(string lang)
@@ -24,7 +24,8 @@ namespace Intern.Game
             switch (lang)
             {
                 case "python": case "javascript": case "typescript": case "jsx": case "tsx": case "sql": case "yaml": case "bash":
-                case "dockerfile": case "html": case "css": case "nginx": case "hcl": case "promql": case "text": return lang;
+                case "dockerfile": case "html": case "css": case "nginx": case "hcl": case "promql": case "text":
+                case "java": case "csharp": case "go": case "cpp": case "rust": case "kotlin": case "swift": case "php": return lang;
             }
             switch (lang.Trim().ToLowerInvariant())
             {
@@ -42,6 +43,14 @@ namespace Intern.Game
                 case "nginx": case "nginxconf": return "nginx";
                 case "hcl": case "terraform": case "tf": return "hcl";
                 case "promql": case "prometheus": return "promql";
+                case "java": return "java";
+                case "c#": case "cs": case "csharp": case "dotnet": return "csharp";
+                case "go": case "golang": return "go";
+                case "c++": case "cpp": case "cc": case "cxx": case "hpp": case "c": case "h": return "cpp";
+                case "rust": case "rs": return "rust";
+                case "kotlin": case "kt": case "kts": return "kotlin";
+                case "swift": return "swift";
+                case "php": return "php";
                 default: return "text";
             }
         }
@@ -65,6 +74,7 @@ namespace Intern.Game
             {
                 case "python": case "yaml": case "bash": case "dockerfile": case "nginx": case "promql": case "hcl": return "#";
                 case "javascript": case "typescript": case "jsx": case "tsx": return "//";
+                case "java": case "csharp": case "go": case "cpp": case "rust": case "kotlin": case "swift": case "php": return "//";
                 case "sql": return "--";
                 default: return null;
             }
@@ -75,7 +85,8 @@ namespace Intern.Game
             switch (Norm(lang))
             {
                 case "html": open = "<!--"; close = "-->"; return true;
-                case "css": case "javascript": case "typescript": case "jsx": case "tsx": case "hcl": case "sql": open = "/*"; close = "*/"; return true;
+                case "css": case "javascript": case "typescript": case "jsx": case "tsx": case "hcl": case "sql":
+                case "java": case "csharp": case "go": case "cpp": case "rust": case "kotlin": case "swift": case "php": open = "/*"; close = "*/"; return true;
                 default: open = close = null; return false;
             }
         }
@@ -86,7 +97,7 @@ namespace Intern.Game
             if (char.IsLetterOrDigit(c) || c == '_') return true;
             switch (Norm(lang))
             {
-                case "javascript": case "typescript": case "jsx": case "tsx": return c == '$';
+                case "javascript": case "typescript": case "jsx": case "tsx": case "php": return c == '$';
                 case "css": case "html": case "yaml": case "hcl": return c == '-';
                 default: return false;
             }
@@ -99,6 +110,7 @@ namespace Intern.Game
             switch (Norm(lang))
             {
                 case "javascript": case "typescript": case "jsx": case "tsx": case "css": case "hcl": case "nginx": case "bash": case "sql": case "promql": case "html": return true;
+                case "java": case "csharp": case "go": case "cpp": case "rust": case "kotlin": case "swift": case "php": return true;
                 default: return false;
             }
         }
@@ -123,6 +135,7 @@ namespace Intern.Game
                 case "nginx": Nginx(s, r, ref state); break;
                 case "hcl": Hcl(s, r, ref state); break;
                 case "promql": Prom(s, r); state = null; break;
+                case "java": case "csharp": case "go": case "cpp": case "rust": case "kotlin": case "swift": case "php": CLike(Norm(lang), s, r, ref state); break;
                 default: state = null; break;
             }
             return r;
@@ -1298,6 +1311,7 @@ namespace Intern.Game
                 case "nginx": return (string[])NginxDirectives.Clone();
                 case "hcl": return (string[])HclKwList.Clone();
                 case "promql": return Concat(PromKw);
+                case "java": case "csharp": case "go": case "cpp": case "rust": case "kotlin": case "swift": case "php": return CLikeKeywords(Norm(lang));
                 default: return new string[0];
             }
         }

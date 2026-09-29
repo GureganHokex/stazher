@@ -128,6 +128,82 @@ namespace Intern.Game
 
         static string Short(string s, int n) { return s.Length > n ? s.Substring(0, n - 1) + "…" : s; }
 
+        // ---------- задачи без запуска (спринт 9) ----------
+        // Вывод сравнивается строка в строку; пробелы в конце строк и пустые строки в конце не важны
+        public static string NormOut(string s)
+        {
+            var lines = (s ?? "").Replace("\r\n", "\n").Replace("\r", "\n").Split('\n').Select(l => l.TrimEnd()).ToList();
+            while (lines.Count > 0 && lines[lines.Count - 1].Length == 0) lines.RemoveAt(lines.Count - 1);
+            return string.Join("\n", lines.ToArray());
+        }
+
+        public static bool Predict(TaskData t, string answer, out string note)
+        {
+            note = null;
+            string want = NormOut(t.output), got = NormOut(answer);
+            if (want == got) return true;
+            var wl = want.Split('\n'); var gl = got.Length == 0 ? new string[0] : got.Split('\n');
+            if (gl.Length == 0) { note = "Впиши вывод программы."; return false; }
+            for (int i = 0; i < Math.Min(wl.Length, gl.Length); i++)
+                if (wl[i] != gl[i]) { note = "Строка " + (i + 1) + " не совпадает." + (wl[i].Trim() == gl[i].Trim() ? " Проверь пробелы в начале строки." : ""); return false; }
+            note = "Строк в выводе " + wl.Length + ", а у тебя " + gl.Length + ".";
+            return false;
+        }
+
+        public static bool ClozeOne(ClozeBlank b, string v)
+        {
+            v = (v ?? "").Trim();
+            if (v.Length == 0 || b == null) return false;
+            foreach (var a in b.answers) if (a.Trim() == v) return true;
+            if (!string.IsNullOrEmpty(b.regex))
+                try { return Regex.IsMatch(v, "^(?:" + b.regex + ")$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)); } catch (Exception) { }
+            return false;
+        }
+
+        // Код с подставленными ответами (null — эталонные); пустой пропуск показывается как ‹N›
+        public static string ClozeCode(TaskData t, IList<string> vals)
+        {
+            string code = t.starter ?? "";
+            int n = t.blanks != null ? t.blanks.Count : 0;
+            for (int i = 0; i < n; i++)
+            {
+                string v = vals == null ? (t.blanks[i].answers.Length > 0 ? t.blanks[i].answers[0] : "") : i < vals.Count ? vals[i] : "";
+                code = code.Replace("[[" + (i + 1) + "]]", string.IsNullOrEmpty(v) ? "‹" + (i + 1) + "›" : v);
+            }
+            return code;
+        }
+
+        public static bool IndentMatters(string lang) { lang = Syntax.Norm(lang); return lang == "python" || lang == "yaml"; }
+        public static int IndentOf(string line, int width) { int n = 0; while (n < line.Length && line[n] == ' ') n++; return width > 0 ? n / width : 0; }
+
+        // «Собери код»: строки игрока (текст без отступа и уровень отступа) против эталона и допустимых порядков
+        public static bool Parsons(TaskData t, IList<KeyValuePair<string, int>> sol, out string note)
+        {
+            note = null;
+            int w = Syntax.IndentWidth(t.language); bool ind = IndentMatters(t.language);
+            var cands = new List<string[]> { t.lines ?? new string[0] };
+            if (t.alternatives != null) cands.AddRange(t.alternatives);
+            string best = null; int bestGood = -1;
+            foreach (var c in cands)
+            {
+                int good = 0; bool ok = c.Length == sol.Count;
+                for (int i = 0; i < Math.Min(c.Length, sol.Count); i++)
+                {
+                    bool same = c[i].Trim() == sol[i].Key.Trim() && (!ind || IndentOf(c[i], w) == sol[i].Value);
+                    if (same && good == i) good++;
+                    if (!same) ok = false;
+                }
+                if (ok) return true;
+                if (good > bestGood) { bestGood = good; best = good < c.Length && good < sol.Count ? (c[good].Trim() == sol[good].Key.Trim() ? "отступ" : "строка") : c.Length > sol.Count ? "мало" : "много"; }
+            }
+            var distr = new HashSet<string>((t.distractors ?? new string[0]).Select(x => x.Trim()));
+            if (sol.Any(x => distr.Contains(x.Key.Trim()) && !(t.lines ?? new string[0]).Any(l => l.Trim() == x.Key.Trim()))) { note = "В решении есть лишняя строка — она не нужна в этой программе."; return false; }
+            note = best == "мало" ? "Не хватает строк: собраны не все." : best == "много" ? "Строк больше, чем нужно." :
+                   best == "отступ" ? "Строка " + (bestGood + 1) + " на месте, но с неверным отступом." :
+                   bestGood == 0 ? "Первая строка не та." : "Верно начало (" + bestGood + " стр.), дальше — не то.";
+            return false;
+        }
+
         // Ввод первого теста для «Запустить» (JS): первый тест целиком
         public static List<object> FirstTest(TaskData t)
         {

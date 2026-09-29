@@ -145,25 +145,42 @@ namespace Intern.Game
         [NonSerialized] public string srcId, genKind;    // genKind: fix — «Почини баг», ask — «Что вернёт код?»
         // задачи-сценарии в песочнице Docker (спринт 7): Resources/Tasks/env.json
         [NonSerialized] public EnvScenario scenario;
+        // задачи без запуска (спринт 9): predict — эталон вывода; parsons — строки в верном порядке и лишние;
+        // cloze — ответы на пропуски [[1]], [[2]]…; clickbug — строка с багом (варианты «что не так» — options)
+        [NonSerialized] public string output;
+        [NonSerialized] public string[] lines, distractors;
+        [NonSerialized] public List<string[]> alternatives;
+        [NonSerialized] public List<ClozeBlank> blanks;
+        [NonSerialized] public int bugLine;
+        [NonSerialized] public List<object> requirements;   // ts: регулярки по исходнику (типы), формат как у static
+        [NonSerialized] public bool warmup;                  // разминка: вне пути, всегда открыта
 
         public bool IsChoice { get { return options != null && options.Length > 0; } }
-        // Как проверяется: choice | py | js | sql | static | scenario
+        public bool IsClickBug { get { return IsChoice && bugLine > 0; } }
+        // Как проверяется: choice | py | js | ts | sql | static | scenario | predict | cloze | parsons
         public string Mode
         {
             get
             {
                 if (type == "scenario") return "scenario";
+                if (type == "predict") return "predict";
+                if (type == "cloze") return "cloze";
+                if (type == "parsons") return "parsons";
                 if (IsChoice) return "choice";
                 switch (language)
                 {
                     case "python": return "py";
                     case "javascript": return "js";
+                    case "typescript": return string.IsNullOrEmpty(entry) ? "static" : "ts";
                     case "sql": return "sql";
                     default: return "static";
                 }
             }
         }
     }
+
+    // Пропуск в задаче «Заполни пропуск»: верные варианты (сравнение без пробелов по краям) или регулярка
+    public class ClozeBlank { public string[] answers = new string[0]; public string regex; }
 
     [Serializable]
     public class TaskFile { public string language; public TaskData[] tasks = new TaskData[0]; }
@@ -203,6 +220,7 @@ namespace Intern.Game
         public bool firstPerson;
         public bool hasCharacter;
         public string profession = "";   // backend frontend devops fullstack
+        public string language = "";     // основной язык (спринт 9): python javascript typescript…; пусто — по профессии
         public int xp;
         public int version;              // 2 — id задач из направлений, 3 — рабочий день
 

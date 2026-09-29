@@ -32,8 +32,9 @@ namespace Intern.Game
         UiBtn pauseCamera;
         readonly List<VisualElement> pauseDiffPills = new List<VisualElement>();
         readonly List<VisualElement> pauseProfPills = new List<VisualElement>();
-        Label pauseProfDesc;
-        string newProf = "backend";
+        Label pauseProfDesc, pauseLangDesc;
+        VisualElement pauseLangRow;
+        string newProf = "backend", newLang = "python";
         ScrollBox settingsScroll;
         readonly List<VisualElement> tabPills = new List<VisualElement>();
 
@@ -370,6 +371,12 @@ def deploy(env=""staging""):
             var grid = K.Box(true); grid.style.flexWrap = Wrap.Wrap; grid.style.justifyContent = Justify.SpaceBetween; grid.pickingMode = PickingMode.Ignore; grid.style.marginTop = 4f;
             foreach (var pid in Professions.Ids) grid.Add(ProfessionCard(pid));
             menuNew.Add(grid);
+            if (newProf != "fullstack")
+            {
+                var ll = SectionLabel("ОСНОВНОЙ ЯЗЫК"); ll.style.marginTop = 18f; menuNew.Add(ll);
+                menuNew.Add(LangRow(Languages.For(newProf), newLang, id => { newLang = id; RefreshMenu(); }));
+                var ld = K.T(Languages.About(newLang), 14f, Muted, false, false, true); ld.style.marginTop = 6f; menuNew.Add(ld);
+            }
             var dl = SectionLabel("СЛОЖНОСТЬ — МОЖНО ПОМЕНЯТЬ В ПАУЗЕ"); dl.style.marginTop = 18f; menuNew.Add(dl);
             var seg = K.Box(true); seg.style.marginTop = 8f; seg.style.backgroundColor = Well; K.Radius(seg, 12f); K.Pad(seg, 4f); Border(seg, Line, 1f);
             string[] mults = { "×1.0", "×1.2", "×1.6" };
@@ -397,7 +404,7 @@ def deploy(env=""staging""):
             }
             var row = K.Box(true); row.pickingMode = PickingMode.Ignore; row.style.marginTop = 8f;
             var back = new UiBtn("Назад", () => CloseNewGame(), Ghost, GhostHover, GhostLip, Muted, null, null, 58f, false, true); back.style.width = 150f; back.style.marginRight = 12f;
-            var go = new UiBtn("Начать: " + Professions.Name(newProf), () => g.UiNewGame((Difficulty)newDiff, newProf), Sun, SunHover, SunLip, Ink, "play", null, 58f, true); K.Grow(go);
+            var go = new UiBtn("Начать: " + Professions.Name(newProf) + (newProf != "fullstack" ? " · " + Languages.Name(newLang) : ""), () => g.UiNewGame((Difficulty)newDiff, newProf, newLang), Sun, SunHover, SunLip, Ink, "play", null, 58f, true); K.Grow(go);
             row.Add(back); row.Add(go); menuNew.Add(row);
         }
 
@@ -428,7 +435,7 @@ def deploy(env=""staging""):
             {
                 c.RegisterCallback<PointerEnterEvent>(e => { if (newProf != id) c.style.backgroundColor = Ghost; });
                 c.RegisterCallback<PointerLeaveEvent>(e => { c.style.backgroundColor = newProf == id ? CardHi : Well; });
-                c.RegisterCallback<ClickEvent>(e => { newProf = id; RefreshMenu(); });
+                c.RegisterCallback<ClickEvent>(e => { newProf = id; newLang = Languages.Valid(id, newLang); RefreshMenu(); });
             }
             return c;
         }
@@ -437,6 +444,7 @@ def deploy(env=""staging""):
         {
             newGamePage = true; newDiff = g.HasProgress ? g.Save.difficulty : 0;
             newProf = g.HasProgress && Career.CanPick(g.Profession) ? g.Profession : "backend";
+            newLang = g.HasProgress ? Languages.Valid(newProf, g.Language) : Languages.Default(newProf);
             menuCard.parent.style.width = 700f;
             RefreshMenu(); Pop(menuCard);
         }
@@ -502,6 +510,9 @@ def deploy(env=""staging""):
             }
             pauseCard.Add(pseg);
             pauseProfDesc = K.T("", 13f, Muted, false, false, true); pauseProfDesc.style.marginTop = 6f; pauseCard.Add(pauseProfDesc);
+            var ll = SectionLabel("ОСНОВНОЙ ЯЗЫК — ПРОГРЕСС СОХРАНЯЕТСЯ"); ll.style.marginTop = 14f; pauseCard.Add(ll);
+            pauseLangRow = K.Box(); pauseLangRow.pickingMode = PickingMode.Ignore; pauseCard.Add(pauseLangRow);
+            pauseLangDesc = K.T("", 13f, Muted, false, false, true); pauseLangDesc.style.marginTop = 6f; pauseCard.Add(pauseLangDesc);
 
             var sep = K.Box(); sep.pickingMode = PickingMode.Ignore; sep.style.height = 1f; sep.style.backgroundColor = Line; sep.style.marginTop = 18f; sep.style.marginBottom = 2f; pauseCard.Add(sep);
             var row = K.Box(true); row.pickingMode = PickingMode.Ignore;
@@ -513,6 +524,32 @@ def deploy(env=""staging""):
         }
 
         static Label SectionLabel(string s) { var l = K.B(s, 12f, Muted); l.style.letterSpacing = 1.5f; return l; }
+
+        // Ряд «таблеток» языков: готовые выбираются, остальные — с пометкой, когда появятся
+        VisualElement LangRow(List<LangInfo> langs, string current, Action<string> pick)
+        {
+            var seg = K.Box(true); seg.style.marginTop = 8f; seg.style.backgroundColor = Well; K.Radius(seg, 12f); K.Pad(seg, 4f); Border(seg, Line, 1f); seg.style.flexWrap = Wrap.Wrap;
+            foreach (var l in langs)
+            {
+                var li = l;
+                bool sel = l.id == current;
+                var pill = K.Box(true); K.Grow(pill); pill.style.height = 40f; K.Radius(pill, 9f); pill.style.justifyContent = Justify.Center; pill.style.alignItems = Align.Center; K.Pad(pill, 0f, 10f, 0f, 10f);
+                pill.style.backgroundColor = sel ? Sun : Color.clear;
+                if (!l.ready) pill.style.opacity = 0.5f;
+                pill.Add(K.B(l.name, 15f, sel ? Ink : Text));
+                if (!l.ready) { var sl = K.T("скоро", 11f, Muted); sl.style.marginLeft = 6f; pill.Add(sl); }
+                pill.RegisterCallback<PointerEnterEvent>(e => { if (li.id != current && li.ready) pill.style.backgroundColor = Ghost; });
+                pill.RegisterCallback<PointerLeaveEvent>(e => { pill.style.backgroundColor = li.id == current ? Sun : Color.clear; });
+                pill.RegisterCallback<ClickEvent>(e =>
+                {
+                    if (li.ready) { pick(li.id); return; }
+                    if (pauseLangDesc != null && pauseLangDesc.panel != null) pauseLangDesc.text = li.name + ": " + Languages.About(li.id);
+                    g.Toast(li.name + " — " + Languages.About(li.id));
+                });
+                seg.Add(pill);
+            }
+            return seg;
+        }
 
         void RefreshPause()
         {
@@ -528,6 +565,10 @@ def deploy(env=""staging""):
                 var ic = pill.Q<Icon>(); if (ic != null) ic.Set(can ? Professions.Icon(id) : "lock", sel ? Ink : Text);
             }
             pauseProfDesc.text = Professions.About(g.Profession) + " Сдано " + g.DoneCount + " из " + g.TotalCount + ".";
+            pauseLangRow.Clear();
+            bool fs = g.Profession == "fullstack";
+            if (!fs) pauseLangRow.Add(LangRow(Languages.For(g.Profession), g.Language, id => { if (g.UiSetLanguage(id)) RefreshPause(); }));
+            pauseLangDesc.text = fs ? "Fullstack опирается на языки пройденных направлений." : Languages.About(g.Language);
             pauseCamera.SetTitle(g.FirstPerson ? "Камера: от первого лица" : "Камера: от третьего лица");
             for (int i = 0; i < pauseDiffPills.Count; i++)
             {

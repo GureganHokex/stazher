@@ -3,6 +3,7 @@
  "roadmap": [
   {
    "topic_id": "be-py-basics",
+   "lang": "python",
    "title": "Python: переменные, ввод и вывод",
    "grade": "junior",
    "requires": [
@@ -13,6 +14,7 @@
   },
   {
    "topic_id": "be-py-control",
+   "lang": "python",
    "title": "Python: условия и циклы",
    "grade": "junior",
    "requires": [
@@ -23,6 +25,7 @@
   },
   {
    "topic_id": "be-py-collections",
+   "lang": "python",
    "title": "Python: списки, словари, множества",
    "grade": "junior",
    "requires": [
@@ -33,6 +36,7 @@
   },
   {
    "topic_id": "be-py-functions",
+   "lang": "python",
    "title": "Python: функции",
    "grade": "junior",
    "requires": [
@@ -43,6 +47,7 @@
   },
   {
    "topic_id": "be-py-oop",
+   "lang": "python",
    "title": "Python: ООП",
    "grade": "junior",
    "requires": [
@@ -53,6 +58,7 @@
   },
   {
    "topic_id": "be-py-exceptions",
+   "lang": "python",
    "title": "Python: исключения",
    "grade": "junior",
    "requires": [

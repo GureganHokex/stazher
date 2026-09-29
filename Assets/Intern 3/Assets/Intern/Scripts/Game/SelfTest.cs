@@ -32,7 +32,10 @@ namespace Intern.Game
             sb.AppendLine("Стажёр " + Application.version + " · самопроверка " + started.ToString("yyyy-MM-dd HH:mm:ss"));
             sb.AppendLine("SQLite: " + (SqlRun.Available ? SqlRun.Library + " " + SqlRun.Version : "НЕТ — " + SqlRun.LoadError));
             var counts = new Dictionary<string, int>();
-            foreach (var track in Tracks.All)
+            var files = Tracks.All.ToList();
+            foreach (var l in Languages.All) if (Tracks.LoadOptional("lang-" + l.id) != null) files.Add("lang-" + l.id);   // ветки языков (спринт 9)
+            if (Tracks.LoadOptional("warmup") != null) files.Add("warmup");
+            foreach (var track in files)
             {
                 var data = Tracks.Load(track);
                 foreach (var tp in data.topics)
@@ -53,12 +56,16 @@ namespace Intern.Game
             }
             foreach (var p in new[] { "backend", "frontend", "devops", "fullstack" })
             {
-                var path = Tracks.BuildPath(p);
-                var done = new HashSet<string>(); int steps = 0;
-                for (var cur = path.Current(done); cur != null && steps < 5000; cur = path.Current(done)) { done.Add(cur.id); steps++; }
-                bool pathOk = steps == path.Tasks.Length && path.Complete(done);
-                if (!pathOk) fail++;
-                sb.AppendLine("путь " + p + ": задач " + path.Tasks.Length + ", пройдено " + steps + (pathOk ? " — ок" : " — ТУПИК"));
+                var langs = Languages.For(p).Where(l => l.ready).Select(l => l.id).ToList();
+                if (langs.Count == 0) langs.Add(Languages.Default(p));
+                foreach (var lang in langs)
+                {
+                    string why;
+                    var path = Tracks.BuildPath(p, lang);
+                    bool pathOk = PathOk(path, p, lang, out why);
+                    if (!pathOk) fail++;
+                    sb.AppendLine("путь " + p + "/" + lang + ": задач " + path.Tasks.Length + (pathOk ? " — ок" : " — " + why));
+                }
             }
             var wd = WorkdaySim();
             foreach (var line in wd) { fail++; sb.AppendLine("FAIL рабочий день: " + line); }
@@ -506,13 +513,121 @@ namespace Intern.Game
             public string HostPath(string p) { return p; }
         }
 
-        static string Check(TaskData t)
+        // Путь проходится до конца, зависимости есть в пути, в пути нет тем чужой ветки языка
+        public static bool PathOk(TrackPath path, string profession, string lang, out string why)
+        {
+            why = null;
+            var done = new HashSet<string>(); int steps = 0;
+            for (var cur = path.Current(done); cur != null && steps < 5000; cur = path.Current(done)) { done.Add(cur.id); steps++; }
+            if (steps != path.Tasks.Length || !path.Complete(done)) { why = "ТУПИК: пройдено " + steps; return false; }
+            var ids = new HashSet<string>(path.Topics.Select(tp => tp.id));
+            var lost = path.Topics.SelectMany(tp => tp.requires).Where(r => !ids.Contains(r)).ToList();
+            if (lost.Count > 0) { why = "зависимости вне пути: " + string.Join(", ", lost.ToArray()); return false; }
+            if (profession != "fullstack")
+            {
+                var alien = path.Topics.Where(tp => !string.IsNullOrEmpty(tp.lang) && tp.lang != lang).Select(tp => tp.id).ToList();
+                if (alien.Count > 0) { why = "темы чужой ветки: " + string.Join(", ", alien.ToArray()); return false; }
+            }
+            return true;
+        }
+
+        // Синтаксис кода задачи без запуска: null — ок
+        static string SyntaxOf(string lang, string code)
+        {
+            switch (Syntax.Norm(lang))
+            {
+                case "python":
+                    try { Parser.ParseProgram(code); return null; } catch (PyError e) { return e.Message; }
+                case "javascript": { var e = JsRun.SyntaxCheck(code); return e == null ? null : e.Text; }
+                case "typescript": { var e = JsRun.SyntaxCheck(TsStrip.Strip(code)); return e == null ? null : e.Text; }
+                default: return null;
+            }
+        }
+
+        // Вывод программы «Что выведет?» настоящим движком игры; null — язык без запуска
+        static string OutputOf(string lang, string code, out string err)
+        {
+            err = null;
+            switch (Syntax.Norm(lang))
+            {
+                case "python": { var r = PyRun.Run(code, null); if (r.Error != null) err = r.Error.Message; return r.Printed; }
+                case "javascript":
+                case "typescript":
+                    {
+                        var r = JsRun.RunFull(Syntax.Norm(lang) == "typescript" ? TsStrip.Strip(code) : code);
+                        if (r.Error != null) err = r.Error.Text; return r.Output;
+                    }
+                default: return null;
+            }
+        }
+
+        public static string Check(TaskData t)
         {
             switch (t.Mode)
             {
                 case "choice":
                     if (t.answer == null || t.answer.Length == 0 || t.answer.Any(a => a < 0 || a >= t.options.Length)) return "неверные индексы ответа";
+                    if (t.type == "clickbug" || t.IsClickBug)
+                    {
+                        int n = (t.starter ?? "").Replace("\r\n", "\n").Split('\n').Length;
+                        if (t.bugLine < 1 || t.bugLine > n) return "bug_line " + t.bugLine + " вне кода (строк " + n + ")";
+                        var se = SyntaxOf(t.language, t.starter);
+                        if (se != null) return "код с багом не разбирается: " + se;
+                    }
                     return TaskChecks.Choice(t, t.answer.ToList()).Correct ? null : "эталонный ответ не принят";
+                case "predict":
+                    {
+                        if (string.IsNullOrEmpty(t.output)) return "нет эталона вывода";
+                        string err, got = OutputOf(t.language, t.starter, out err);
+                        if (err != null) return "программа упала: " + err;
+                        string note;
+                        if (got != null && !TaskChecks.Predict(t, got, out note)) return "вывод движка игры не совпал с эталоном (" + note + "): " + got.Replace("\n", "⏎");
+                        return TaskChecks.Predict(t, t.output, out note) ? null : "эталон не принят: " + note;
+                    }
+                case "cloze":
+                    {
+                        if (t.blanks == null || t.blanks.Count == 0) return "нет пропусков";
+                        for (int i = 0; i < t.blanks.Count; i++)
+                        {
+                            var b = t.blanks[i];
+                            if (!(t.starter ?? "").Contains("[[" + (i + 1) + "]]")) return "в коде нет метки [[" + (i + 1) + "]]";
+                            if (b.answers.Length == 0 && string.IsNullOrEmpty(b.regex)) return "пропуск " + (i + 1) + " без ответа";
+                            if (b.answers.Length > 0 && !TaskChecks.ClozeOne(b, b.answers[0])) return "пропуск " + (i + 1) + ": эталон не принят";
+                            if (TaskChecks.ClozeOne(b, "___")) return "пропуск " + (i + 1) + ": принимает что угодно";
+                        }
+                        if (t.starter.Contains("[[" + (t.blanks.Count + 1) + "]]")) return "меток больше, чем пропусков";
+                        var se = SyntaxOf(t.language, TaskChecks.ClozeCode(t, null));
+                        return se == null ? null : "код с ответами не разбирается: " + se;
+                    }
+                case "parsons":
+                    {
+                        if (t.lines == null || t.lines.Length < 2) return "мало строк";
+                        int w = Syntax.IndentWidth(t.language);
+                        Func<string[], List<KeyValuePair<string, int>>> sol = ls => ls.Select(l => new KeyValuePair<string, int>(l.Trim(), TaskChecks.IndentOf(l, w))).ToList();
+                        string note;
+                        if (!TaskChecks.Parsons(t, sol(t.lines), out note)) return "эталон не принят: " + note;
+                        if (t.alternatives != null)
+                            foreach (var a in t.alternatives) if (!TaskChecks.Parsons(t, sol(a), out note)) return "допустимый порядок не принят: " + note;
+                        if (TaskChecks.Parsons(t, sol(t.lines.Reverse().ToArray()), out note)) return "обратный порядок принят";
+                        if (TaskChecks.IndentMatters(t.language) && t.lines.Any(l => TaskChecks.IndentOf(l, w) > 0)
+                            && TaskChecks.Parsons(t, t.lines.Select(l => new KeyValuePair<string, int>(l.Trim(), 0)).ToList(), out note)) return "код без отступов принят";
+                        var trimmed = new HashSet<string>(t.lines.Select(l => l.Trim()));
+                        if ((t.distractors ?? new string[0]).Any(x => trimmed.Contains(x.Trim()))) return "лишняя строка совпадает с нужной";
+                        var se = SyntaxOf(t.language, string.Join("\n", t.lines));
+                        return se == null ? null : "собранный код не разбирается: " + se;
+                    }
+                case "ts":
+                    {
+                        var r = JsRun.Check(TsStrip.Strip(t.solution ?? ""), t.entry, t.testCases);
+                        if (!r.AllPassed) { JsError e; var cr = TaskChecks.FromJs(r, out e); return "эталон не прошёл: " + string.Join(" | ", cr.Where(x => !x.Passed).Select(x => x.Note).ToArray()); }
+                        if (t.requirements != null && t.requirements.Count > 0)
+                        {
+                            var rq = TaskChecks.Static(t.solution, t.requirements);
+                            if (rq.Any(x => !x.Passed)) return "эталон не выполняет требования: " + string.Join(" | ", rq.Where(x => !x.Passed).Select(x => x.InputsText).ToArray());
+                            if (TaskChecks.Static(t.starter, t.requirements).All(x => x.Passed)) return "заготовка выполняет все требования";
+                        }
+                        return JsRun.Check(TsStrip.Strip(t.starter ?? ""), t.entry, t.testCases).AllPassed ? "заготовка проходит тесты" : null;
+                    }
                 case "static":
                     {
                         var good = TaskChecks.Static(t.solution, t.testCases);

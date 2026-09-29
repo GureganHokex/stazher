@@ -74,6 +74,9 @@ namespace Intern.Game
         }
         public string Profession { get { return string.IsNullOrEmpty(Save.profession) ? "backend" : Save.profession; } }
         public string ProfessionName { get { return Professions.Name(Profession); } }
+        // основной язык (спринт 9): ветка языка в пути; для Fullstack своего выбора нет
+        public string Language { get { return Languages.Valid(Profession, Save.language); } }
+        public string LanguageName { get { return Languages.Name(Language); } }
         public int GradeIdx { get { return Path.GradeIndex(Done); } }          // 0..3, 4 — направление пройдено
         public bool PathComplete { get { return GradeIdx >= 4; } }
         // после конца пути вместо грейда — титул по уровню (Middle → Senior 30 → Lead 40 → Principal 50 → Architect 60)
@@ -82,10 +85,10 @@ namespace Intern.Game
 
         void LoadPath()
         {
-            Path = Tracks.BuildPath(Profession);
+            Path = Tracks.BuildPath(Profession, Language);
             Tasks = new TaskFile { language = Profession, tasks = Path.Tasks };
             ResetGenCache();
-            Debug.Log("[Стажёр] Направление " + Profession + ": тем " + Path.Topics.Count + ", задач " + Path.Tasks.Length + ", грейд " + RankName);
+            Debug.Log("[Стажёр] Направление " + Profession + " · " + Language + ": тем " + Path.Topics.Count + ", задач " + Path.Tasks.Length + ", грейд " + RankName);
         }
 
         // Старые сохранения (15 задач Python, id py01…) → задачи направления Backend
@@ -224,7 +227,7 @@ namespace Intern.Game
         public void Persist() { if (FiredReport == null) Progress.Save(Save); }
 
         public bool IsUnlocked(int i) { return i >= 0 && i < Tasks.tasks.Length && Path.TaskOpen(Tasks.tasks[i], Done); }
-        public bool IsOpen(TaskData t) { return Path.TaskOpen(t, Done); }
+        public bool IsOpen(TaskData t) { return t != null && (t.warmup || Path.TaskOpen(t, Done)); }
         public bool IsDone(TaskData t) { return t != null && (t.scenario != null ? EnvDone(t) : Done.Contains(t.id) || GenDone(t)); }
 
         public TaskData CurrentTaskPublic { get { return CurrentTask; } }
@@ -911,7 +914,8 @@ namespace Intern.Game
         {
             if (fresh)
             {
-                Progress.Wipe(); Save = new SaveData { version = 6, profession = Career.CanPick(profession) && !string.IsNullOrEmpty(profession) ? profession : "backend" };
+                Progress.Wipe(); Save = new SaveData { version = 7, profession = Career.CanPick(profession) && !string.IsNullOrEmpty(profession) ? profession : "backend" };
+                Save.language = Languages.Valid(Save.profession, newGameLang); newGameLang = null;
                 WorkDay.Reset(Save);
                 LoadPath();
                 SetupWork();
@@ -928,7 +932,7 @@ namespace Intern.Game
             if (!Sprint.Planned) PlanSprint();
             if (leadWalker != null) leadWalker.ResetHome();
             if (Work.Ended) dayOverPending = true;
-            if (fresh) Toast("Направление: " + ProfessionName + ". Начинаем с общей базы — грейд «Стажёр».");
+            if (fresh) Toast("Направление: " + ProfessionName + (Profession != "fullstack" ? ", язык " + LanguageName : "") + ". Начинаем с общей базы — грейд «Стажёр».");
             if (fresh || !Save.hasCharacter) { OpenWardrobe(true); return; }
             player.Teleport(refs.spawn.position, refs.spawn.eulerAngles.y);
             player.FaceCameraYaw(refs.spawn.eulerAngles.y);
@@ -1298,13 +1302,29 @@ namespace Intern.Game
         public void UiContinue() { StartGame((Difficulty)Save.difficulty, false); }
         public void UiNewGame(Difficulty d) { StartGame(d, true, "backend"); }
         public void UiNewGame(Difficulty d, string profession) { StartGame(d, true, profession); }
+        public void UiNewGame(Difficulty d, string profession, string language) { newGameLang = language; StartGame(d, true, profession); }
+        string newGameLang;
+
+        // Смена основного языка: ветка языка в пути меняется, сданное остаётся засчитанным
+        public bool UiSetLanguage(string lang)
+        {
+            var l = Languages.Get(lang);
+            if (l == null || !l.ready || lang == Language || Languages.Valid(Profession, lang) != lang) return false;
+            if (ideUi != null && ideUi.Task != null) ideUi.Close();
+            Save.language = lang; Persist();
+            LoadPath(); EnsureDaily(true); UpdateBoard();
+            ide = new IdeWindow(this);
+            if (ideUi != null && CurrentTask != null) ideUi.Open(CurrentTask);
+            Toast("Основной язык: " + LanguageName + ". " + RankName + ", сдано " + DoneCount + " из " + TotalCount + ".");
+            return true;
+        }
 
         // Смена направления посреди игры: сданные задачи (и общая база) остаются засчитанными
         public bool UiSetProfession(string p)
         {
             if (p == Profession || !Career.CanPick(p)) return false;
             if (ideUi != null && ideUi.Task != null) ideUi.Close();
-            Save.profession = p; Persist();
+            Save.profession = p; Save.language = Languages.Valid(p, Save.language); Persist();
             LoadPath(); EnsureDaily(true); UpdateBoard();
             ide = new IdeWindow(this);
             if (ideUi != null && CurrentTask != null) ideUi.Open(CurrentTask);

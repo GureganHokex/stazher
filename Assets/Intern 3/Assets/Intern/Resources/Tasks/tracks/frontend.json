@@ -33,6 +33,7 @@
   },
   {
    "topic_id": "fe-js-basics",
+   "lang": "javascript",
    "title": "JavaScript: основы",
    "grade": "junior",
    "requires": [
@@ -43,6 +44,7 @@
   },
   {
    "topic_id": "fe-js-closures-this",
+   "lang": "javascript",
    "title": "Замыкания и this",
    "grade": "junior",
    "requires": [
@@ -53,6 +55,7 @@
   },
   {
    "topic_id": "fe-js-async",
+   "lang": "javascript",
    "title": "Промисы и async/await",
    "grade": "junior",
    "requires": [

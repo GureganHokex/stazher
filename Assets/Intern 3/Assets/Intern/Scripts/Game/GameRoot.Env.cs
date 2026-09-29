@@ -23,6 +23,7 @@ namespace Intern.Game
             if (Save.envDone == null) Save.envDone = new List<string>();
             if (Save.envProgress == null) Save.envProgress = new List<EnvProgress>();
             if (Save.envImages == null) Save.envImages = new List<string>();
+            if (string.IsNullOrEmpty(Save.language)) Save.language = Languages.Default(Save.profession);   // спринт 9: язык по профессии
             if (Save.version >= 7) return;
             Save.version = 7;
             if (Progress.HasSave()) Progress.Save(Save);

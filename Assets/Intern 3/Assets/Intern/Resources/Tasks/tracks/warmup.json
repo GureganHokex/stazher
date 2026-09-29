@@ -1,0 +1,490 @@
+{
+ "track": "warmup",
+ "roadmap": [
+  {
+   "topic_id": "warmup-python",
+   "lang": "python",
+   "title": "Разминка: Python",
+   "grade": "intern",
+   "requires": [],
+   "description": "Задачи без написания кода: вывод, пропуски, сборка из строк, поиск бага.",
+   "theory": "Разминка — короткие задачи без написания кода. Они не входят в путь и не двигают грейд, зато тренируют главное умение разработчика: читать чужой код.\n\n• «Что выведет?» — прочитай программу и впиши вывод построчно.\n• «Заполни пропуск» — впиши недостающие слова в код.\n• «Собери код» — расставь строки в нужном порядке (в Python важны и отступы), лишние строки не бери.\n• «Кликни по багу» — найди строку с ошибкой и объясни, что с ней не так.\n\nЗа каждую задачу — немного опыта и монет. Сдать можно в любой момент рабочего дня."
+  },
+  {
+   "topic_id": "warmup-javascript",
+   "lang": "javascript",
+   "title": "Разминка: JavaScript",
+   "grade": "intern",
+   "requires": [],
+   "description": "Задачи без написания кода: вывод, пропуски, сборка из строк, поиск бага.",
+   "theory": "Разминка — короткие задачи без написания кода. Они не входят в путь и не двигают грейд, зато тренируют главное умение разработчика: читать чужой код.\n\n• «Что выведет?» — прочитай программу и впиши вывод построчно.\n• «Заполни пропуск» — впиши недостающие слова в код.\n• «Собери код» — расставь строки в нужном порядке (в Python важны и отступы), лишние строки не бери.\n• «Кликни по багу» — найди строку с ошибкой и объясни, что с ней не так.\n\nЗа каждую задачу — немного опыта и монет. Сдать можно в любой момент рабочего дня."
+  },
+  {
+   "topic_id": "warmup-typescript",
+   "lang": "typescript",
+   "title": "Разминка: TypeScript",
+   "grade": "intern",
+   "requires": [],
+   "description": "Задачи без написания кода: вывод, пропуски, сборка из строк, поиск бага.",
+   "theory": "Разминка — короткие задачи без написания кода. Они не входят в путь и не двигают грейд, зато тренируют главное умение разработчика: читать чужой код.\n\n• «Что выведет?» — прочитай программу и впиши вывод построчно.\n• «Заполни пропуск» — впиши недостающие слова в код.\n• «Собери код» — расставь строки в нужном порядке (в Python важны и отступы), лишние строки не бери.\n• «Кликни по багу» — найди строку с ошибкой и объясни, что с ней не так.\n\nЗа каждую задачу — немного опыта и монет. Сдать можно в любой момент рабочего дня."
+  }
+ ],
+ "tasks": [
+  {
+   "task_id": "wu-py-01",
+   "topic_id": "warmup-python",
+   "grade": "intern",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «Разомнёмся. Срезы списков путают даже те, кто пишет на Python годами.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "language": "python",
+    "code": "items = [\"лампа\", \"стол\", \"стул\", \"полка\"]\nprint(len(items))\nprint(items[1:3])\nprint(items[-1])\nprint(items[::2])",
+    "output": "4\n['стол', 'стул']\nполка\n['лампа', 'стул']"
+   },
+   "explanation": "Срез items[1:3] берёт элементы с индексами 1 и 2 — правая граница не входит. Отрицательный индекс считает с конца, а шаг 2 берёт каждый второй элемент.",
+   "hints": [
+    "Индексы начинаются с 0.",
+    "В срезе a[i:j] элемент j не входит."
+   ],
+   "title": "Срезы списков"
+  },
+  {
+   "task_id": "wu-py-02",
+   "topic_id": "warmup-python",
+   "grade": "intern",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "story": "Ира: «В отчёте странные числа. Посчитай в уме, что выведет код.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "language": "python",
+    "code": "total = 0\nfor price in [100, 250, 50]:\n    if price > 60:\n        total += price\nprint(f\"Итого: {total}\")\nprint(total // 3, total % 3)\nprint(7 / 2)",
+    "output": "Итого: 350\n116 2\n3.5"
+   },
+   "explanation": "В сумму попали 100 и 250: 50 не больше 60. // — целочисленное деление, % — остаток, а обычное / в Python 3 всегда даёт дробное число.",
+   "hints": [
+    "Какие цены проходят условие price > 60?",
+    "// и % — целая часть и остаток от деления."
+   ],
+   "title": "Сумма и деление"
+  },
+  {
+   "task_id": "wu-py-03",
+   "topic_id": "warmup-python",
+   "grade": "intern",
+   "type": "cloze",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «Склад отдаёт остатки словарём. Допиши проверку наличия так, чтобы неизвестный товар не ронял код.»",
+   "content": {
+    "question": "Заполни пропуски: безопасно достань остаток из словаря и пройди по всем товарам.",
+    "language": "python",
+    "code": "stock = {\"лампа\": 3, \"стол\": 0}\n\ndef in_stock(name):\n    return stock.[[1]](name, 0) > 0\n\nfor name in [[2]]:\n    print(name, in_stock(name))\nprint(in_stock(\"диван\"))",
+    "blanks": [
+     {
+      "answer": [
+       "get"
+      ]
+     },
+     {
+      "answer": [
+       "stock",
+       "stock.keys()"
+      ]
+     }
+    ]
+   },
+   "explanation": "dict.get(ключ, 0) возвращает 0 для отсутствующего ключа вместо KeyError. Цикл for по словарю идёт по ключам, поэтому подходит и stock, и stock.keys().",
+   "hints": [
+    "Метод словаря, который принимает значение по умолчанию.",
+    "По словарю можно пройти циклом for напрямую."
+   ],
+   "title": "Остатки на складе"
+  },
+  {
+   "task_id": "wu-py-04",
+   "topic_id": "warmup-python",
+   "grade": "intern",
+   "type": "parsons",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «Собери функцию подсчёта чётных чисел. В Python отступы — часть кода, не забудь про них.»",
+   "content": {
+    "question": "Собери функцию count_even: сколько чётных чисел в списке. Отступы важны: ⇥ и ⇤ меняют уровень строки.",
+    "language": "python",
+    "lines": [
+     "def count_even(numbers):",
+     "    count = 0",
+     "    for n in numbers:",
+     "        if n % 2 == 0:",
+     "            count += 1",
+     "    return count"
+    ],
+    "distractors": [
+     "        if n % 2 == 1:",
+     "    return n"
+    ]
+   },
+   "explanation": "Счётчик заводят до цикла, увеличивают внутри if, а return стоит на уровне тела функции — после цикла. Если сдвинуть return внутрь цикла, функция вернётся на первом же числе.",
+   "hints": [
+    "Сначала объявление функции, потом счётчик.",
+    "return — на одном уровне с for, а не внутри него."
+   ],
+   "title": "Подсчёт чётных"
+  },
+  {
+   "task_id": "wu-py-05",
+   "topic_id": "warmup-python",
+   "grade": "intern",
+   "type": "clickbug",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "story": "Ира: «Средний балл занижен: для [4, 5, 3] получается 2.67 вместо 4. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "language": "python",
+    "code": "def average(scores):\n    total = 0\n    for i in range(1, len(scores)):\n        total += scores[i]\n    return total / len(scores)\n\nprint(average([4, 5, 3]))",
+    "bug_line": 3,
+    "options": [
+     "range начинается с 1: первая оценка не попадает в сумму",
+     "Делить нужно на len(scores) - 1",
+     "total нужно объявить внутри цикла",
+     "Деление / нужно заменить на //"
+    ],
+    "correct_answer": 0
+   },
+   "explanation": "range(1, n) начинается с индекса 1, и scores[0] пропускается — классическая ошибка «на единицу». Проще всего писать for s in scores: total += s или вообще sum(scores).",
+   "hints": [
+    "С какого индекса начинается список?",
+    "Посчитай, какие элементы попадают в сумму."
+   ],
+   "title": "Заниженный средний балл"
+  },
+  {
+   "task_id": "wu-js-01",
+   "topic_id": "warmup-javascript",
+   "grade": "intern",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Марина: «Вопрос с собеседования: приведение типов в JavaScript. Что напечатает код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "language": "javascript",
+    "code": "console.log(1 + \"2\");\nconsole.log(\"5\" - 2);\nconsole.log(0 == \"\");\nconsole.log(0 === \"\");\nconsole.log(typeof null);",
+    "output": "12\n3\ntrue\nfalse\nobject"
+   },
+   "explanation": "Плюс со строкой склеивает, а минус всегда приводит к числу. == сравнивает с приведением типов (0 и пустая строка равны), === — без приведения. typeof null — известная историческая ошибка языка: \"object\".",
+   "hints": [
+    "+ со строкой — это склейка.",
+    "=== не приводит типы, == — приводит."
+   ],
+   "title": "Приведение типов"
+  },
+  {
+   "task_id": "wu-js-02",
+   "topic_id": "warmup-javascript",
+   "grade": "intern",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «Методы массивов — хлеб фронтенда. Что выведет код?»",
+   "content": {
+    "question": "Что напечатает программа? Массивы node печатает как [ 1, 2 ].",
+    "language": "javascript",
+    "code": "const prices = [120, 80, 300, 45];\nconst cheap = prices.filter((p) => p < 100);\nconsole.log(cheap);\nconsole.log(prices.map((p) => p * 2).slice(0, 2));\nconsole.log(prices.reduce((sum, p) => sum + p, 0));\nconsole.log(prices.length);",
+    "output": "[ 80, 45 ]\n[ 240, 160 ]\n545\n4"
+   },
+   "explanation": "filter оставляет подходящие элементы, map создаёт новый массив, slice(0, 2) берёт первые два, reduce сворачивает массив в одно число. Исходный prices при этом не меняется.",
+   "hints": [
+    "filter и map не меняют исходный массив.",
+    "slice(0, 2) — элементы с индексами 0 и 1."
+   ],
+   "title": "Методы массивов"
+  },
+  {
+   "task_id": "wu-js-03",
+   "topic_id": "warmup-javascript",
+   "grade": "intern",
+   "type": "cloze",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «Корзина: нужны названия товаров и сумма. Допиши методы массивов.»",
+   "content": {
+    "question": "Заполни пропуски: получи массив названий и сумму цен.",
+    "language": "javascript",
+    "code": "const cart = [\n  { title: \"Лампа\", price: 1990 },\n  { title: \"Стол\", price: 7490 },\n];\nconst titles = cart.[[1]]((item) => item.title);\nconst sum = cart.[[2]]((acc, item) => acc + item.price, 0);\nconsole.log(titles.join(\", \"), sum);",
+    "blanks": [
+     {
+      "answer": [
+       "map"
+      ]
+     },
+     {
+      "answer": [
+       "reduce"
+      ]
+     }
+    ]
+   },
+   "explanation": "map превращает каждый товар в его название, reduce копит сумму, начиная с 0.",
+   "hints": [
+    "Метод, который превращает каждый элемент в новое значение.",
+    "Метод, который сворачивает массив в одно значение."
+   ],
+   "title": "Названия и сумма корзины"
+  },
+  {
+   "task_id": "wu-js-04",
+   "topic_id": "warmup-javascript",
+   "grade": "intern",
+   "type": "parsons",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "story": "Стас: «Нужна статистика слов в отзывах. Собери функцию из строк.»",
+   "content": {
+    "question": "Собери функцию countWords: объект «слово → сколько раз встретилось».",
+    "language": "javascript",
+    "lines": [
+     "function countWords(text) {",
+     "  const words = text.trim().split(\" \");",
+     "  const counts = {};",
+     "  for (const w of words) {",
+     "    counts[w] = (counts[w] || 0) + 1;",
+     "  }",
+     "  return counts;",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "function countWords(text) {",
+      "  const counts = {};",
+      "  const words = text.trim().split(\" \");",
+      "  for (const w of words) {",
+      "    counts[w] = (counts[w] || 0) + 1;",
+      "  }",
+      "  return counts;",
+      "}"
+     ]
+    ],
+    "distractors": [
+     "  for (let i = 0; i <= words.length; i++) {",
+     "  return words;"
+    ]
+   },
+   "explanation": "counts[w] || 0 даёт 0 для слова, которого ещё нет в объекте. Две строки с const можно поменять местами — они не зависят друг от друга, поэтому засчитываются оба порядка.",
+   "hints": [
+    "Сначала подготовь слова и пустой объект.",
+    "Внутри цикла увеличь счётчик слова."
+   ],
+   "title": "Статистика слов"
+  },
+  {
+   "task_id": "wu-js-05",
+   "topic_id": "warmup-javascript",
+   "grade": "intern",
+   "type": "clickbug",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "story": "Ира: «Админка не пускает админа: hasAdmin всегда false. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "language": "javascript",
+    "code": "function hasAdmin(users) {\n  users.forEach((u) => {\n    if (u.role === \"admin\") return true;\n  });\n  return false;\n}\n\nconsole.log(hasAdmin([{ role: \"admin\" }]));",
+    "bug_line": 3,
+    "options": [
+     "return внутри колбэка forEach не выходит из hasAdmin",
+     "=== нужно заменить на ==",
+     "У forEach нет параметра u",
+     "return false должен стоять первым"
+    ],
+    "correct_answer": 0
+   },
+   "explanation": "return в стрелочной функции завершает только колбэк, а forEach игнорирует результат. Нужен users.some((u) => u.role === \"admin\") или обычный цикл for…of.",
+   "hints": [
+    "Из какой функции выходит этот return?",
+    "Есть метод массива, который отвечает «есть ли хоть один такой элемент»."
+   ],
+   "title": "Админа не пускает"
+  },
+  {
+   "task_id": "wu-ts-01",
+   "topic_id": "warmup-typescript",
+   "grade": "intern",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Марина: «Необязательные поля и ?? встречаются на каждом шагу. Что напечатает код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "language": "typescript",
+    "code": "interface User {\n    name: string;\n    city?: string;\n}\n\nconst users: User[] = [{ name: \"Гена\", city: \"Казань\" }, { name: \"Ира\" }];\nfor (const u of users) {\n    console.log(u.name + \": \" + (u.city ?? \"город не указан\"));\n}\nconsole.log(users.length);",
+    "output": "Гена: Казань\nИра: город не указан\n2"
+   },
+   "explanation": "Поле city? может отсутствовать — тогда оно undefined. Оператор ?? подставляет значение справа только для null и undefined.",
+   "hints": [
+    "У Иры поля city нет.",
+    "?? срабатывает на null и undefined."
+   ],
+   "title": "Необязательный город"
+  },
+  {
+   "task_id": "wu-ts-02",
+   "topic_id": "warmup-typescript",
+   "grade": "intern",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «enum в TypeScript — это ещё и настоящий объект в рантайме. Что выведет код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "language": "typescript",
+    "code": "enum Level {\n    Intern,\n    Junior,\n    Middle,\n}\n\nconst me: Level = Level.Junior;\nconsole.log(me);\nconsole.log(Level[me]);\nconsole.log(Level.Middle > me);",
+    "output": "1\nJunior\ntrue"
+   },
+   "explanation": "Числовой enum нумерует значения с нуля: Intern = 0, Junior = 1, Middle = 2. Обратный доступ Level[1] возвращает имя «Junior» — TypeScript создаёт объект в обе стороны.",
+   "hints": [
+    "Значения enum по умолчанию — 0, 1, 2…",
+    "Level[число] даёт имя значения."
+   ],
+   "title": "enum уровней"
+  },
+  {
+   "task_id": "wu-ts-03",
+   "topic_id": "warmup-typescript",
+   "grade": "intern",
+   "type": "cloze",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Марина: «Функция форматирует и строки, и числа. Допиши тип и проверку.»",
+   "content": {
+    "question": "Заполни пропуски: объединение типов и сужение через проверку типа.",
+    "language": "typescript",
+    "code": "function format(value: string [[1]] number): string {\n    if ([[2]] value === \"number\") {\n        return value.toFixed(2);\n    }\n    return value.trim();\n}\n\nconsole.log(format(3.14159));\nconsole.log(format(\"  привет  \"));",
+    "blanks": [
+     {
+      "answer": [
+       "|"
+      ]
+     },
+     {
+      "answer": [
+       "typeof"
+      ]
+     }
+    ]
+   },
+   "explanation": "string | number — объединение: value может быть любым из двух типов. Проверка typeof value === \"number\" сужает тип: внутри if TypeScript знает, что это число, и разрешает toFixed, а после — что это строка.",
+   "hints": [
+    "«Или то, или другое» в типах пишут вертикальной чертой.",
+    "Оператор, который возвращает имя типа во время выполнения."
+   ],
+   "title": "Строка или число"
+  },
+  {
+   "task_id": "wu-ts-04",
+   "topic_id": "warmup-typescript",
+   "grade": "intern",
+   "type": "parsons",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «Собери список незакрытых задач с типами.»",
+   "content": {
+    "question": "Собери код: интерфейс задачи и функция, которая возвращает названия незакрытых задач.",
+    "language": "typescript",
+    "lines": [
+     "interface Task {",
+     "  title: string;",
+     "  done: boolean;",
+     "}",
+     "function openTasks(tasks: Task[]): string[] {",
+     "  return tasks.filter((t) => !t.done).map((t) => t.title);",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "interface Task {",
+      "  done: boolean;",
+      "  title: string;",
+      "}",
+      "function openTasks(tasks: Task[]): string[] {",
+      "  return tasks.filter((t) => !t.done).map((t) => t.title);",
+      "}"
+     ]
+    ],
+    "distractors": [
+     "  done: string;",
+     "function openTasks(tasks: Task[]): Task {"
+    ]
+   },
+   "explanation": "Сначала описываем форму задачи, потом функцию. filter оставляет незакрытые, map берёт названия — получается string[]. Порядок полей в интерфейсе не важен.",
+   "hints": [
+    "done — это да или нет.",
+    "Функция возвращает названия, то есть массив строк."
+   ],
+   "title": "Незакрытые задачи"
+  },
+  {
+   "task_id": "wu-ts-05",
+   "topic_id": "warmup-typescript",
+   "grade": "intern",
+   "type": "clickbug",
+   "difficulty": 1,
+   "xp_reward": 10,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "story": "Ира: «Бейдж «Самый дорогой» висит на самом дешёвом товаре. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "language": "typescript",
+    "code": "interface Product {\n    title: string;\n    price: number;\n}\n\nfunction mostExpensive(items: Product[]): Product {\n    let best = items[0];\n    for (const p of items) {\n        if (p.price < best.price) best = p;\n    }\n    return best;\n}",
+    "bug_line": 9,
+    "options": [
+     "Знак сравнения перевёрнут: функция ищет самый дешёвый товар",
+     "best нужно объявить через const",
+     "Цикл for…of не подходит для массивов",
+     "Тип результата должен быть Product[]"
+    ],
+    "correct_answer": 0
+   },
+   "explanation": "Условие p.price < best.price заменяет лучший товар более дешёвым. Для максимума нужно >. Типы тут не помогут: оба варианта одинаково корректны для компилятора — такие баги ловят тесты.",
+   "hints": [
+    "Что делает условие: ищет больше или меньше?",
+    "Для максимума best меняют на товар подороже."
+   ],
+   "title": "Самый дорогой товар"
+  }
+ ]
+}

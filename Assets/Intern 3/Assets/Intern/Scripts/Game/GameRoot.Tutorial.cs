@@ -141,7 +141,7 @@ namespace Intern.Game
         public TaskData TaskById(string id)
         {
             if (TaskGen.IsSpec(id)) return GenTask(id);
-            return PathTask(id) ?? EnvTaskById(id);
+            return PathTask(id) ?? EnvTaskById(id) ?? WarmupTaskById(id);
         }
 
         // ================== доска задач ==================

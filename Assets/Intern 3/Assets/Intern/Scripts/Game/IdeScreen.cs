@@ -84,7 +84,7 @@ namespace Intern.Game
         string TMode { get { return Task != null ? Task.Mode : "py"; } }
         bool IsPy { get { return TMode == "py"; } }
         bool IsChoice { get { return TMode == "choice"; } }
-        bool IsJs { get { return TMode == "js"; } }
+        bool IsJs { get { return TMode == "js" || TMode == "ts"; } }   // TypeScript идёт тем же путём, со стиранием типов
         bool IsSql { get { return TMode == "sql"; } }
         bool IsStatic { get { return TMode == "static"; } }
         bool IsScenario { get { return TMode == "scenario"; } }
@@ -136,6 +136,8 @@ namespace Intern.Game
                 case "nginx": return "nginx.conf";
                 case "hcl": return "main.tf";
                 case "promql": return "query.promql";
+                case "java": return "Main.java"; case "go": return "main.go"; case "csharp": return "Program.cs"; case "cpp": return "main.cpp";
+                case "rust": return "main.rs"; case "kotlin": return "Main.kt"; case "swift": return "main.swift"; case "php": return "index.php";
                 default: return t.type == "incident" ? "incident.log" : t.type == "find_bug" ? "debug.log" : "notes.txt";
             }
         }
@@ -149,6 +151,7 @@ namespace Intern.Game
                 case "python": return ".py"; case "javascript": return ".js"; case "typescript": return ".ts"; case "tsx": return ".tsx"; case "jsx": return ".jsx";
                 case "sql": return ".sql"; case "yaml": return ".yaml"; case "dockerfile": return ".dockerfile"; case "bash": return ".sh"; case "html": return ".html";
                 case "css": return ".css"; case "nginx": return ".conf"; case "hcl": return ".tf"; case "promql": return ".promql";
+                case "java": return ".java"; case "go": return ".go"; case "csharp": return ".cs"; case "cpp": return ".cpp"; case "rust": return ".rs"; case "kotlin": return ".kt"; case "swift": return ".swift"; case "php": return ".php";
                 default: return t.type == "incident" || t.type == "find_bug" ? ".log" : ".txt";
             }
         }
@@ -160,6 +163,7 @@ namespace Intern.Game
                 case "python": return "Python 3"; case "javascript": return "JavaScript"; case "typescript": return "TypeScript"; case "tsx": return "TypeScript JSX";
                 case "jsx": return "JavaScript JSX"; case "sql": return "SQL (SQLite)"; case "yaml": return "YAML"; case "dockerfile": return "Dockerfile"; case "bash": return "Bash";
                 case "html": return "HTML"; case "css": return "CSS"; case "nginx": return "Nginx"; case "hcl": return "Terraform"; case "promql": return "PromQL";
+                case "java": return "Java"; case "go": return "Go"; case "csharp": return "C#"; case "cpp": return "C++"; case "rust": return "Rust"; case "kotlin": return "Kotlin"; case "swift": return "Swift"; case "php": return "PHP";
                 default: return "Текст";
             }
         }
@@ -182,6 +186,14 @@ namespace Intern.Game
                 case "nginx": text = "NGX"; col = Pal.Hex("3BB273"); break;
                 case "hcl": text = "TF"; col = Pal.Hex("9C7BEA"); break;
                 case "promql": text = "PQL"; col = Pal.Hex("E6522C"); break;
+                case "java": text = "JAVA"; col = Pal.Hex("E76F00"); break;
+                case "go": text = "GO"; col = Pal.Hex("00ADD8"); break;
+                case "csharp": text = "C#"; col = Pal.Hex("9B4F96"); break;
+                case "cpp": text = "C++"; col = Pal.Hex("659AD2"); break;
+                case "rust": text = "RS"; col = Pal.Hex("DEA584"); break;
+                case "kotlin": text = "KT"; col = Pal.Hex("A97BFF"); break;
+                case "swift": text = "SW"; col = Pal.Hex("F05138"); break;
+                case "php": text = "PHP"; col = Pal.Hex("777BB4"); break;
                 default: text = "TXT"; col = K.Muted; break;
             }
         }
@@ -197,6 +209,10 @@ namespace Intern.Game
                 case "incident": shortName = "INC"; name = "ИНЦИДЕНТ"; col = K.Red; break;
                 case "estimation": shortName = "EST"; name = "ОЦЕНКА"; col = K.Sun; break;
                 case "scenario": shortName = "ENV"; name = "ОКРУЖЕНИЕ"; col = EnvColor; break;
+                case "predict": shortName = "OUT"; name = "ЧТО ВЫВЕДЕТ?"; col = K.Blue; break;
+                case "cloze": shortName = "GAP"; name = "ЗАПОЛНИ ПРОПУСК"; col = K.Purple; break;
+                case "parsons": shortName = "ORD"; name = "СОБЕРИ КОД"; col = K.Orange; break;
+                case "clickbug": shortName = "BUG"; name = "КЛИКНИ ПО БАГУ"; col = K.Brand; break;
                 default: shortName = "DEV"; name = "КОД"; col = K.Green; break;
             }
         }
@@ -206,6 +222,11 @@ namespace Intern.Game
         {
             if (!unlocked) return new Icon("lock", K.Dim, size);
             if (t.type == "scenario") return new Icon("terminal", EnvColor, size);
+            if (t.type == "predict" || t.type == "cloze" || t.type == "parsons" || t.type == "clickbug")
+            {
+                string sn, nm; Color cc; TypeInfo(t.type, out sn, out nm, out cc);
+                var bl = K.T(sn, 9f, cc, true, true); bl.style.width = size + 8f; bl.style.unityTextAlign = TextAnchor.MiddleCenter; bl.style.marginLeft = -4f; bl.style.marginRight = -4f; return bl;
+            }
             if (!t.IsChoice && t.language == "python") return new Icon("py", Color.white, size);
             string txt; Color col;
             if (t.IsChoice) { string nm; TypeInfo(t.type, out txt, out nm, out col); }
@@ -559,18 +580,19 @@ namespace Intern.Game
             SetText(statusMode, mode);
             var col = dbg != null ? K.StatusDebug : K.Status;
             if (statusBar.style.backgroundColor.value != col) statusBar.style.backgroundColor = col;
-            bool dirty = !IsChoice && Code != savedCode && !(IsScenario && EnvFileReadOnly);
+            bool dirty = !IsChoice && !IsNoRun && Code != savedCode && !(IsScenario && EnvFileReadOnly);
             tabDot.style.display = dirty ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         void RefreshEditorFlags()
         {
-            ed.ReadOnly = dbg != null || IsChoice || (IsScenario && EnvFileReadOnly);
+            ed.ReadOnly = dbg != null || IsChoice || IsNoRun || (IsScenario && EnvFileReadOnly);
             if (dbg != null)
             {
                 bool stopped = dbg.Paused || dbg.Finished;
                 ed.DebugLine = stopped ? dbg.Line : -1; ed.DebugIsError = dbg.Finished && dbg.Error != null;
             }
+            else if (IsClickBug && BugPick > 0) { ed.DebugLine = BugPick; ed.DebugIsError = g.IsDone(Task) ? false : choiceVerdict != null && !choiceOk; }
             else { ed.DebugLine = -1; ed.DebugIsError = false; }
             if (IsPy && lint != null) { ed.ErrorLine = lint.Line; ed.ErrorText = ErrorPlain(lint); }
             else if (IsJs && jsLint != null && jsLint.Line > 0) { ed.ErrorLine = jsLint.Line; ed.ErrorText = jsLint.Text; }
@@ -580,11 +602,11 @@ namespace Intern.Game
             if (dbg != null) SetText(debugState, dbg.Finished ? (dbg.Error != null ? "упала с ошибкой" : "завершилась") : dbg.Paused ? "пауза · строка " + dbg.Line : "выполняется…");
             bool busy = (dbg != null && !dbg.Finished) || Busy;   // завершившуюся отладку кнопки закрывают сами
             runBtn.Enabled = !busy; resetBtn.Enabled = !busy;
-            checkBtn.Enabled = !busy && !(IsChoice && Task != null && (Picks.Count == 0 || g.IsDone(Task))) && !(IsScenario && (envChecking || EnvFinished));
+            checkBtn.Enabled = !busy && !(IsChoice && Task != null && (Picks.Count == 0 || g.IsDone(Task))) && !(IsScenario && (envChecking || EnvFinished)) && !(IsNoRun && g.IsDone(Task));
             runBtn.style.display = dbg != null || !CanRun ? DisplayStyle.None : DisplayStyle.Flex;
             debugBtn.style.display = dbg != null || !IsPy ? DisplayStyle.None : DisplayStyle.Flex;
-            resetBtn.style.display = IsChoice ? DisplayStyle.None : DisplayStyle.Flex;
-            var cl = checkBtn.Q<Label>(); if (cl != null) SetText(cl, IsChoice ? "Ответить" : "Проверить");
+            resetBtn.style.display = IsChoice || IsNoRun ? DisplayStyle.None : DisplayStyle.Flex;
+            var cl = checkBtn.Q<Label>(); if (cl != null) SetText(cl, IsChoice || IsNoRun ? "Ответить" : "Проверить");
             SetText(resetLabel, IsScenario ? (confirmReset ? "Точно заново?" : "Заново") : confirmReset ? "Точно сбросить?" : "Сбросить");
             resetLabel.style.color = confirmReset ? K.Red : K.Muted;
             ed.Place();
@@ -655,7 +677,12 @@ namespace Intern.Game
             story.style.backgroundColor = Pal.Hex("202020"); K.Pad(story, 10f, 12f, 10f, 12f); K.Radius(story, 6f); K.Line(story, Pal.Hex("2B2B2B"), 1f, 1f, 1f, 1f);
             Section(c, "ЦЕЛЬ");
             Para(c, "<b>" + K.Esc(t.goal) + "</b>", 15f, K.TextHi);
-            if (IsChoice) Para(c, (t.multi ? "Отметь все верные варианты" : "Выбери один вариант") + " на вкладке «Ответ» внизу и нажми «Ответить» (Ctrl+Enter). Клавиши 1–9 тоже работают.", 13f, K.Muted, 6f);
+            if (IsClickBug) Para(c, "Кликни по строке с ошибкой прямо в редакторе, потом выбери на вкладке «Ответ», что с ней не так, и нажми «Ответить» (Ctrl+Enter).", 13f, K.Muted, 6f);
+            else if (IsChoice) Para(c, (t.multi ? "Отметь все верные варианты" : "Выбери один вариант") + " на вкладке «Ответ» внизу и нажми «Ответить» (Ctrl+Enter). Клавиши 1–9 тоже работают.", 13f, K.Muted, 6f);
+            else if (IsPredict) Para(c, "Код не запускается: прочитай его и впиши на вкладке «Ответ», что он напечатает. Эталон получен настоящим " + LangName(t.language) + ".", 13f, K.Muted, 6f);
+            else if (IsCloze) Para(c, "Впиши недостающие куски кода в пропуски ‹1›, ‹2›… на вкладке «Ответ».", 13f, K.Muted, 6f);
+            else if (IsParsons) Para(c, "Собери программу из строк на вкладке «Ответ»: порядок и отступы — твои. Среди строк есть лишние.", 13f, K.Muted, 6f);
+            else if (IsTs) Para(c, "TypeScript: перед запуском типы стираются, тесты вызывают " + K.Esc(t.entry) + "(...). Типы проверяются по коду — требования справа.", 13f, K.Muted, 6f);
             else if (IsStatic) Para(c, "Проверка сверяет текст решения с требованиями — их список справа. Запускать ничего не нужно.", 13f, K.Muted, 6f);
             else if (IsSql) Para(c, "Проверяется результат последнего запроса. «Запустить» покажет таблицу в терминале.", 13f, K.Muted, 6f);
             else if (IsJs && !string.IsNullOrEmpty(t.entry)) Para(c, "Тесты вызывают функцию " + K.Esc(t.entry) + "(...). «Запустить» вызовет её с данными первого теста.", 13f, K.Muted, 6f);
@@ -691,9 +718,9 @@ namespace Intern.Game
             // решение / ответ
             if (Diff == Difficulty.Easy && !isDone)
             {
-                if (IsChoice)
+                if (IsChoice || IsNoRun)
                 {
-                    if (revealed.Contains(t.id)) Para(c, "Верные варианты подсвечены зелёным на вкладке «Ответ». Отметь их и ответь — награда будет ×0.5.", 13f, K.Muted, 14f);
+                    if (revealed.Contains(t.id)) Para(c, (IsNoRun ? "Эталон показан на вкладке «Ответ». Повтори его" : "Верные варианты подсвечены зелёным на вкладке «Ответ». Отметь их") + " и ответь — награда будет ×0.5.", 13f, K.Muted, 14f);
                     else if (Fails >= 3)
                     {
                         var sb = Btn.Text("Показать ответ (награда ×0.5)", () => { g.ReportWork(WorkKind.Hint); revealed.Add(Task.id); usedSolution.Add(Task.id); bottom = Bottom.Answer; RefreshAll(); }, Pal.Hex("5A1D1D"), Pal.Hex("6E2424"), 14f, Pal.Hex("FFB4B4"), "warning", Pal.Hex("FFB4B4"));
@@ -813,6 +840,7 @@ namespace Intern.Game
             }
 
             if (g.EnvVisible) EnvSection(c);
+            if (g.WarmupVisible) WarmupSection(c);
 
             var rootRow = K.Box(true); rootRow.style.alignItems = Align.Center; rootRow.style.marginTop = 12f; rootRow.style.marginLeft = -12f;
             rootRow.Add(new Icon("chevD", K.Text, 16f)); rootRow.Add(K.T(g.Save.company > 0 ? g.CompanyName.ToUpperInvariant() : "KODZILLA-SOFT", 12f, K.Text, false, true)); c.Add(rootRow);
@@ -1057,8 +1085,13 @@ namespace Intern.Game
                         }
                     }
                 }
-                else if (IsChoice && !showExpl)
+                else if ((IsChoice || IsNoRun) && !showExpl)
                     Para(c, "Сначала ответь сам — разбор решения откроется, когда задача будет сдана.", 14f, K.Muted, 6f);
+                if (IsTs && Task.requirements != null && Task.requirements.Count > 0)
+                {
+                    Section(c, "ТИПЫ — ПРОВЕРКА ПО КОДУ");
+                    foreach (var x in Task.requirements) { var d = x as Dictionary<string, object>; object inp = null; if (d != null) d.TryGetValue("input", out inp); Para(c, "• " + K.Esc(inp as string ?? ""), 14f, K.Text, 4f); }
+                }
                 rightScroll.Apply(); return;
             }
             rightTitle.text = "РАЗБОР КОДА";
@@ -1093,11 +1126,11 @@ namespace Intern.Game
         {
             switch (b)
             {
-                case Bottom.Answer: return IsChoice;
+                case Bottom.Answer: return IsChoice || IsNoRun;
                 case Bottom.Problems: return IsPy || IsJs || IsSql;
                 case Bottom.Terminal: return CanRun || IsScenario;
                 case Bottom.DebugConsole: return IsPy;
-                default: return !IsChoice && !IsScenario;
+                default: return !IsChoice && !IsScenario && !IsNoRun;
             }
         }
 
@@ -1115,7 +1148,7 @@ namespace Intern.Game
         void RefreshBottom()
         {
             foreach (var kv in bottomTabBtns) kv.Value.style.display = TabVisible(kv.Key) ? DisplayStyle.Flex : DisplayStyle.None;
-            if (!TabVisible(bottom)) bottom = IsChoice ? Bottom.Answer : CanRun || IsScenario ? Bottom.Terminal : Bottom.Tests;
+            if (!TabVisible(bottom)) bottom = IsChoice || IsNoRun ? Bottom.Answer : CanRun || IsScenario ? Bottom.Terminal : Bottom.Tests;
             foreach (var kv in bottomTabLabels)
             {
                 bool on = kv.Key == bottom;
@@ -1175,7 +1208,8 @@ namespace Intern.Game
                             var r = lastCheck[i];
                             var row = K.Box(true); row.style.alignItems = Align.FlexStart; row.style.marginTop = 4f;
                             row.Add(new Icon(r.Passed ? "check" : "error", r.Passed ? K.Green : K.Red, 16f));
-                            string what = IsStatic ? "Требование " + (i + 1) + "   <color=#CCCCCC>" + K.Esc(r.InputsText) + "</color>"
+                            int nTests = IsTs && Task.testCases != null ? Task.testCases.Count : -1;   // TS: после тестов идут требования к типам
+                            string what = IsStatic || (nTests >= 0 && i >= nTests) ? "Требование " + (IsStatic ? i + 1 : i - nTests + 1) + "   <color=#CCCCCC>" + K.Esc(r.InputsText) + "</color>"
                                 : IsSql ? "Тест " + (i + 1) + "   <color=#9D9D9D>результат последнего запроса</color>"
                                 : "Тест " + (i + 1) + "   <color=#9D9D9D>" + (func ? "вызов: " : "ввод: ") + K.Esc(string.IsNullOrEmpty(r.InputsText) ? "—" : Short(r.InputsText, 140)) + "</color>";
                             var tl = K.T(what, 15f, K.Text, false, false, true); tl.style.marginLeft = 8f; tl.style.flexShrink = 1f; row.Add(tl);
@@ -1204,10 +1238,17 @@ namespace Intern.Game
 
         void AnswerTab(VisualElement c)
         {
+            if (IsNoRun) { NoRunTab(c); return; }
             var t = Task;
             bool isDone = g.IsDone(t), show = isDone || revealed.Contains(t.id);
             int keys = Math.Min(9, t.options.Length);
             Para(c, "<b>" + K.Esc(t.goal) + "</b>", 16f, K.TextHi, 2f);
+            if (IsClickBug)
+            {
+                int bp = BugPick;
+                var st = Para(c, bp > 0 ? "Выбрана строка " + bp + ": <color=#CCCCCC>" + K.Esc(bp <= ed.L.Count ? ed.L[bp - 1].Trim() : "") + "</color>" : "Сначала кликни по строке с багом в редакторе выше.", 14f, bp > 0 ? K.Sun : Pal.Hex("FF8FA3"), 4f);
+                if (show && t.bugLine > 0) Para(c, "Баг — в строке " + t.bugLine + ".", 14f, K.Green, 4f);
+            }
             Para(c, (t.multi ? "Отметь все верные варианты" : "Выбери один вариант") + " — мышью или клавишами 1–" + keys + ", затем «Ответить» (Enter).", 13f, K.Muted, 4f);
             var sel = Picks; var wrong = WrongPicks; var right = new HashSet<int>(t.answer ?? new int[0]);
             for (int i = 0; i < t.options.Length; i++)
@@ -1256,6 +1297,7 @@ namespace Intern.Game
             Task = t;
             bool ticket = t.IsChoice && string.IsNullOrEmpty(t.starter);
             if (IsScenario) EnvLoadEditor(t);
+            else if (IsNoRun) { ed.Language = t.language; ed.Text = NoRunEditorText(t); fieldFocus = -1; }
             else
             {
                 ed.Language = ticket ? "text" : t.language;   // язык — до текста: от него зависит ширина табуляции
@@ -1267,14 +1309,14 @@ namespace Intern.Game
             jsLint = null; jsLinted = null; choiceVerdict = null; choiceOk = false;
             solutionShown = usedSolution.Contains(t.id) && !t.IsChoice; confirmReset = false;
             if (IsJs && !jsWarm) { jsWarm = true; try { JsRun.Prewarm(); } catch (Exception e) { Debug.LogWarning("[Стажёр] Прогрев JS: " + e.Message); } }
-            bottomPanel.style.height = IsChoice ? 470f : IsScenario ? 340f : 270f;
+            bottomPanel.style.height = IsChoice || IsNoRun ? (IsParsons ? 520f : 470f) : IsScenario ? 340f : 270f;
             tabIconHost.Clear(); tabIconHost.Add(FileIcon(t, true));
             tabName.text = FileName(t);
             SetText(statusLang, "{ } " + LangName(ticket ? "text" : IsScenario ? ed.Language : t.language));
             SetText(statusIndent, "Пробелы: " + Syntax.IndentWidth(ed.Language));
             terminal.Length = 0;
             terminal.Append("<color=#9D9D9D>Кодзилла Софт · терминал. " + (CanRun ? "Запуск: кнопка «Запустить» или Ctrl+F5. " : "") + "Сдать задачу: «Проверить» или Ctrl+Enter.</color>\n");
-            side = Side.Task; bottom = IsChoice ? Bottom.Answer : CanRun || IsScenario ? Bottom.Terminal : Bottom.Tests;
+            side = Side.Task; bottom = IsChoice || IsNoRun ? Bottom.Answer : CanRun || IsScenario ? Bottom.Terminal : Bottom.Tests;
             sideScroll.ToTop(); rightScroll.ToTop(); bottomScroll.ToTop();
             RefreshExplanations(true);
             if (IsScenario) EnvOpened(); else termFocus = false;
@@ -1320,20 +1362,21 @@ namespace Intern.Game
             StopDebugSilently();
             hintsShown.Clear(); failedChecks.Clear(); timeSpent.Clear(); usedSolution.Clear();
             picks.Clear(); wrongPicks.Clear(); revealed.Clear(); toggled.Clear(); jsCheck = null; jsRun = null;
+            predictAns.Clear(); clozeAns.Clear(); clozeMarks.Clear(); parsonsPool.Clear(); parsonsSol.Clear(); bugPicks.Clear(); fieldFocus = -1;
             Task = null;
             if (t != null) Open(t);
         }
 
         void SaveCode()
         {
-            if (Task == null || Task.IsChoice) return;
+            if (Task == null || Task.IsChoice || IsNoRun) return;
             if (IsScenario) { EnvSaveFile(); return; }
             g.Save.SetCode(Task.id, Code); g.Persist(); savedCode = Code;
         }
 
         public void SetActive(bool a)
         {
-            Active = a; ed.Active = a && !(IsScenario && termFocus);
+            Active = a; ed.Active = a && !(IsScenario && termFocus) && fieldFocus < 0;
             if (!a) { ed.HidePopup(); ed.HideTooltip(); if (hoverBtn != null) { hoverBtn.SetHover(false); hoverBtn = null; } }
             ed.Place(); RefreshStatus();
         }
@@ -1368,6 +1411,7 @@ namespace Intern.Game
                 if (jsTask == Task)
                 {
                     JsError fe; var res = TaskChecks.FromJs(r, out fe);
+                    if (IsTs && Task.requirements != null) res.AddRange(TaskChecks.Static(Code, Task.requirements));   // типы — по исходнику
                     FinishCheck(res, fe != null ? fe.Line : -1, fe != null ? fe.Text : null);
                 }
             }
@@ -1384,6 +1428,7 @@ namespace Intern.Game
                 }
             }
             if (IsScenario) EnvUpdate();
+            if (IsNoRun) FieldsUpdate();
             if (Active) PollHover();
         }
 
@@ -1404,7 +1449,7 @@ namespace Intern.Game
             if (IsJs && jsLinted != code)
             {
                 jsLinted = code;
-                try { jsLint = Syntax.IsJs(Task.language) && Task.language == "javascript" ? JsRun.SyntaxCheck(code) : null; }
+                try { jsLint = Task.language == "javascript" || IsTs ? JsRun.SyntaxCheck(JsCode(code)) : null; }
                 catch (Exception e) { jsLint = null; Debug.LogWarning("[Стажёр] Проверка синтаксиса JS: " + e.Message); }
             }
         }
@@ -1451,11 +1496,11 @@ namespace Intern.Game
         // ---------- JavaScript ----------
         void RunJs()
         {
-            terminal.Append(Prompt()).Append("node " + FileName(Task) + "\n");
+            terminal.Append(Prompt()).Append((IsTs ? "npx tsx " : "node ") + FileName(Task) + "\n");
             string call = JsCallSuffix(Task);
             if (call.Length > 0) terminal.Append("<color=#9D9D9D># после кода вызываем " + K.Esc(Task.entry) + "(...) с данными первого теста</color>\n");
             jsTask = Task;
-            try { jsRun = JsRun.StartRun(Code + call); }
+            try { jsRun = JsRun.StartRun(JsCode(Code) + call); }
             catch (Exception e) { jsRun = null; terminal.Append("<color=#F14C4C>Не удалось запустить JavaScript: " + K.Esc(e.Message) + "</color>\n"); }
             bottom = Bottom.Terminal;
             RefreshBottom(); RefreshEditorFlags(); RefreshStatus();
@@ -1557,14 +1602,15 @@ namespace Intern.Game
             if (Task == null || dbg != null || Busy) return;
             g.ReportWork(WorkKind.Check);
             if (IsScenario) { SaveCode(); EnvCheckStep(true); return; }
+            if (IsNoRun) { SubmitNoRun(); return; }
             if (IsChoice) { SubmitChoice(); return; }
             SaveCode();
             switch (TMode)
             {
-                case "js":
+                case "js": case "ts":
                     terminal.Append(Prompt()).Append("npm test\n");
                     jsTask = Task;
-                    try { jsCheck = JsRun.StartCheck(Code, Task.entry, Task.testCases ?? new List<object>()); }
+                    try { jsCheck = JsRun.StartCheck(JsCode(Code), Task.entry, Task.testCases ?? new List<object>()); }
                     catch (Exception e) { jsCheck = null; FinishCheck(new List<CheckResult> { new CheckResult { InputsText = "", Expected = "", Actual = "", Note = "Не удалось запустить проверку JavaScript: " + e.Message } }, -1, null); return; }
                     bottom = Bottom.Terminal;
                     RefreshBottom(); RefreshEditorFlags(); RefreshStatus();
@@ -1656,8 +1702,11 @@ namespace Intern.Game
             if (t == null || !IsChoice) return;
             g.ReportWork(WorkKind.Check);
             if (g.IsDone(t)) { Notice("Эта задача уже сдана. Разбор — справа и внизу.", "check", K.Green); return; }
+            if (IsClickBug && BugPick == 0) { Notice("Сначала кликни в редакторе по строке, где ошибка.", "md"); bottom = Bottom.Answer; RefreshBottom(); return; }
             if (Picks.Count == 0) { Notice("Сначала выбери вариант ответа: клик по нему или клавиши 1–9.", "md"); bottom = Bottom.Answer; RefreshBottom(); return; }
             var v = TaskChecks.Choice(t, Picks);
+            bool lineOk = !IsClickBug || BugPick == t.bugLine;
+            if (!lineOk && v.Correct) { v.Correct = false; }
             if (v.Correct)
             {
                 choiceOk = true; choiceVerdict = "Верно!";
@@ -1669,7 +1718,9 @@ namespace Intern.Game
                 choiceOk = false;
                 failedChecks[t.id] = Fails + 1;
                 if (Diff != Difficulty.Hard) foreach (var w in v.Wrong) WrongPicks.Add(w);
-                if (t.multi && Diff != Difficulty.Hard)
+                if (IsClickBug && !lineOk && Diff != Difficulty.Hard) choiceVerdict = "Баг не в строке " + BugPick + ". Присмотрись к остальным.";
+                else if (IsClickBug && Diff != Difficulty.Hard) choiceVerdict = "Строка верная, но причина другая.";
+                else if (t.multi && Diff != Difficulty.Hard)
                     choiceVerdict = "Не совсем: верных отмечено " + v.RightPicked + " из " + (t.answer != null ? t.answer.Length : 0) + (v.WrongPicked > 0 ? ", лишних — " + v.WrongPicked : "") + ".";
                 else choiceVerdict = "Неверно. Подумай ещё.";
                 g.SpawnBug();
@@ -1715,9 +1766,10 @@ namespace Intern.Game
                         var p = pp.Value; var v = PickAt(p);
                         if (e.button != 0) { e.Use(); return; }
                         if (IsScenario) EnvFocusByClick(v);
+                        if (IsNoRun && FieldFocusByClick(v)) { e.Use(); return; }
                         var b = Up<Btn>(v);
                         if (b != null && !InEditor(v)) { pressedBtn = b; e.Use(); return; }
-                        if (InEditor(v)) { pressedEditor = true; ed.MouseDown(p, e.clickCount, e.shift); RefreshStatus(); if (!ed.PopupOpen) { } e.Use(); return; }
+                        if (InEditor(v)) { pressedEditor = true; ed.MouseDown(p, e.clickCount, e.shift); RefreshStatus(); if (IsClickBug) ClickBugPicked(); e.Use(); return; }
                         pressedScroll = Up<ScrollBox>(v);
                         e.Use(); return;
                     }
@@ -1746,6 +1798,7 @@ namespace Intern.Game
                     }
                 case EventType.KeyDown:
                     if (IsScenario && termFocus && bottom == Bottom.Terminal && TermKey(e)) { e.Use(); return; }
+                    if (IsNoRun && fieldFocus >= 0 && bottom == Bottom.Answer && FieldKey(e)) { e.Use(); return; }
                     if (HotKey(e)) { e.Use(); return; }
                     if (IsChoice && !(e.control || e.command || e.alt))
                     {

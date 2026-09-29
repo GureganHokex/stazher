@@ -16,6 +16,10 @@ namespace Intern.Game
     {
         public string id, title, grade, description, theory, track;
         public string[] requires = new string[0];
+        // ветка языка (спринт 9): lang — чья это тема (null — общая), replaces — какие темы других веток она заменяет,
+        // professions — для каких профессий тема из файла lang-*.json (пусто — для всех)
+        public string lang;
+        public string[] replaces = new string[0], professions = new string[0];
         public int gradeIndex, order, level;
         public List<TaskData> tasks = new List<TaskData>();
     }
@@ -62,6 +66,13 @@ namespace Intern.Game
                 case "frontend": return "FE";
                 case "devops": return "OPS";
                 case "fullstack": return "FS";
+                case "lang-typescript": return "TS";
+                case "lang-python": return "PY";
+                case "lang-javascript": return "JS";
+                case "lang-go": return "GO";
+                case "lang-java": return "JAVA";
+                case "lang-csharp": return "CS";
+                case "warmup": return "WU";
                 default: return "KOD";
             }
         }
@@ -273,13 +284,53 @@ namespace Intern.Game
             return d;
         }
 
-        public static TrackPath BuildPath(string profession) { return BuildPath(profession, Load); }
-
-        public static TrackPath BuildPath(string profession, Func<string, TrackData> load)
+        // Файл, которого может не быть (ветка языка): без ошибки в логе
+        public static TrackData LoadOptional(string track)
         {
+            TrackData d;
+            if (cache.TryGetValue(track, out d)) return d;
+            var ta = Resources.Load<TextAsset>("Tasks/tracks/" + track);
+            if (ta == null) return null;
+            return Load(track);
+        }
+
+        public static TrackPath BuildPath(string profession) { return BuildPath(profession, Languages.Default(profession), null); }
+        public static TrackPath BuildPath(string profession, string language) { return BuildPath(profession, language, null); }
+        public static TrackPath BuildPath(string profession, Func<string, TrackData> load) { return BuildPath(profession, Languages.Default(profession), load); }
+
+        // Путь = общие темы + ветка языка + темы профессии. Темы другой ветки выпадают, зависимости от них переходят
+        // на темы выбранной ветки, которые их заменяют (replaces). Темы клонируются: кэш файлов не меняется
+        public static TrackPath BuildPath(string profession, string language, Func<string, TrackData> load)
+        {
+            var custom = load;   // отдельная переменная: load ниже подменяется на Load, а замыкание видело бы подмену
+            Func<string, TrackData> opt = n =>
+            {
+                try { return custom != null ? custom(n) : LoadOptional(n); }
+                catch (Exception) { return null; }
+            };
+            if (load == null) load = Load;
             var names = profession == "fullstack" ? new[] { "fullstack" } : new[] { "common", profession };
+            var src = new List<Topic>();
+            foreach (var n in names) src.AddRange(load(n).topics.Where(tp => string.IsNullOrEmpty(tp.lang) || tp.lang == language || profession == "fullstack"));
+            if (profession != "fullstack" && !string.IsNullOrEmpty(language))
+            {
+                var branch = opt("lang-" + language);
+                if (branch != null) src.AddRange(branch.topics.Where(tp => tp.professions.Length == 0 || tp.professions.Contains(profession)));
+            }
+            var ids = new HashSet<string>(src.Select(tp => tp.id));
+            var repl = new Dictionary<string, string>();
+            foreach (var tp in src) foreach (var r in tp.replaces) if (!ids.Contains(r)) repl[r] = tp.id;
             var topics = new List<Topic>();
-            foreach (var n in names) topics.AddRange(load(n).topics);
+            foreach (var tp in src)
+            {
+                var req = tp.requires.Select(r => ids.Contains(r) ? r : repl.ContainsKey(r) ? repl[r] : null).Where(r => r != null && r != tp.id).Distinct().ToArray();
+                topics.Add(new Topic
+                {
+                    id = tp.id, title = tp.title, grade = tp.grade, description = tp.description, theory = tp.theory, track = tp.track,
+                    requires = req, gradeIndex = tp.gradeIndex, order = tp.order, level = tp.level, tasks = tp.tasks,
+                    lang = tp.lang, replaces = tp.replaces, professions = tp.professions,
+                });
+            }
             return new TrackPath(profession, topics);
         }
 
@@ -312,6 +363,9 @@ namespace Intern.Game
                 };
                 tp.gradeIndex = Grades.Index(tp.grade);
                 tp.requires = List(r, "requires").OfType<string>().ToArray();
+                tp.lang = Str(r, "lang");
+                tp.replaces = List(r, "replaces").OfType<string>().ToArray();
+                tp.professions = List(r, "professions").OfType<string>().ToArray();
                 d.topics.Add(tp); byId[tp.id] = tp;
             }
             foreach (var o in List(root, "tasks"))
@@ -320,7 +374,9 @@ namespace Intern.Game
                 if (r == null) continue;
                 Topic tp;
                 if (!byId.TryGetValue(Str(r, "topic_id") ?? "", out tp)) continue;
-                tp.tasks.Add(ToTask(r, tp));
+                var task = ToTask(r, tp);
+                task.warmup = d.track == "warmup";
+                tp.tasks.Add(task);
             }
             foreach (var tp in d.topics) tp.tasks.Sort((a, b) => string.CompareOrdinal(a.id, b.id));
             // коды задач внутри направления: по грейдам и зависимостям, как в пути игрока
@@ -368,6 +424,29 @@ namespace Intern.Game
             else t.solution = ca as string;
             object tcs; c.TryGetValue("test_cases", out tcs);
             t.testCases = tcs as List<object>;
+            // спринт 9: задачи без запуска и требования к типам TypeScript
+            t.output = Str(c, "output");
+            var ls = List(c, "lines"); if (ls.Count > 0) t.lines = ls.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToArray();
+            var ds = List(c, "distractors"); t.distractors = ds.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToArray();
+            var alts = List(c, "alternatives");
+            if (alts.Count > 0) t.alternatives = alts.OfType<List<object>>().Select(a => a.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToArray()).ToList();
+            var bl = List(c, "blanks");
+            if (bl.Count > 0)
+            {
+                t.blanks = new List<ClozeBlank>();
+                foreach (var b in bl)
+                {
+                    var bd = b as Dictionary<string, object>;
+                    var cb = new ClozeBlank();
+                    object av = bd != null && bd.ContainsKey("answer") ? bd["answer"] : b;
+                    var al = av as List<object>;
+                    cb.answers = al != null ? al.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToArray() : av != null && !(av is Dictionary<string, object>) ? new[] { Convert.ToString(av, CultureInfo.InvariantCulture) } : new string[0];
+                    if (bd != null) cb.regex = Str(bd, "regex");
+                    t.blanks.Add(cb);
+                }
+            }
+            t.bugLine = Int(c, "bug_line", 0);
+            object reqs; c.TryGetValue("requirements", out reqs); t.requirements = reqs as List<object>;
             // программа на Python (stdin → stdout): тесты в старом формате — для «Запустить», отладчика и старой IDE
             if (!t.IsChoice && t.language == "python" && string.IsNullOrEmpty(t.entry) && t.testCases != null)
             {

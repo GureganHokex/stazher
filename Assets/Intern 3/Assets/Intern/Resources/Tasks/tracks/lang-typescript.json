@@ -1,0 +1,696 @@
+{
+ "track": "lang-typescript",
+ "roadmap": [
+  {
+   "topic_id": "ts-basics",
+   "lang": "typescript",
+   "replaces": [
+    "fe-js-basics"
+   ],
+   "professions": [
+    "frontend"
+   ],
+   "title": "TypeScript: типы и переменные",
+   "grade": "junior",
+   "requires": [
+    "c-debugging"
+   ],
+   "description": "let и const, примитивные типы, массивы, объединения, объекты и interface, вывод типов.",
+   "theory": "TypeScript — это JavaScript с типами. Код выполняется как обычный JS: перед запуском типы просто стираются. Зато ошибки вида «передал строку вместо числа» видны сразу в редакторе, а не у пользователя.\n\nПеременные объявляют через const (нельзя переприсвоить) и let (можно). var не используем.\n\n    const price: number = 1990;\n    let title: string = \"Лампа\";\n    let inStock: boolean = true;\n\nТип можно не писать — TypeScript выведет его сам: const count = 3 уже number. Явно типы пишут на границах: у параметров функций, у результата, у данных из API.\n\n• Массивы: number[] или Array<string>.\n• Объединение (union): string | number — «или то, или другое». Часто так описывают варианты: type Status = \"new\" | \"paid\" | \"sent\".\n• Объект описывают через interface или type:\n\n    interface Product {\n        id: number;\n        title: string;\n        price: number;\n        tags?: string[];   // ? — поле может отсутствовать\n    }\n\n• readonly поле нельзя менять после создания.\n• any выключает проверки — избегай. Если тип неизвестен, бери unknown и сужай проверкой typeof.\n\nСужение типов: внутри if (typeof x === \"string\") TypeScript знает, что x — строка. Для union из объектов проверяют общее поле-метку: if (event.type === \"click\").\n\nЧастые ошибки новичков: сравнение == вместо === (=== не приводит типы), ожидание, что типы проверятся во время работы программы (нет — только при сборке), и any «чтобы не ругался»."
+  },
+  {
+   "topic_id": "ts-functions",
+   "lang": "typescript",
+   "replaces": [
+    "fe-js-closures-this"
+   ],
+   "professions": [
+    "frontend"
+   ],
+   "title": "TypeScript: функции и дженерики",
+   "grade": "junior",
+   "requires": [
+    "ts-basics"
+   ],
+   "description": "Типы параметров и результата, необязательные и параметры по умолчанию, стрелочные функции, замыкания, дженерики.",
+   "theory": "У функции типизируют параметры и результат:\n\n    function total(prices: number[], discount = 0): number {\n        const sum = prices.reduce((acc, p) => acc + p, 0);\n        return sum - discount;\n    }\n\n• Параметр со значением по умолчанию (discount = 0) можно не передавать, тип выводится из значения.\n• Необязательный параметр пишут с вопросом: function greet(name?: string). Внутри он string | undefined — проверь, прежде чем использовать.\n• Стрелочная функция: const double = (x: number): number => x * 2.\n• Тип функции: type Formatter = (value: number) => string.\n\nЗамыкание — функция, которая помнит переменные места, где её создали:\n\n    function makeCounter() {\n        let count = 0;\n        return () => ++count;\n    }\n\nКаждый вызов makeCounter() создаёт свой count.\n\nДженерики — функции «для любого типа», но без потери информации о нём:\n\n    function first<T>(items: T[]): T | undefined {\n        return items[0];\n    }\n    const x = first([1, 2, 3]);   // number | undefined\n\nT подставляется при вызове. В отличие от any, тип результата известен. Ограничение: <T extends { id: number }> — T обязан иметь поле id.\n\nСтандартные методы массивов тоже дженерики: map<U>, filter, find. Поэтому prices.map(p => p * 2) — это number[]."
+  },
+  {
+   "topic_id": "ts-async",
+   "lang": "typescript",
+   "replaces": [
+    "fe-js-async"
+   ],
+   "professions": [
+    "frontend"
+   ],
+   "title": "TypeScript: асинхронность",
+   "grade": "junior",
+   "requires": [
+    "ts-functions"
+   ],
+   "description": "Promise<T>, async и await, обработка ошибок, Promise.all, порядок выполнения.",
+   "theory": "Асинхронный код не блокирует страницу: запрос к серверу уходит, а браузер продолжает работать. Результат приходит позже — в Promise.\n\nPromise<T> — «обещание» значения типа T. async-функция всегда возвращает Promise:\n\n    async function loadPrice(id: number): Promise<number> {\n        const res = await fetch(\"/api/price/\" + id);\n        const data: { price: number } = await res.json();\n        return data.price;\n    }\n\nawait ждёт результат промиса и достаёт значение. Писать await можно только внутри async-функции.\n\n• Ошибки ловят обычным try/catch вокруг await. Необработанная ошибка в промисе — частая причина «белого экрана».\n• Параллельно: const [a, b] = await Promise.all([loadA(), loadB()]) — оба запроса идут одновременно. Последовательные await ждут друг друга — медленнее.\n• Порядок выполнения: сначала весь синхронный код, потом колбэки промисов (микрозадачи), потом setTimeout (макрозадачи). Поэтому console.log после await выполнится позже, чем код после вызова async-функции.\n\nТип результата пиши явно: Promise<User[]>. Так ошибка «забыл await» (получил Promise вместо массива) видна сразу."
+  }
+ ],
+ "tasks": [
+  {
+   "task_id": "ts-basics-01",
+   "topic_id": "ts-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «В корзине считают итог без типов — вчера туда прилетела строка «3» вместо числа, и сумма стала «19903». Напиши функцию с типами.»",
+   "content": {
+    "question": "Напиши функцию cartTotal(price: number, qty: number): number — стоимость позиции: цена × количество.",
+    "language": "typescript",
+    "entry": "cartTotal",
+    "code": "function cartTotal(price, qty) {\n    // верни цену, умноженную на количество\n}",
+    "correct_answer": "function cartTotal(price: number, qty: number): number {\n    return price * qty;\n}",
+    "test_cases": [
+     {
+      "input": [
+       1990,
+       2
+      ],
+      "expected": 3980
+     },
+     {
+      "input": [
+       250,
+       0
+      ],
+      "expected": 0
+     },
+     {
+      "input": [
+       99,
+       3
+      ],
+      "expected": 297
+     }
+    ],
+    "requirements": [
+     {
+      "input": "параметр price: number",
+      "expected": {
+       "regex": "price\\s*:\\s*number"
+      }
+     },
+     {
+      "input": "параметр qty: number",
+      "expected": {
+       "regex": "qty\\s*:\\s*number"
+      }
+     },
+     {
+      "input": "результат : number",
+      "expected": {
+       "regex": "\\)\\s*:\\s*number\\s*\\{"
+      }
+     }
+    ]
+   },
+   "explanation": "Типы у параметров не дают передать строку: cartTotal(\"3\", 2) не соберётся. Результат : number защищает и тех, кто вызывает функцию. В рантайме это обычное умножение — типы стираются.",
+   "hints": [
+    "Типы пишут после имени через двоеточие: price: number.",
+    "Тип результата — после скобок: function f(a: number): number { … }"
+   ],
+   "title": "Итог корзины с типами"
+  },
+  {
+   "task_id": "ts-basics-02",
+   "topic_id": "ts-basics",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "story": "Ира: «Кто-то спорит, что TypeScript меняет поведение ===. Посмотри, что на самом деле напечатает этот код.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "language": "typescript",
+    "code": "const count: number = 3;\nconst label: string = \"3\";\nconsole.log(count === 3);\nconsole.log(String(count) === label);\nconsole.log(typeof label);\nconsole.log(count + 1);",
+    "output": "true\ntrue\nstring\n4"
+   },
+   "explanation": "Типы TypeScript не меняют выполнение: это обычный JavaScript. === сравнивает без приведения типов, поэтому число сравнивают с числом, а строку — со строкой после String(count). typeof label во время работы — \"string\".",
+   "hints": [
+    "=== не приводит типы.",
+    "typeof возвращает строку с именем типа."
+   ],
+   "title": "Типы и сравнение ==="
+  },
+  {
+   "task_id": "ts-basics-03",
+   "topic_id": "ts-basics",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Марина: «Опиши товар интерфейсом, а то в коде поля придумывают на ходу. Допиши пропуски.»",
+   "content": {
+    "question": "Заполни пропуски: интерфейс Product с необязательными тегами и функция, которая возвращает название.",
+    "language": "typescript",
+    "code": "[[1]] Product {\n    id: number;\n    title: string;\n    tags[[2]]: string[];\n}\n\nfunction titleOf(p: Product): [[3]] {\n    return p.title;\n}",
+    "blanks": [
+     {
+      "answer": [
+       "interface"
+      ]
+     },
+     {
+      "answer": [
+       "?"
+      ]
+     },
+     {
+      "answer": [
+       "string"
+      ]
+     }
+    ]
+   },
+   "explanation": "interface описывает форму объекта. Вопрос перед двоеточием делает поле необязательным: tags может не быть. Функция возвращает title, у него тип string — это и есть тип результата.",
+   "hints": [
+    "Объект описывают ключевым словом interface (или type).",
+    "Необязательное поле помечают вопросом после имени."
+   ],
+   "title": "Интерфейс товара"
+  },
+  {
+   "task_id": "ts-basics-04",
+   "topic_id": "ts-basics",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "story": "Ира: «Скидка в корзине не применяется, хотя промокод введён. Вот функция, найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "language": "typescript",
+    "code": "type Promo = \"SALE10\" | \"SALE20\" | null;\n\nfunction discountFor(promo: Promo): number {\n    if (promo = \"SALE10\") {\n        return 10;\n    }\n    if (promo === \"SALE20\") {\n        return 20;\n    }\n    return 0;\n}",
+    "bug_line": 4,
+    "options": [
+     "В условии присваивание = вместо сравнения ===",
+     "Тип Promo не может быть null",
+     "return 10 нужно заменить на return 0.1",
+     "Сравнивать строки через === нельзя"
+    ],
+    "correct_answer": 0
+   },
+   "explanation": "promo = \"SALE10\" присваивает значение и возвращает его — строка «SALE10» истинна, поэтому скидка 10 даётся всем. Нужно сравнение ===. TypeScript такое пропустит: присваивание в условии для него законно. Такие баги ловят линтер (правило no-cond-assign) и тесты.",
+   "hints": [
+    "Посмотри на условия if внимательно.",
+    "Один знак = и три знака === делают разные вещи."
+   ],
+   "title": "Промокод не применяется"
+  },
+  {
+   "task_id": "ts-basics-05",
+   "topic_id": "ts-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "story": "Стас: «Статусы заказа приходят строкой. Нужна подпись для интерфейса, а неизвестный статус не должен ломать страницу.»",
+   "content": {
+    "question": "Напиши функцию statusLabel(status: OrderStatus): string, где type OrderStatus = \"new\" | \"paid\" | \"sent\". new → «Новый», paid → «Оплачен», sent → «Отправлен», всё остальное → «Неизвестно».",
+    "language": "typescript",
+    "entry": "statusLabel",
+    "code": "type OrderStatus = \"new\" | \"paid\" | \"sent\";\n\nfunction statusLabel(status) {\n    // верни подпись по статусу\n}",
+    "correct_answer": "type OrderStatus = \"new\" | \"paid\" | \"sent\";\n\nfunction statusLabel(status: OrderStatus): string {\n    switch (status) {\n        case \"new\": return \"Новый\";\n        case \"paid\": return \"Оплачен\";\n        case \"sent\": return \"Отправлен\";\n        default: return \"Неизвестно\";\n    }\n}",
+    "test_cases": [
+     {
+      "input": [
+       "new"
+      ],
+      "expected": "Новый"
+     },
+     {
+      "input": [
+       "paid"
+      ],
+      "expected": "Оплачен"
+     },
+     {
+      "input": [
+       "sent"
+      ],
+      "expected": "Отправлен"
+     },
+     {
+      "input": [
+       "lost"
+      ],
+      "expected": "Неизвестно"
+     }
+    ],
+    "requirements": [
+     {
+      "input": "параметр status: OrderStatus",
+      "expected": {
+       "regex": "status\\s*:\\s*OrderStatus"
+      }
+     },
+     {
+      "input": "результат : string",
+      "expected": {
+       "regex": "\\)\\s*:\\s*string\\s*\\{"
+      }
+     }
+    ]
+   },
+   "explanation": "Union из строк описывает все допустимые значения, и TypeScript подскажет, если какой-то забыли. Но данные с сервера типы не проверяют: там может прийти что угодно, поэтому default с «Неизвестно» — защита в рантайме.",
+   "hints": [
+    "switch по строкам — удобный способ разобрать варианты.",
+    "Не забудь default: с сервера может прийти неожиданное значение."
+   ],
+   "title": "Подписи статусов заказа"
+  },
+  {
+   "task_id": "ts-functions-01",
+   "topic_id": "ts-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «Нужна функция итога корзины со скидкой. Скидку передают не всегда.»",
+   "content": {
+    "question": "Напиши total(prices: number[], discount = 0): number — сумма цен минус скидка.",
+    "language": "typescript",
+    "entry": "total",
+    "code": "function total(prices, discount) {\n    // сумма минус скидка; скидку могут не передать\n}",
+    "correct_answer": "function total(prices: number[], discount = 0): number {\n    const sum = prices.reduce((acc, p) => acc + p, 0);\n    return sum - discount;\n}",
+    "test_cases": [
+     {
+      "input": [
+       [
+        100,
+        200,
+        300
+       ]
+      ],
+      "expected": 600
+     },
+     {
+      "input": [
+       [
+        100,
+        200
+       ],
+       50
+      ],
+      "expected": 250
+     },
+     {
+      "input": [
+       []
+      ],
+      "expected": 0
+     }
+    ],
+    "requirements": [
+     {
+      "input": "prices: number[]",
+      "expected": {
+       "regex": "prices\\s*:\\s*(number\\[\\]|Array<number>)"
+      }
+     },
+     {
+      "input": "скидка по умолчанию 0",
+      "expected": {
+       "regex": "discount\\s*(:\\s*number\\s*)?=\\s*0"
+      }
+     }
+    ]
+   },
+   "explanation": "Значение по умолчанию discount = 0 делает параметр необязательным, и тип number выводится сам. reduce с начальным 0 корректно работает и для пустого массива.",
+   "hints": [
+    "Параметр по умолчанию: discount = 0.",
+    "Сумму удобно считать через reduce((acc, p) => acc + p, 0)."
+   ],
+   "title": "Итог со скидкой по умолчанию"
+  },
+  {
+   "task_id": "ts-functions-02",
+   "topic_id": "ts-functions",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Марина: «Классика собеседований: замыкания. Что напечатает код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "language": "typescript",
+    "code": "function makeCounter(start: number): () => number {\n    let count = start;\n    return () => ++count;\n}\n\nconst a = makeCounter(0);\nconst b = makeCounter(10);\na();\na();\nconsole.log(a());\nconsole.log(b());\nconsole.log(a());",
+    "output": "3\n11\n4"
+   },
+   "explanation": "Каждый вызов makeCounter создаёт свою переменную count, а возвращённая функция её помнит — это замыкание. Счётчики a и b независимы: a дошёл до 3 и 4, b начал с 10 и вернул 11.",
+   "hints": [
+    "У a и b свои переменные count.",
+    "++count сначала увеличивает, потом возвращает значение."
+   ],
+   "title": "Счётчики на замыканиях"
+  },
+  {
+   "task_id": "ts-functions-03",
+   "topic_id": "ts-functions",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «Собери функцию, которая берёт первый элемент любого массива. Строки перепутали, пара лишних.»",
+   "content": {
+    "question": "Собери дженерик-функцию first: возвращает первый элемент массива или undefined, если массив пуст.",
+    "language": "typescript",
+    "lines": [
+     "function first<T>(items: T[]): T | undefined {",
+     "  if (items.length === 0) {",
+     "    return undefined;",
+     "  }",
+     "  return items[0];",
+     "}"
+    ],
+    "distractors": [
+     "function first(items: any): any {",
+     "  return items[1];"
+    ]
+   },
+   "explanation": "<T> делает функцию дженериком: для массива чисел результат number | undefined, для строк — string | undefined. any работал бы тоже, но потерял бы тип результата. Индекс первого элемента — 0.",
+   "hints": [
+    "Начни с объявления функции с <T>.",
+    "Сначала проверь пустой массив, потом верни items[0]."
+   ],
+   "title": "Дженерик first"
+  },
+  {
+   "task_id": "ts-functions-04",
+   "topic_id": "ts-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "story": "Стас: «В каталоге надо находить товары по id, а в заказах — позиции по id. Не хочу две одинаковые функции.»",
+   "content": {
+    "question": "Напиши дженерик findById<T extends { id: number }>(items: T[], id: number): T | undefined.",
+    "language": "typescript",
+    "entry": "findById",
+    "code": "function findById(items, id) {\n    // найди элемент с нужным id\n}",
+    "correct_answer": "function findById<T extends { id: number }>(items: T[], id: number): T | undefined {\n    return items.find((item) => item.id === id);\n}",
+    "test_cases": [
+     {
+      "input": [
+       [
+        {
+         "id": 1,
+         "title": "Лампа"
+        },
+        {
+         "id": 2,
+         "title": "Торшер"
+        }
+       ],
+       2
+      ],
+      "expected": {
+       "id": 2,
+       "title": "Торшер"
+      }
+     },
+     {
+      "input": [
+       [
+        {
+         "id": 1
+        }
+       ],
+       5
+      ],
+      "expected": null
+     },
+     {
+      "input": [
+       [],
+       1
+      ],
+      "expected": null
+     }
+    ],
+    "requirements": [
+     {
+      "input": "дженерик с ограничением T extends { id: number }",
+      "expected": {
+       "regex": "<\\s*T\\s+extends\\s*\\{\\s*id\\s*:\\s*number\\s*;?\\s*\\}\\s*>"
+      }
+     },
+     {
+      "input": "результат T | undefined",
+      "expected": {
+       "regex": "\\)\\s*:\\s*T\\s*\\|\\s*undefined"
+      }
+     }
+    ]
+   },
+   "explanation": "Ограничение T extends { id: number } разрешает брать item.id, а T сохраняет полный тип элемента: для товаров вернётся товар, для позиций — позиция. find возвращает undefined, если ничего не нашлось.",
+   "hints": [
+    "Ограничение пишут так: <T extends { id: number }>.",
+    "Метод find уже возвращает элемент или undefined."
+   ],
+   "title": "Поиск по id для всех"
+  },
+  {
+   "task_id": "ts-functions-05",
+   "topic_id": "ts-functions",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "story": "Ира: «Форматтер цен иногда пишет «undefined ₽». Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "language": "typescript",
+    "code": "type Formatter = (value: number) => string;\n\nconst formatPrice: Formatter = (value) => {\n    const rounded = Math.round(value);\n    rounded.toLocaleString(\"ru-RU\") + \" ₽\";\n};\n\nconsole.log(formatPrice(1990));",
+    "bug_line": 5,
+    "options": [
+     "Результат строки не возвращается: нет return",
+     "Math.round нельзя вызывать для числа",
+     "Тип Formatter описан неверно",
+     "toLocaleString нужно вызвать у строки"
+    ],
+    "correct_answer": 0
+   },
+   "explanation": "В стрелочной функции с фигурными скобками результат нужно вернуть явно через return. Без него функция возвращает undefined. TypeScript заметил бы это: тип Formatter обещает string.",
+   "hints": [
+    "Посмотри, что функция возвращает.",
+    "В теле в фигурных скобках нужен return."
+   ],
+   "title": "Цена «undefined ₽»"
+  },
+  {
+   "task_id": "ts-async-01",
+   "topic_id": "ts-async",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «Разберёмся с порядком выполнения. Что напечатает код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "language": "typescript",
+    "code": "async function load(): Promise<string> {\n    console.log(\"2: запрос ушёл\");\n    return \"данные\";\n}\n\nconsole.log(\"1: старт\");\nload().then((data: string) => console.log(\"4: пришли \" + data));\nconsole.log(\"3: страница живёт\");",
+    "output": "1: старт\n2: запрос ушёл\n3: страница живёт\n4: пришли данные"
+   },
+   "explanation": "Тело async-функции до первого await выполняется сразу, поэтому «2» идёт после «1». Колбэк then — микрозадача: она выполнится только после всего синхронного кода, поэтому «3» раньше «4».",
+   "hints": [
+    "Синхронный код всегда выполняется целиком раньше колбэков промисов.",
+    "До первого await тело async-функции работает синхронно."
+   ],
+   "title": "Порядок выполнения"
+  },
+  {
+   "task_id": "ts-async-02",
+   "topic_id": "ts-async",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Марина: «Сервис цен отдаёт промис. Сделай функцию, которая ждёт цену и добавляет доставку.»",
+   "content": {
+    "question": "Напиши async function withDelivery(price: Promise<number>, delivery: number): Promise<number> — дождись цены и прибавь доставку.",
+    "language": "typescript",
+    "entry": "withDelivery",
+    "code": "function withDelivery(price, delivery) {\n    // дождись цены и прибавь доставку\n}",
+    "correct_answer": "async function withDelivery(price: Promise<number>, delivery: number): Promise<number> {\n    const p = await price;\n    return p + delivery;\n}",
+    "test_cases": [
+     {
+      "input": [
+       1000,
+       300
+      ],
+      "expected": 1300
+     },
+     {
+      "input": [
+       0,
+       0
+      ],
+      "expected": 0
+     }
+    ],
+    "requirements": [
+     {
+      "input": "async-функция",
+      "expected": {
+       "regex": "async\\s+function\\s+withDelivery"
+      }
+     },
+     {
+      "input": "результат Promise<number>",
+      "expected": {
+       "regex": "\\)\\s*:\\s*Promise<\\s*number\\s*>"
+      }
+     },
+     {
+      "input": "используется await",
+      "expected": {
+       "regex": "\\bawait\\b"
+      }
+     }
+    ]
+   },
+   "explanation": "await достаёт число из промиса, а async-функция сама заворачивает результат обратно в Promise<number>. Если передать обычное число, await просто вернёт его — поэтому тесты с числами тоже работают.",
+   "hints": [
+    "Функцию помечают async, внутри — await price.",
+    "Тип результата async-функции — Promise<тип>."
+   ],
+   "title": "Цена с доставкой"
+  },
+  {
+   "task_id": "ts-async-03",
+   "topic_id": "ts-async",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Гена: «Загрузка профиля падает без сообщения. Допиши обработку ошибки.»",
+   "content": {
+    "question": "Заполни пропуски: дождись загрузки и поймай ошибку.",
+    "language": "typescript",
+    "code": "async function loadProfile(fetchUser: () => Promise<string>): Promise<string> {\n    [[1]] {\n        const name = [[2]] fetchUser();\n        return \"Привет, \" + name;\n    } [[3]] (err) {\n        return \"Не удалось загрузить профиль\";\n    }\n}",
+    "blanks": [
+     {
+      "answer": [
+       "try"
+      ]
+     },
+     {
+      "answer": [
+       "await"
+      ]
+     },
+     {
+      "answer": [
+       "catch"
+      ]
+     }
+    ]
+   },
+   "explanation": "Ошибку в await ловят обычным try/catch. Без await в try ошибка промиса вылетела бы мимо catch: функция уже вернула бы промис.",
+   "hints": [
+    "Для перехвата ошибок — try { … } catch (err) { … }.",
+    "Чтобы дождаться промиса, нужен await."
+   ],
+   "title": "Ошибка загрузки профиля"
+  },
+  {
+   "task_id": "ts-async-04",
+   "topic_id": "ts-async",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "story": "Марина: «Главная грузит товары и баннеры по очереди — медленно. Собери параллельную загрузку.»",
+   "content": {
+    "question": "Собери функцию, которая загружает товары и баннеры параллельно через Promise.all и возвращает их количество.",
+    "language": "typescript",
+    "lines": [
+     "async function loadHome(): Promise<number> {",
+     "  const [products, banners] = await Promise.all([",
+     "    loadProducts(),",
+     "    loadBanners(),",
+     "  ]);",
+     "  return products.length + banners.length;",
+     "}"
+    ],
+    "distractors": [
+     "  const products = await loadProducts();",
+     "  return products + banners;"
+    ]
+   },
+   "explanation": "Promise.all запускает оба запроса сразу и ждёт оба — время загрузки равно самому долгому запросу, а не сумме. Результаты приходят массивом в том же порядке, поэтому их удобно разобрать деструктуризацией.",
+   "hints": [
+    "Оба вызова идут внутрь массива для Promise.all.",
+    "Результат Promise.all разбирают через const [a, b] = await …"
+   ],
+   "title": "Параллельная загрузка главной"
+  },
+  {
+   "task_id": "ts-async-05",
+   "topic_id": "ts-async",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "story": "Ира: «Счётчик товаров на главной показывает [object Promise]. Найди баг.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "language": "typescript",
+    "code": "async function countProducts(): Promise<number> {\n    return 42;\n}\n\nasync function renderBadge(): Promise<string> {\n    const count = countProducts();\n    return \"Товаров: \" + count;\n}",
+    "bug_line": 6,
+    "options": [
+     "Нет await: count — это промис, а не число",
+     "countProducts должна быть не async",
+     "Нельзя складывать строку и число",
+     "renderBadge должна возвращать number"
+    ],
+    "correct_answer": 0
+   },
+   "explanation": "Без await count — это Promise<number>, а при сложении со строкой промис превращается в «[object Promise]». С явным типом const count: number = countProducts() TypeScript сразу показал бы ошибку.",
+   "hints": [
+    "Что возвращает вызов async-функции без await?",
+    "Внутри async-функции промис нужно дождаться."
+   ],
+   "title": "[object Promise] в бейдже"
+  }
+ ]
+}
