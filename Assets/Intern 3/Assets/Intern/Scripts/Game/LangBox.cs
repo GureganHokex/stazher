@@ -21,6 +21,7 @@ namespace Intern.Game
         public string parser = "go";     // go — go test -json; check — строки ##TEST|имя|PASS/FAIL (свой набор проверок языка)
         public string testShow, runShow; // что показать игроку в терминале вместо полной команды
         public string testMarker;        // без этого в файле тестов задача считается сломанной (selftest)
+        public string dockerfile;        // образ не скачивается, а собирается игрой из этого Dockerfile (docker build)
         public string[] env = new string[0];
         public Dictionary<string, string> extraFiles = new Dictionary<string, string>();
     }
@@ -106,8 +107,164 @@ namespace Intern.Game
             extraFiles = new Dictionary<string, string> { { "Check.cs", CheckCs }, { "Usings.cs", UsingsCs }, { "stazher-cs.sh", CsScript } },
         };
 
-        public static LangSpec For(string lang) { return lang == "go" ? Go : lang == "java" ? Java : lang == "csharp" ? CSharp : null; }
-        public static IEnumerable<LangSpec> All { get { yield return Go; yield return Java; yield return CSharp; } }
+        // Спринт 14: C++. Маленького официального образа с g++ нет (gcc:14 — около 1,4 ГБ), поэтому игра один раз собирает свой
+        // из debian:trixie-slim. Сборка с -fsanitize=address,undefined: выход за границы, деление на ноль и рекурсия — со строкой кода
+        public static readonly LangSpec Cpp = new LangSpec
+        {
+            id = "cpp", name = "C++", image = "stazher/cpp:1", container = "stazher-cpp", dockerfile = CppDockerfile,
+            src = "main.cpp", test = "tests.cpp", parser = "check", size = "около 500 МБ",
+            runCmd = "sh stazher-cpp.sh run", testCmd = "sh stazher-cpp.sh test",
+            testShow = "g++ -std=c++20 -fsanitize=address,undefined -o tests tests.cpp && ./tests", runShow = "g++ -std=c++20 -fsanitize=address,undefined -o main main.cpp && ./main", testMarker = "check::",
+            env = new[] { "LANG=C.UTF-8" },
+            extraFiles = new Dictionary<string, string> { { "check.hpp", CheckHpp }, { "stazher-cpp.sh", CppScript } },
+        };
+
+        public static LangSpec For(string lang) { return lang == "go" ? Go : lang == "java" ? Java : lang == "csharp" ? CSharp : lang == "cpp" ? Cpp : null; }
+        public static IEnumerable<LangSpec> All { get { yield return Go; yield return Java; yield return CSharp; yield return Cpp; } }
+
+        // Tools/s14/check.hpp — набор проверок для tests.cpp
+        public const string CheckHpp =
+            "// Проверки «Стажёра» для задач на C++: каждая проверка печатает строку ##TEST|имя|PASS или ##TEST|имя|FAIL|почему.\n" +
+            "// Исключение в проверяемом коде ловится внутри проверки — остальные тесты всё равно выполнятся.\n" +
+            "#pragma once\n" +
+            "#include <cmath>\n" +
+            "#include <cxxabi.h>\n" +
+            "#include <cstdlib>\n" +
+            "#include <exception>\n" +
+            "#include <iostream>\n" +
+            "#include <map>\n" +
+            "#include <sstream>\n" +
+            "#include <string>\n" +
+            "#include <type_traits>\n" +
+            "#include <typeinfo>\n" +
+            "#include <unordered_map>\n" +
+            "#include <vector>\n" +
+            "\n" +
+            "namespace check {\n" +
+            "\n" +
+            "inline std::string clean(std::string s) {\n" +
+            "    std::string r;\n" +
+            "    for (char c : s) {\n" +
+            "        if (c == '|') r += '/';\n" +
+            "        else if (c == '\\n') r += \" \\xE2\\x8F\\x8E \";\n" +
+            "        else if (c != '\\r') r += c;\n" +
+            "    }\n" +
+            "    return r;\n" +
+            "}\n" +
+            "\n" +
+            "inline void pass(const std::string& n) { std::cout << \"##TEST|\" << clean(n) << \"|PASS\" << std::endl; }\n" +
+            "inline void fail(const std::string& n, const std::string& m) { std::cout << \"##TEST|\" << clean(n) << \"|FAIL|\" << clean(m) << std::endl; }\n" +
+            "\n" +
+            "inline std::string demangle(const char* name) {\n" +
+            "    int st = 0;\n" +
+            "    char* d = abi::__cxa_demangle(name, nullptr, nullptr, &st);\n" +
+            "    std::string r = st == 0 && d ? d : name;\n" +
+            "    std::free(d);\n" +
+            "    return r;\n" +
+            "}\n" +
+            "\n" +
+            "template <class T, class = void> struct is_range : std::false_type {};\n" +
+            "template <class T> struct is_range<T, std::void_t<decltype(std::declval<const T&>().begin()), decltype(std::declval<const T&>().end())>> : std::true_type {};\n" +
+            "template <class T> struct is_map : std::false_type {};\n" +
+            "template <class K, class V, class... R> struct is_map<std::map<K, V, R...>> : std::true_type {};\n" +
+            "template <class K, class V, class... R> struct is_map<std::unordered_map<K, V, R...>> : std::true_type {};\n" +
+            "template <class T, class = void> struct streamable : std::false_type {};\n" +
+            "template <class T> struct streamable<T, std::void_t<decltype(std::declval<std::ostream&>() << std::declval<const T&>())>> : std::true_type {};\n" +
+            "\n" +
+            "template <class T> std::string show(const T& v);\n" +
+            "\n" +
+            "template <class T> std::string show(const T& v) {\n" +
+            "    std::ostringstream o;\n" +
+            "    using D = std::decay_t<T>;\n" +
+            "    if constexpr (std::is_same_v<D, std::string>) o << '\"' << v << '\"';\n" +
+            "    else if constexpr (std::is_same_v<D, const char*> || std::is_same_v<D, char*>) o << '\"' << v << '\"';\n" +
+            "    else if constexpr (std::is_same_v<D, bool>) o << (v ? \"true\" : \"false\");\n" +
+            "    else if constexpr (std::is_same_v<D, char>) o << '\\'' << v << '\\'';\n" +
+            "    else if constexpr (std::is_floating_point_v<D>) { o.precision(15); o << v; }\n" +
+            "    else if constexpr (is_map<D>::value) {\n" +
+            "        std::map<std::string, std::string> sorted;\n" +
+            "        for (const auto& kv : v) sorted[show(kv.first)] = show(kv.second);\n" +
+            "        o << '{'; bool first = true;\n" +
+            "        for (const auto& kv : sorted) { if (!first) o << \", \"; first = false; o << kv.first << \": \" << kv.second; }\n" +
+            "        o << '}';\n" +
+            "    }\n" +
+            "    else if constexpr (is_range<D>::value) {\n" +
+            "        o << '['; bool first = true;\n" +
+            "        for (const auto& x : v) { if (!first) o << \", \"; first = false; o << show(x); }\n" +
+            "        o << ']';\n" +
+            "    }\n" +
+            "    else if constexpr (streamable<D>::value) o << v;\n" +
+            "    else o << \"<значение \" << demangle(typeid(D).name()) << \">\";\n" +
+            "    return o.str();\n" +
+            "}\n" +
+            "\n" +
+            "inline std::string what(const std::exception& e) { return demangle(typeid(e).name()) + \": \" + e.what(); }\n" +
+            "\n" +
+            "template <class G, class W> bool same(const G& g, const W& w) {\n" +
+            "    if constexpr (std::is_arithmetic_v<G> && std::is_arithmetic_v<W> && (std::is_floating_point_v<G> || std::is_floating_point_v<W>))\n" +
+            "        return std::fabs(static_cast<double>(g) - static_cast<double>(w)) < 1e-9;\n" +
+            "    else if constexpr (std::is_arithmetic_v<G> && std::is_arithmetic_v<W>)\n" +
+            "        return static_cast<long long>(g) == static_cast<long long>(w);\n" +
+            "    else return g == w;\n" +
+            "}\n" +
+            "\n" +
+            "// eq(\"имя\", [] { return f(1); }, ожидаемое)\n" +
+            "template <class F, class W> void eq(const std::string& name, F got, const W& want) {\n" +
+            "    try {\n" +
+            "        auto g = got();\n" +
+            "        if (same(g, want)) pass(name); else fail(name, \"получено \" + show(g) + \", ожидалось \" + show(want));\n" +
+            "    } catch (const std::exception& e) { fail(name, \"исключение \" + what(e)); }\n" +
+            "    catch (...) { fail(name, \"исключение неизвестного типа\"); }\n" +
+            "}\n" +
+            "\n" +
+            "// near(\"имя\", [] { return f(1.5); }, 2.25) — дробные сравниваются с допуском\n" +
+            "template <class F> void near(const std::string& name, F got, double want) {\n" +
+            "    try {\n" +
+            "        double g = static_cast<double>(got());\n" +
+            "        if (std::fabs(g - want) < 1e-9) pass(name); else fail(name, \"получено \" + show(g) + \", ожидалось \" + show(want));\n" +
+            "    } catch (const std::exception& e) { fail(name, \"исключение \" + what(e)); }\n" +
+            "}\n" +
+            "\n" +
+            "// throws<std::invalid_argument>(\"имя\", [] { f(-1); })\n" +
+            "template <class E, class F> void throws(const std::string& name, F f) {\n" +
+            "    std::string want = demangle(typeid(E).name());\n" +
+            "    try { f(); fail(name, \"исключения не было, ожидалось \" + want); }\n" +
+            "    catch (const E&) { pass(name); }\n" +
+            "    catch (const std::exception& e) { fail(name, \"исключение \" + what(e) + \", ожидалось \" + want); }\n" +
+            "    catch (...) { fail(name, \"исключение неизвестного типа, ожидалось \" + want); }\n" +
+            "}\n" +
+            "\n" +
+            "}  // namespace check\n";
+
+        // Tools/s14/stazher-cpp.sh — сборка g++ с санитайзерами и запуск; тесты стартуют до main игрока
+        public const string CppScript =
+            "#!/bin/sh\n" +
+            "# «Стажёр»: сборка и запуск C++ (g++, C++20). Санитайзеры (address, undefined) показывают выход за границы,\n" +
+            "# деление на ноль, переполнение и бесконечную рекурсию со строкой кода.\n" +
+            "# sh stazher-cpp.sh run  — main.cpp;  sh stazher-cpp.sh test — main.cpp + tests.cpp + check.hpp\n" +
+            "rm -rf out && mkdir out || exit 2\n" +
+            "if [ \"$1\" = test ]; then\n" +
+            "  # main.cpp подключается целиком и не меняется; тесты запускаются до его main и завершают программу\n" +
+            "  printf '#include \"check.hpp\"\\n#include \"main.cpp\"\\n#include \"tests.cpp\"\\nnamespace { struct StazherTests { StazherTests() { tests(); std::cout.flush(); std::exit(0); } } stazher_tests; }\\n' > stazher-tests.cpp\n" +
+            "  SRC=stazher-tests.cpp; BIN=out/tests\n" +
+            "else\n" +
+            "  SRC=main.cpp; BIN=out/main\n" +
+            "fi\n" +
+            "LC_ALL=C g++ -std=c++20 -g -O0 -Wall -Werror=return-type -fdiagnostics-color=never -fmax-errors=8 \\\n" +
+            "    -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -o $BIN $SRC 2>out/gcc.txt\n" +
+            "if [ $? -ne 0 ]; then grep -v \"^In file included from\\|^                 from\" out/gcc.txt >&2; exit 1; fi\n" +
+            "ASAN_OPTIONS=detect_leaks=0:halt_on_error=1:exitcode=134 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:exitcode=134 exec ./$BIN\n";
+
+        // Tools/s14/Dockerfile — образ компилятора C++, игра собирает его сама (docker build)
+        public const string CppDockerfile =
+            "# Компилятор C++ для «Стажёра»: g++ из Debian с санитайзерами. Образ собирает сама игра, один раз.\n" +
+            "FROM debian:trixie-slim\n" +
+            "RUN apt-get -o Acquire::Retries=5 update \\\n" +
+            " && apt-get -o Acquire::Retries=5 install -y --no-install-recommends g++ \\\n" +
+            " && rm -rf /var/lib/apt/lists/*\n" +
+            "ENV LANG=C.UTF-8\n" +
+            "WORKDIR /work\n" +
+            "LABEL stazher=1\n";
 
         // Tools/s13/Check.cs — набор проверок для Tests.cs
         public const string CheckCs =
@@ -336,6 +493,13 @@ namespace Intern.Game
         static string Prepare(LangSpec s, Action<string> note, out bool pulled)
         {
             pulled = false;
+            if (!HasImage(s) && s.dockerfile != null)
+            {
+                if (note != null) note("docker build -t " + s.image + " — первый запуск " + s.name + ": собираю образ компилятора: скачаю около 80 МБ пакетов, на диске займёт " + s.size + ". Это один раз, несколько минут.");
+                var bld = DevEnv.DockerCmd("build --label " + DevEnv.Label + " -t " + s.image + " -", 20 * 60 * 1000, s.dockerfile.Replace("\r\n", "\n"));
+                if (!bld.Ok) return "Не удалось собрать образ " + s.image + (bld.TimedOut ? " за 20 минут" : "") + ": " + BuildError(bld.Text) + ". Проверь интернет и что Docker Desktop запущен.";
+                pulled = true;
+            }
             if (!HasImage(s))
             {
                 if (note != null) note("docker pull " + s.image + " — первый запуск " + s.name + ": скачиваю образ компилятора (на диске займёт " + s.size + "), это один раз.");
@@ -512,6 +676,9 @@ namespace Intern.Game
         static readonly Regex CscErr = new Regex(@"^(\w+\.cs)\((\d+),(\d+)\): error (CS\d+): (.*)$");
         static readonly Regex SrcAt = new Regex(@"\((\w+\.(?:java|cs)):(\d+)\)");   // (Main.java:4), (Program.cs:5) — из Check и трассировок Java
         static readonly Regex CsAt = new Regex(@"(\w+\.cs):line (\d+)");            // трассировка .NET: in /work/…/Program.cs:line 5
+        static readonly Regex GppErr = new Regex(@"^(\w+\.(?:cpp|hpp|h)):(\d+):(\d+): (?:fatal )?error: (.*?)(?: \[-(?:Werror=[\w-]+|fpermissive)\])?$");
+        static readonly Regex CppAt = new Regex(@"(?:^|[/\s])(\w+\.cpp):(\d+)");          // кадр трассировки санитайзера: …/main.cpp:6
+        static readonly Regex UbsanErr = new Regex(@"^(\w+\.cpp):(\d+):\d+: runtime error: (.*)$", RegexOptions.Multiline);
 
         public class CompileError { public string file, text; public int line; }
 
@@ -519,7 +686,7 @@ namespace Intern.Game
         public static List<CompileError> CompileErrors(string err)
         {
             var list = new List<CompileError>();
-            var lines = (err ?? "").Replace("\r", "").Split('\n');
+            var lines = (err ?? "").Replace("\r", "").Replace('\u2018', '\'').Replace('\u2019', '\'').Split('\n');
             for (int i = 0; i < lines.Length; i++)
             {
                 string l = lines[i].Trim();
@@ -536,6 +703,8 @@ namespace Intern.Game
                     list.Add(new CompileError { file = m.Groups[1].Value, line = int.Parse(m.Groups[2].Value), text = text });
                     continue;
                 }
+                m = GppErr.Match(l);
+                if (m.Success) { list.Add(new CompileError { file = m.Groups[1].Value, line = int.Parse(m.Groups[2].Value), text = Explain(m.Groups[4].Value) }); continue; }
                 m = CscErr.Match(l);
                 if (m.Success)
                 {
@@ -616,6 +785,19 @@ namespace Intern.Game
         {
             ex = null; err = err ?? "";
             Func<int, string> lineAt = i => { int end = err.IndexOf('\n', i); return (end > 0 ? err.Substring(i, end - i) : err.Substring(i)).Trim(); };
+            // C++: санитайзеры и необработанное исключение
+            var ub = UbsanErr.Match(err);
+            if (ub.Success) { ex = ExplainRuntime(ub.Groups[3].Value); return ub.Groups[1].Value == srcName ? int.Parse(ub.Groups[2].Value) : CppFrame(err, srcName); }
+            var asan = Regex.Match(err, @"ERROR: AddressSanitizer: ([\w-]+)");
+            if (asan.Success) { ex = ExplainRuntime("asan:" + asan.Groups[1].Value); return CppFrame(err.Substring(asan.Index), srcName); }
+            int tc = err.IndexOf("terminate called after throwing an instance of '", StringComparison.Ordinal);
+            if (tc >= 0)
+            {
+                string first = lineAt(tc), type = first.Substring(first.IndexOf('\'') + 1).TrimEnd('\'');
+                var wm = Regex.Match(err.Substring(tc), @"what\(\):\s*(.*)");
+                ex = "необработанное исключение " + type + (wm.Success ? ": " + wm.Groups[1].Value.Trim() : "");
+                return -1;
+            }
             int k = err.IndexOf("Unhandled exception. ", StringComparison.Ordinal);
             if (k >= 0)
             {
@@ -637,11 +819,38 @@ namespace Intern.Game
             return j != null ? int.Parse(j.Groups[2].Value) : -1;
         }
 
+        static int CppFrame(string report, string srcName)
+        {
+            var f = CppAt.Matches(report ?? "").Cast<Match>().FirstOrDefault(x => x.Groups[1].Value == srcName);
+            return f != null ? int.Parse(f.Groups[2].Value) : -1;
+        }
+
+        // Сообщения санитайзеров C++ — по-русски
+        static string ExplainRuntime(string e)
+        {
+            Match m;
+            switch (e)
+            {
+                case "asan:heap-buffer-overflow": case "asan:stack-buffer-overflow": case "asan:global-buffer-overflow": return "выход за границы массива или vector (AddressSanitizer: " + e.Substring(5) + ")";
+                case "asan:stack-overflow": return "переполнение стека — похоже на бесконечную рекурсию (AddressSanitizer: stack-overflow)";
+                case "asan:SEGV": return "обращение по неверному адресу — nullptr или испорченный указатель (AddressSanitizer: SEGV)";
+                case "asan:heap-use-after-free": return "обращение к уже удалённой памяти (AddressSanitizer: heap-use-after-free)";
+                case "asan:stack-use-after-return": case "asan:stack-use-after-scope": return "обращение к переменной, которой уже нет — ссылка на локальную переменную? (AddressSanitizer: " + e.Substring(5) + ")";
+                case "asan:attempting": case "asan:double-free": return "память освобождена дважды (AddressSanitizer: double-free)";
+            }
+            if (e.StartsWith("asan:")) return "ошибка работы с памятью (AddressSanitizer: " + e.Substring(5) + ")";
+            if (e.StartsWith("division by zero")) return "деление на ноль (" + e + ")";
+            if ((m = Regex.Match(e, @"^signed integer overflow: (.+) cannot be represented in type '(.+)'$")).Success) return "переполнение: " + m.Groups[1].Value + " не помещается в " + m.Groups[2].Value + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^index (-?\d+) out of bounds")).Success) return "индекс " + m.Groups[1].Value + " за границами массива (" + e + ")";
+            if (e.Contains("null pointer")) return "обращение через nullptr (" + e + ")";
+            return e;
+        }
+
         // Строка ошибки из вывода запуска (компиляция или падение); 0 — ошибки нет
         public static int ErrorLine(string stderr, string srcName, out string msg)
         {
             msg = null;
-            if (srcName.EndsWith(".java") || srcName.EndsWith(".cs"))
+            if (srcName.EndsWith(".java") || srcName.EndsWith(".cs") || srcName.EndsWith(".cpp"))
             {
                 var ce = CompileErrors(stderr).FirstOrDefault(e => e.file == srcName);
                 if (ce != null) { msg = "Ошибка компиляции в строке " + ce.line + ": " + ce.text; return ce.line; }
@@ -687,6 +896,21 @@ namespace Intern.Game
             if (e == "unreachable statement") return "до этой строки выполнение никогда не дойдёт (" + e + ")";
             if (e.StartsWith("class ") && e.Contains("is public, should be declared in a file named")) return "публичный класс должен называться как файл — Main (" + e + ")";
             if (e.Contains("unreported exception")) return "проверяемое исключение нужно поймать или объявить в throws (" + e + ")";
+            // g++ (C++)
+            if ((m = Regex.Match(e, @"^'(\w+)' was not declared in this scope(?:; did you mean '(\w+)'\?)?$")).Success) return "имя " + m.Groups[1].Value + " не объявлено" + (m.Groups[2].Success ? " — может, " + m.Groups[2].Value + "?" : ": опечатка или нет #include") + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^expected '(.+?)' before (.+)$")).Success) return "не хватает «" + m.Groups[1].Value + "» (" + e + ")";
+            if (e.StartsWith("control reaches end of non-void function") || e.StartsWith("no return statement in function returning non-void")) return "не все ветки функции возвращают значение: не хватает return (" + e + ")";
+            if ((m = Regex.Match(e, @"^(?:invalid conversion from|cannot convert) '(.+?)' to '(.+?)'")).Success) return "нельзя превратить " + m.Groups[1].Value + " в " + m.Groups[2].Value + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^'(\w+)' is not a member of '(.+?)'(?:; did you mean '(\w+)'\?)?")).Success) return "в " + m.Groups[2].Value + " нет " + m.Groups[1].Value + (m.Groups[3].Success ? " — может, " + m.Groups[3].Value + "?" : ": опечатка или нет #include") + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^'(\w+)' (?:in namespace '\w+' )?does not name a type")).Success) return m.Groups[1].Value + " — не тип: опечатка или нет #include (" + e + ")";
+            if ((m = Regex.Match(e, @"^no matching function for call to '(.+)'$")).Success) return "нет подходящей функции для вызова " + m.Groups[1].Value + ": не те аргументы? (" + e + ")";
+            if ((m = Regex.Match(e, @"^'(.+?)' is private within this context$")).Success) return m.Groups[1].Value + " закрыт (private) — снаружи класса его не видно (" + e + ")";
+            if (e.StartsWith("passing 'const ") && e.Contains("discards qualifiers")) return "метод вызывается у const-объекта, но сам не помечен const (" + e + ")";
+            if ((m = Regex.Match(e, @"^assignment of read-only (?:variable|location|member) '(.+?)'")).Success) return m.Groups[1].Value + " объявлен const — менять нельзя (" + e + ")";
+            if ((m = Regex.Match(e, @"^(?:redeclaration|conflicting declaration) of '(.+?)'")).Success) return m.Groups[1].Value + " уже объявлен (" + e + ")";
+            if ((m = Regex.Match(e, @"^invalid operands of types '(.+?)' and '(.+?)' to binary 'operator(.+?)'$")).Success) return "оператор " + m.Groups[3].Value + " не работает с " + m.Groups[1].Value + " и " + m.Groups[2].Value + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^no match for 'operator(.+?)'")).Success) return "для этих типов нет оператора " + m.Groups[1].Value + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^'(?:class|struct) (.+?)' has no member named '(\w+)'(?:; did you mean '(\w+)'\?)?")).Success) return "у " + m.Groups[1].Value + " нет члена " + m.Groups[2].Value + (m.Groups[3].Success ? " — может, " + m.Groups[3].Value + "?" : "") + " (" + e + ")";
             // csc (C#)
             if ((m = Regex.Match(e, @"^The name '(\w+)' does not exist in the current context$")).Success) return "имя " + m.Groups[1].Value + " не найдено: опечатка или не объявлено (" + e + ")";
             if ((m = Regex.Match(e, @"^([;{}()\[\],]|\w+) expected$")).Success) return "не хватает «" + m.Groups[1].Value + "» (" + e + ")";
@@ -714,6 +938,13 @@ namespace Intern.Game
         }
 
         static string CleanPaths(string s) { return Regex.Replace(s ?? "", @"/work/\.stazher/run/[A-Za-z0-9_-]+/", ""); }
+        // Причина неудачной сборки: строка с ERROR (BuildKit) или последняя содержательная — не ссылка «View build details»
+        static string BuildError(string text)
+        {
+            var lines = (text ?? "").Replace("\r", "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith("View build details")).ToArray();
+            var err = lines.FirstOrDefault(l => l.StartsWith("ERROR") || l.Contains("failed to solve") || l.StartsWith("E: "));
+            return err ?? (lines.Length > 0 ? lines[lines.Length - 1] : "нет вывода");
+        }
         static string FirstLine(string s) { s = (s ?? "").Trim(); int i = s.IndexOf('\n'); return i > 0 ? s.Substring(0, i) : s; }
         static string S(Dictionary<string, object> o, string k) { object v; return o.TryGetValue(k, out v) ? v as string : null; }
     }

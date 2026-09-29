@@ -1,0 +1,1138 @@
+{
+ "track": "lang-cpp",
+ "roadmap": [
+  {
+   "topic_id": "cpp-basics",
+   "lang": "cpp",
+   "replaces": [
+    "be-py-basics"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "C++: переменные и типы",
+   "grade": "junior",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "Функция main, #include и std::cout, int/long long/double/bool/char/std::string, auto и const, целое деление, приведение типов.",
+   "theory": "C++ — компилируемый язык: компилятор (здесь g++) превращает код прямо в машинные инструкции. Поэтому C++ быстрый — на нём пишут базы данных, браузеры, биржи и игровые движки. Но и ошибок он прощает меньше: многие проверки — на тебе.\n\nПрограмма начинается с функции main:\n\n    #include <iostream>\n    #include <string>\n\n    int main() {\n        std::cout << \"Привет, Кодзилла!\" << \"\\n\";\n    }\n\n• #include подключает библиотеку: <iostream> — ввод-вывод, <string> — строки, <vector> — массивы.\n• std:: — пространство имён стандартной библиотеки: std::cout, std::string.\n• std::cout << a << b печатает значения по очереди, \"\\n\" переводит строку.\n• main — единственная функция, которой можно не писать return: она сама вернёт 0.\n\nПеременные:\n\n    int qty = 2;                // целое, до 2 147 483 647\n    long long views = 5000000000;\n    double price = 19.99;\n    bool inStock = true;\n    char grade = 'A';           // один символ — в одинарных кавычках\n    std::string title = \"Лампа\";\n    auto total = qty * 1990;    // auto: тип выводится сам (int)\n    const int vat = 20;         // константа\n\nМелочи, на которых спотыкаются:\n• int / int — целое деление: 7 / 2 == 3. Дробный результат даст 7 / 2.0 или static_cast<double>(7) / 2.\n• static_cast<int>(19.99 * 100) отбрасывает дробную часть, а 19.99 * 100 в double — это 1998.9999…; для денег округляют: std::lround.\n• Число в строку — std::to_string(42); \"Итого: \" + 42 не склеит строку, а сдвинет указатель.\n• title.size() считает байты, а не буквы: у «Лампа» в UTF-8 их 10.\n\nФункция с параметрами и результатом:\n\n    int cartTotal(int price, int qty) {\n        return price * qty;\n    }\n\nФункция, которая должна вернуть значение, но не вернула — ошибка; игра собирает код с флагом, который делает это ошибкой компиляции."
+  },
+  {
+   "topic_id": "cpp-control",
+   "lang": "cpp",
+   "replaces": [
+    "be-py-control"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "C++: условия и циклы",
+   "grade": "junior",
+   "requires": [
+    "cpp-basics"
+   ],
+   "description": "if/else, логические операторы, switch и провал в следующий case, циклы for, while и range-for, переполнение int.",
+   "theory": "Условие — в круглых скобках, тело — в фигурных:\n\n    if (score >= 90) {\n        return \"отлично\";\n    } else if (score >= 75) {\n        return \"хорошо\";\n    }\n\n• Логика: && — «и», || — «или», ! — «не». Тернарный оператор: qty > 0 ? \"есть\" : \"нет\".\n\nswitch сравнивает целое число с вариантами:\n\n    switch (level) {\n        case 1:\n            std::cout << \"junior\\n\";\n            break;\n        case 2:\n            std::cout << \"middle\\n\";\n            break;\n        default:\n            std::cout << \"?\\n\";\n    }\n\nБез break выполнение «проваливается» в следующий case — это частый баг.\n\nЦиклы:\n\n    for (int i = 0; i < 10; i++) { … }        // со счётчиком\n    while (total < 100) { … }                  // пока условие верно\n    for (int price : prices) { … }             // по всем элементам (range-for)\n\n• break выходит из цикла, continue переходит к следующему шагу.\n• Индексы — от 0 до size() - 1, условие цикла: i < prices.size().\n• Переполнение int в C++ — неопределённое поведение: программа может выдать что угодно. Большие суммы считают в long long. Игра собирает код с проверкой (UBSan), поэтому переполнение остановит программу и покажет строку."
+  },
+  {
+   "topic_id": "cpp-collections",
+   "lang": "cpp",
+   "replaces": [
+    "be-py-collections"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "C++: vector и map",
+   "grade": "junior",
+   "requires": [
+    "cpp-control"
+   ],
+   "description": "std::vector, push_back и size, [] и at, std::map и unordered_map, find/contains, range-for со структурной распаковкой.",
+   "theory": "std::vector — массив, который растёт сам:\n\n    #include <vector>\n\n    std::vector<int> prices{1990, 500, 7500};\n    prices.push_back(100);         // добавить в конец\n    prices.size();                 // 4\n    prices[0];                     // 1990 — без проверки границ!\n    prices.at(10);                 // бросит std::out_of_range\n    prices.back();                 // последний элемент\n\n• prices[10] для вектора из 4 элементов — неопределённое поведение: C++ не проверит индекс и прочитает чужую память. Игра собирает код с AddressSanitizer, поэтому такая ошибка остановит программу со строкой.\n\nstd::map хранит пары ключ → значение, отсортированные по ключу:\n\n    #include <map>\n\n    std::map<std::string, int> stock{{\"лампа\", 3}, {\"стол\", 1}};\n    stock[\"лампа\"] = 5;              // перезаписать\n    stock.contains(\"шкаф\");          // false (C++20)\n    auto it = stock.find(\"шкаф\");    // итератор; stock.end() — не нашёл\n    stock.at(\"шкаф\");                // бросит std::out_of_range\n    for (const auto& [name, qty] : stock) { … }   // обход пар\n\n• Ловушка: stock[\"шкаф\"] для отсутствующего ключа не падает, а добавляет его со значением 0. Для чтения без побочных эффектов — find, contains или at.\n• std::unordered_map — то же самое, но без сортировки и обычно быстрее.\n• const auto& в цикле — «посмотреть без копирования». Без & каждый элемент копировался бы."
+  },
+  {
+   "topic_id": "cpp-functions",
+   "lang": "cpp",
+   "replaces": [
+    "be-py-functions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "C++: функции и ссылки",
+   "grade": "junior",
+   "requires": [
+    "cpp-collections"
+   ],
+   "description": "Передача по значению и по ссылке, const&, перегрузка, параметры по умолчанию, рекурсия, лямбды и захват.",
+   "theory": "Главное отличие C++ от Java, C# и Python: по умолчанию функция получает копию аргумента — даже огромного вектора.\n\n    void bump(int x)  { x += 10; }   // меняет копию — снаружи ничего не изменится\n    void bump2(int& x) { x += 10; }  // & — ссылка: меняет саму переменную вызывающего\n\n    int total(const std::vector<int>& prices);   // const& — без копии и без права менять\n\n• Большие объекты (строки, векторы) передают по const&, если функция их только читает, и по &, если меняет.\n• В range-for так же: for (int p : prices) даёт копии, for (int& p : prices) — сами элементы.\n• Перегрузка: одно имя, разные параметры — print(int) и print(const std::string&).\n• Параметр по умолчанию: std::string price(int rub, const std::string& cur = \"₽\").\n• Рекурсия — функция вызывает сама себя. Без базового случая — переполнение стека.\n\nПеременную обязательно инициализировать: int sum; — это не ноль, а мусор, который был в памяти.\n\nЛямбда — функция прямо в выражении:\n\n    auto twice = [](int n) { return n * 2; };\n    int k = 3;\n    auto addK = [k](int n) { return n + k; };    // k скопирована в момент создания\n    auto addRef = [&k](int n) { return n + k; }; // k по ссылке — увидит изменения"
+  },
+  {
+   "topic_id": "cpp-classes",
+   "lang": "cpp",
+   "replaces": [
+    "be-py-oop"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "C++: классы и структуры",
+   "grade": "junior",
+   "requires": [
+    "cpp-functions"
+   ],
+   "description": "struct и class, конструкторы и список инициализации, public/private, const-методы, operator<<, деструкторы и RAII.",
+   "theory": "struct и class — одно и то же, разница только в доступе по умолчанию: у struct всё public, у class — private.\n\n    class Product {\n    public:\n        Product(std::string name, int price) : name_(std::move(name)), price_(price) {}\n\n        int price() const { return price_; }   // const: метод не меняет объект\n\n    private:\n        std::string name_;\n        int price_;\n    };\n\n• После двоеточия в конструкторе — список инициализации: поля получают значения сразу.\n• const после параметров метода обещает не менять объект. У const-объекта можно вызвать только такие методы.\n• Поля часто помечают подчёркиванием (name_), чтобы не путать с параметрами.\n\nОбъекты в C++ — значения, а не ссылки, как в Java и C#:\n\n    Point a{1, 2};\n    Point b = a;     // копия: b.x = 10 не изменит a\n    Point& c = a;    // ссылка: c.y = 20 изменит a\n\nПоэтому объект, переданный в функцию без &, тоже копируется.\n\nЧтобы объект печатался через std::cout, пишут operator<<:\n\n    std::ostream& operator<<(std::ostream& out, const Product& p) {\n        return out << p.name() << \" — \" << p.price() << \" ₽\";\n    }\n\nДеструктор ~Product() вызывается сам, когда объект выходит из области видимости. На этом держится RAII: объект захватывает ресурс (файл, соединение, память) в конструкторе и гарантированно освобождает в деструкторе."
+  },
+  {
+   "topic_id": "cpp-errors",
+   "lang": "cpp",
+   "replaces": [
+    "be-py-exceptions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "C++: исключения и RAII",
+   "grade": "junior",
+   "requires": [
+    "cpp-functions"
+   ],
+   "description": "throw/try/catch, исключения стандартной библиотеки, ловля по const&, свой класс исключения, RAII вместо finally, unique_ptr.",
+   "theory": "Исключение бросают через throw, ловят в try/catch:\n\n    #include <stdexcept>\n\n    try {\n        int port = std::stoi(text);\n    } catch (const std::invalid_argument& e) {\n        std::cout << \"не число: \" << e.what() << \"\\n\";\n    }\n\n• Ловят по ссылке на константу — const std::invalid_argument&: без копии и без «срезания» типа.\n• e.what() — текст ошибки.\n• Непойманное исключение завершает программу: terminate called after throwing an instance of …\n\nИсключения стандартной библиотеки (все наследуют std::exception):\n• std::invalid_argument — неверный аргумент (std::stoi(\"x4\")).\n• std::out_of_range — нет такого индекса или ключа (vector::at, map::at).\n• std::runtime_error — ошибка во время работы: не хватает денег, файл не открылся.\n\nОсторожно: std::stoi(\"4x\") не бросает исключение, а возвращает 4 — разбирает цифры в начале строки.\n\nСвоё исключение — класс-наследник:\n\n    class StockError : public std::runtime_error {\n    public:\n        StockError(int have) : std::runtime_error(\"мало товара\"), have(have) {}\n        const int have;\n    };\n\nfinally в C++ нет — его заменяет RAII: деструкторы локальных объектов вызываются при любом выходе из функции, и при return, и при исключении. Поэтому память выделяют не через new/delete, а через умные указатели:\n\n    auto report = std::make_unique<Report>();   // удалится сам"
+  }
+ ],
+ "tasks": [
+  {
+   "task_id": "cpp-basics-01",
+   "topic_id": "cpp-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Итог корзины на C++",
+   "story": "Гена: «Расчёт корзины переносим в быстрый сервис на C++. Начнём с простого: стоимость позиции.»",
+   "content": {
+    "question": "Допиши функцию cartTotal(int price, int qty) — стоимость позиции: цена × количество.",
+    "entry": "cartTotal",
+    "code": "#include <iostream>\n\n// стоимость позиции: цена × количество\nint cartTotal(int price, int qty) {\n    return 0;\n}\n\nint main() {\n    std::cout << cartTotal(1990, 2) << \"\\n\";\n}",
+    "correct_answer": "#include <iostream>\n\n// стоимость позиции: цена × количество\nint cartTotal(int price, int qty) {\n    return price * qty;\n}\n\nint main() {\n    std::cout << cartTotal(1990, 2) << \"\\n\";\n}",
+    "tests_code": "void tests() {\n    check::eq(\"1990 × 2\", [] { return cartTotal(1990, 2); }, 3980);\n    check::eq(\"250 × 0\", [] { return cartTotal(250, 0); }, 0);\n    check::eq(\"99 × 3\", [] { return cartTotal(99, 3); }, 297);\n}",
+    "requirements": [
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Функция объявляется так: тип результата (int), имя, параметры с типами. Результат возвращают через return, инструкция заканчивается точкой с запятой. Тесты вызывают cartTotal напрямую, поэтому имя и параметры менять нельзя.",
+   "hints": [
+    "Верни произведение через return.",
+    "Умножение — звёздочка: price * qty."
+   ]
+  },
+  {
+   "task_id": "cpp-basics-02",
+   "topic_id": "cpp-basics",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Байты, буквы и половинки",
+   "story": "Ира: «В логах то цена круглая, то длина названия странная. Что напечатает этот код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "#include <iostream>\n#include <string>\n\nint main() {\n    int price = 7;\n    std::cout << price / 2 << \"\\n\";\n    std::cout << price / 2.0 << \"\\n\";\n    std::cout << price % 4 << \"\\n\";\n    std::string title = \"Лампа\";\n    std::cout << title + \" за \" + std::to_string(price) << \"\\n\";\n    std::cout << title.size() << \"\\n\";\n    bool cheap = price < 10;\n    std::cout << cheap << \" \" << std::boolalpha << cheap << \"\\n\";\n}",
+    "language": "cpp",
+    "output": "3\n3.5\n3\nЛампа за 7\n10\n1 true"
+   },
+   "explanation": "7 / 2 — деление двух int, оно целое: 3. С 2.0 — дробное: 3.5. 7 % 4 — остаток 3. std::to_string превращает число в строку, и + склеивает строки. size() считает байты: каждая русская буква в UTF-8 занимает 2 байта, у «Лампа» их 10. bool печатается как 1, а после std::boolalpha — словом true.",
+   "hints": [
+    "Деление двух int отбрасывает дробную часть.",
+    "size() считает байты, а не буквы."
+   ]
+  },
+  {
+   "task_id": "cpp-basics-03",
+   "topic_id": "cpp-basics",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Первая программа",
+   "story": "Гена: «Допиши пропуски — без них g++ программу не соберёт или она напечатает не то.»",
+   "content": {
+    "question": "Заполни пропуски: подключи строки, объяви константу и переведи строку в конце.",
+    "code": "#include <iostream>\n#include <[[1]]>\n\nint main() {\n    std::string title = \"Лампа\";\n    [[2]] int price = 1990;\n    std::cout << title << \" стоит \" << price << \" ₽\" << [[3]];\n}",
+    "blanks": [
+     {
+      "answer": [
+       "string"
+      ]
+     },
+     {
+      "answer": [
+       "const",
+       "constexpr"
+      ]
+     },
+     {
+      "answer": [
+       "\"\\n\"",
+       "std::endl",
+       "'\\n'"
+      ]
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "std::string живёт в заголовке <string>. const делает переменную константой — её нельзя изменить после объявления (constexpr — константа, известная ещё при компиляции). Перевод строки — \"\\n\" или std::endl (он ещё и сразу выталкивает буфер вывода).",
+   "hints": [
+    "Заголовок для std::string называется так же, как тип.",
+    "Перевод строки — \\n в кавычках."
+   ]
+  },
+  {
+   "task_id": "cpp-basics-04",
+   "topic_id": "cpp-basics",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Средний чек без копеек",
+   "story": "Ира: «Средний чек всегда круглый: 2 вместо 2.5. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "#include <iostream>\n\ndouble average(int sum, int count) {\n    return sum / count;\n}\n\nint main() {\n    std::cout << average(5, 2) << \"\\n\";\n}",
+    "bug_line": 4,
+    "options": [
+     "Деление двух int целое — дробная часть теряется ещё до превращения в double",
+     "Функция не может возвращать double",
+     "Параметры должны быть long long",
+     "std::cout не печатает дробные числа"
+    ],
+    "correct_answer": 0,
+    "language": "cpp"
+   },
+   "explanation": "sum / count — деление двух int, результат 2. Только потом C++ превращает 2 в double — потерянная половина не вернётся. Нужно привести хотя бы одно число до деления: static_cast<double>(sum) / count.",
+   "hints": [
+    "Что происходит раньше: деление или превращение в double?",
+    "Приведи sum к double перед делением."
+   ]
+  },
+  {
+   "task_id": "cpp-basics-05",
+   "topic_id": "cpp-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Рубли в копейки",
+   "story": "Стас: «Платёжка принимает сумму в копейках. Иногда списывается на копейку меньше — разберись.»",
+   "content": {
+    "question": "Напиши toKopecks(double rub) — сумму в копейках (long), округлённую до ближайшей копейки: 19.99 → 1999.",
+    "entry": "toKopecks",
+    "code": "#include <cmath>\n#include <iostream>\n\n// рубли в копейки: 19.99 -> 1999\nlong toKopecks(double rub) {\n    return static_cast<long>(rub * 100);\n}\n\nint main() {\n    std::cout << toKopecks(19.99) << \"\\n\";\n}",
+    "correct_answer": "#include <cmath>\n#include <iostream>\n\n// рубли в копейки: 19.99 -> 1999\nlong toKopecks(double rub) {\n    return std::lround(rub * 100);\n}\n\nint main() {\n    std::cout << toKopecks(19.99) << \"\\n\";\n}",
+    "tests_code": "void tests() {\n    check::eq(\"19.99 ₽\", [] { return toKopecks(19.99); }, 1999L);\n    check::eq(\"1.15 ₽\", [] { return toKopecks(1.15); }, 115L);\n    check::eq(\"100 ₽\", [] { return toKopecks(100); }, 10000L);\n    check::eq(\"0.1 ₽\", [] { return toKopecks(0.1); }, 10L);\n    check::eq(\"0 ₽\", [] { return toKopecks(0); }, 0L);\n}",
+    "requirements": [
+     {
+      "input": "округляет до целого (std::lround или std::round)",
+      "expected": {
+       "regex": "\\b(l?l?round)\\s*\\("
+      }
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "double хранит числа в двоичной системе, и 19.99 × 100 получается 1998.9999999999998. static_cast<long> просто отбрасывает дробную часть — выходит 1998, копейка потеряна. std::lround округляет до ближайшего целого и сразу возвращает long.",
+   "hints": [
+    "Приведение типа не округляет, а отбрасывает дробную часть.",
+    "std::lround(rub * 100) из <cmath>."
+   ]
+  },
+  {
+   "task_id": "cpp-control-01",
+   "topic_id": "cpp-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Оценка за код-ревью",
+   "story": "Гена: «Бот код-ревью ставит оценку по баллам. Перенеси правило на C++.»",
+   "content": {
+    "question": "Напиши reviewGrade(int score): от 90 — «отлично», от 75 — «хорошо», от 50 — «зачёт», иначе «на доработку».",
+    "entry": "reviewGrade",
+    "code": "#include <iostream>\n#include <string>\n\n// оценка за код-ревью по баллам\nstd::string reviewGrade(int score) {\n    return \"\";\n}\n\nint main() {\n    std::cout << reviewGrade(80) << \"\\n\";\n}",
+    "correct_answer": "#include <iostream>\n#include <string>\n\n// оценка за код-ревью по баллам\nstd::string reviewGrade(int score) {\n    if (score >= 90) {\n        return \"отлично\";\n    } else if (score >= 75) {\n        return \"хорошо\";\n    } else if (score >= 50) {\n        return \"зачёт\";\n    }\n    return \"на доработку\";\n}\n\nint main() {\n    std::cout << reviewGrade(80) << \"\\n\";\n}",
+    "tests_code": "void tests() {\n    check::eq(\"95\", [] { return reviewGrade(95); }, \"отлично\");\n    check::eq(\"ровно 90\", [] { return reviewGrade(90); }, \"отлично\");\n    check::eq(\"80\", [] { return reviewGrade(80); }, \"хорошо\");\n    check::eq(\"ровно 75\", [] { return reviewGrade(75); }, \"хорошо\");\n    check::eq(\"50\", [] { return reviewGrade(50); }, \"зачёт\");\n    check::eq(\"12\", [] { return reviewGrade(12); }, \"на доработку\");\n}",
+    "requirements": [
+     {
+      "input": "сравнивает с 90",
+      "expected": {
+       "regex": ">=?\\s*(90|89)\\b|\\b(90|89)\\s*<=?"
+      }
+     },
+     {
+      "input": "сравнивает с 75",
+      "expected": {
+       "regex": ">=?\\s*(75|74)\\b|\\b(75|74)\\s*<=?"
+      }
+     },
+     {
+      "input": "сравнивает с 50",
+      "expected": {
+       "regex": ">=?\\s*(50|49)\\b|\\b(50|49)\\s*<=?"
+      }
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Условия проверяются сверху вниз, первое сработавшее возвращает результат — поэтому начинают с самого высокого порога. Границы включительные — нужен >=. Последний return обязателен: без него функция на ветке «на доработку» ничего бы не вернула, и g++ в игре это не соберёт.",
+   "hints": [
+    "Начни с порога 90 и спускайся вниз.",
+    "Ровно 90 — это «отлично»: используй >=."
+   ]
+  },
+  {
+   "task_id": "cpp-control-02",
+   "topic_id": "cpp-control",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "switch проваливается",
+   "story": "Ира: «Сотрудник второго уровня в отчёте почему-то и middle, и senior. Что напечатает этот код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "#include <iostream>\n\nint main() {\n    int total = 0;\n    for (int i = 1; i <= 10; i++) {\n        if (i % 2 == 0) continue;\n        if (i > 7) break;\n        total += i;\n    }\n    std::cout << \"total = \" << total << \"\\n\";\n\n    int level = 2;\n    switch (level) {\n        case 1:\n            std::cout << \"junior\\n\";\n        case 2:\n            std::cout << \"middle\\n\";\n        case 3:\n            std::cout << \"senior\\n\";\n            break;\n        default:\n            std::cout << \"?\\n\";\n    }\n}",
+    "language": "cpp",
+    "output": "total = 16\nmiddle\nsenior"
+   },
+   "explanation": "continue пропускает чётные i, в сумму попадают 1 + 3 + 5 + 7 = 16, на 9 срабатывает break. switch прыгает на case 2 и печатает middle, но break там нет — выполнение проваливается в case 3 и печатает senior, а уже его break выходит из switch.",
+   "hints": [
+    "continue сразу переходит к следующему i.",
+    "Без break switch выполняет и следующие case."
+   ]
+  },
+  {
+   "task_id": "cpp-control-03",
+   "topic_id": "cpp-control",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "FizzBuzz для ленты заказов",
+   "story": "Гена: «Классика собеседований. Собери функцию из строк.»",
+   "content": {
+    "question": "Собери label(int n): кратно 15 — FizzBuzz, кратно 3 — Fizz, кратно 5 — Buzz, иначе само число строкой.",
+    "lines": [
+     "std::string label(int n) {",
+     "    if (n % 15 == 0) return \"FizzBuzz\";",
+     "    if (n % 3 == 0) return \"Fizz\";",
+     "    if (n % 5 == 0) return \"Buzz\";",
+     "    return std::to_string(n);",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "std::string label(int n) {",
+      "    if (n % 15 == 0) return \"FizzBuzz\";",
+      "    if (n % 5 == 0) return \"Buzz\";",
+      "    if (n % 3 == 0) return \"Fizz\";",
+      "    return std::to_string(n);",
+      "}"
+     ]
+    ],
+    "distractors": [
+     "    return n;",
+     "        break;"
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Кратность 15 проверяют первой, иначе 15 успеет попасть в Fizz. Fizz и Buzz можно поменять местами. return n не соберётся: функция возвращает std::string, а число само в строку не превращается — нужен std::to_string.",
+   "hints": [
+    "Самый частный случай — первым.",
+    "Число в строку превращает std::to_string."
+   ]
+  },
+  {
+   "task_id": "cpp-control-04",
+   "topic_id": "cpp-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма до n",
+   "story": "Гена: «Для отчёта нужна сумма 1 + 2 + … + n. Осторожно: n бывает большим.»",
+   "content": {
+    "question": "Напиши sumTo(int n) — сумму чисел от 1 до n включительно (long long). Для n ≤ 0 — 0. Сумма может не влезть в int.",
+    "entry": "sumTo",
+    "code": "#include <iostream>\n\n// сумма 1 + 2 + ... + n\nlong long sumTo(int n) {\n    return 0;\n}\n\nint main() {\n    std::cout << sumTo(10) << \"\\n\";\n}",
+    "correct_answer": "#include <iostream>\n\n// сумма 1 + 2 + ... + n\nlong long sumTo(int n) {\n    long long total = 0;\n    for (int i = 1; i <= n; i++) {\n        total += i;\n    }\n    return total;\n}\n\nint main() {\n    std::cout << sumTo(10) << \"\\n\";\n}",
+    "tests_code": "void tests() {\n    check::eq(\"n = 1\", [] { return sumTo(1); }, 1);\n    check::eq(\"n = 10\", [] { return sumTo(10); }, 55);\n    check::eq(\"n = 0\", [] { return sumTo(0); }, 0);\n    check::eq(\"n = -5\", [] { return sumTo(-5); }, 0);\n    check::eq(\"n = 100000 (не влезает в int)\", [] { return sumTo(100000); }, 5000050000LL);\n}",
+    "requirements": [
+     {
+      "input": "копит сумму в long long",
+      "expected": {
+       "regex": "long\\s+long\\s+\\w+\\s*="
+      }
+     },
+     {
+      "input": "обходит числа циклом",
+      "expected": {
+       "regex": "\\b(for|while)\\s*\\("
+      }
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Сумма до 100 000 — 5 000 050 000, больше максимума int. В C++ переполнение int — неопределённое поведение: результат может быть любым. Игра это ловит (UBSan) и остановит тесты со строкой ошибки. Поэтому копим в long long.",
+   "hints": [
+    "long long total = 0; и цикл for от 1 до n.",
+    "Условие цикла — i <= n, включительно."
+   ]
+  },
+  {
+   "task_id": "cpp-control-05",
+   "topic_id": "cpp-control",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Сумма заказа читает чужую память",
+   "story": "Ира: «Сумма заказа иногда огромная, а под санитайзером падает с heap-buffer-overflow. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "#include <iostream>\n#include <vector>\n\nint orderSum(const std::vector<int>& prices) {\n    int sum = 0;\n    for (size_t i = 0; i <= prices.size(); i++) {\n        sum += prices[i];\n    }\n    return sum;\n}\n\nint main() {\n    std::cout << orderSum({100, 250, 40}) << \"\\n\";\n}",
+    "bug_line": 6,
+    "options": [
+     "Условие i <= prices.size() заходит за последний элемент",
+     "Счётчик должен начинаться с 1",
+     "size_t нельзя сравнивать с size()",
+     "sum нужно объявить как long long"
+    ],
+    "correct_answer": 0,
+    "language": "cpp"
+   },
+   "explanation": "У вектора из трёх элементов индексы 0, 1 и 2, а size() равен 3. С условием <= цикл делает лишний шаг с i = 3, и prices[3] читает память за вектором. C++ это не проверяет — без санитайзера сумма была бы просто мусорной. Правильно i < prices.size(), а ещё проще for (int p : prices).",
+   "hints": [
+    "Какой последний индекс у вектора из трёх элементов?",
+    "Поменяй <= на <."
+   ]
+  },
+  {
+   "task_id": "cpp-collections-01",
+   "topic_id": "cpp-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Частота тегов",
+   "story": "Стас: «Хочу видеть, какие теги у товаров встречаются чаще. Посчитай их.»",
+   "content": {
+    "question": "Напиши tagCounts(const std::vector<std::string>& tags) — std::map, где у каждого тега записано, сколько раз он встретился.",
+    "entry": "tagCounts",
+    "code": "#include <iostream>\n#include <map>\n#include <string>\n#include <vector>\n\n// сколько раз встретился каждый тег\nstd::map<std::string, int> tagCounts(const std::vector<std::string>& tags) {\n    std::map<std::string, int> counts;\n    return counts;\n}\n\nint main() {\n    for (const auto& [tag, n] : tagCounts({\"sale\", \"new\", \"sale\"})) {\n        std::cout << tag << \": \" << n << \"\\n\";\n    }\n}",
+    "correct_answer": "#include <iostream>\n#include <map>\n#include <string>\n#include <vector>\n\n// сколько раз встретился каждый тег\nstd::map<std::string, int> tagCounts(const std::vector<std::string>& tags) {\n    std::map<std::string, int> counts;\n    for (const auto& tag : tags) {\n        counts[tag]++;\n    }\n    return counts;\n}\n\nint main() {\n    for (const auto& [tag, n] : tagCounts({\"sale\", \"new\", \"sale\"})) {\n        std::cout << tag << \": \" << n << \"\\n\";\n    }\n}",
+    "tests_code": "using Counts = std::map<std::string, int>;\n\nvoid tests() {\n    check::eq(\"sale, new, sale\", [] { return tagCounts({\"sale\", \"new\", \"sale\"}); }, Counts{{\"sale\", 2}, {\"new\", 1}});\n    check::eq(\"один тег\", [] { return tagCounts({\"hit\"}); }, Counts{{\"hit\", 1}});\n    check::eq(\"пустой список\", [] { return tagCounts({}); }, Counts{});\n    check::eq(\"регистр важен\", [] { return tagCounts({\"New\", \"new\", \"new\"}); }, Counts{{\"New\", 1}, {\"new\", 2}});\n}",
+    "requirements": [
+     {
+      "input": "обходит теги циклом",
+      "expected": {
+       "regex": "\\bfor\\s*\\("
+      }
+     },
+     {
+      "input": "увеличивает счётчик тега",
+      "expected": {
+       "regex": "\\+\\+|\\+=\\s*1"
+      }
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Здесь ловушка map работает на нас: counts[tag] для нового тега сам создаёт запись со значением 0, и ++ делает из неё 1. Обход по const auto& — без копирования каждой строки.",
+   "hints": [
+    "for (const auto& tag : tags) — обход без копий.",
+    "counts[tag]++; — новый ключ начнётся с нуля."
+   ]
+  },
+  {
+   "task_id": "cpp-collections-02",
+   "topic_id": "cpp-collections",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "vector и map",
+   "story": "Гена: «Прежде чем писать склад, проверь, как ведут себя vector и map.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "#include <iostream>\n#include <map>\n#include <string>\n#include <vector>\n\nint main() {\n    std::vector<int> prices{500, 1500};\n    prices.push_back(999);\n    prices.insert(prices.begin(), 100);\n    std::cout << prices.size() << \" \" << prices[1] << \" \" << prices.back() << \"\\n\";\n\n    std::map<std::string, int> stock;\n    stock[\"лампа\"] = 3;\n    std::cout << stock[\"шкаф\"] << \" \" << stock.size() << \"\\n\";\n    std::cout << stock.count(\"стол\") << \" \" << stock.contains(\"шкаф\") << \"\\n\";\n    for (const auto& [name, qty] : stock) {\n        std::cout << name << \"=\" << qty << \"\\n\";\n    }\n}",
+    "language": "cpp",
+    "output": "4 500 999\n0 2\n0 1\nлампа=3\nшкаф=0"
+   },
+   "explanation": "push_back добавляет 999 в конец, insert — 100 в начало: [100, 500, 1500, 999]. Чтение stock[\"шкаф\"] не падает, а добавляет «шкаф» со значением 0 — теперь в map два ключа, и contains(\"шкаф\") уже true (печатается как 1). map хранит ключи отсортированными, поэтому «лампа» идёт раньше «шкафа».",
+   "hints": [
+    "insert(begin(), x) вставляет в начало.",
+    "operator[] у map добавляет отсутствующий ключ."
+   ]
+  },
+  {
+   "task_id": "cpp-collections-03",
+   "topic_id": "cpp-collections",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Цены из справочника",
+   "story": "Гена: «Справочник цен почти готов. Заполни пропуски.»",
+   "content": {
+    "question": "Заполни пропуски: тип контейнера, поиск без побочных эффектов и тип в цикле.",
+    "code": "#include <iostream>\n#include <map>\n#include <string>\n\nint main() {\n    std::[[1]]<std::string, int> prices{{\"лампа\", 1990}, {\"стол\", 7500}};\n    auto it = prices.[[2]](\"шкаф\");\n    if (it != prices.end()) {\n        std::cout << it->second << \"\\n\";\n    }\n    for (const [[3]]& [name, price] : prices) {\n        std::cout << name << \": \" << price << \"\\n\";\n    }\n}",
+    "blanks": [
+     {
+      "answer": [
+       "map",
+       "unordered_map"
+      ]
+     },
+     {
+      "answer": [
+       "find"
+      ]
+     },
+     {
+      "answer": [
+       "auto"
+      ]
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Словарь с ключами-строками — std::map (или unordered_map). find не добавляет ключ, в отличие от [], а возвращает итератор; end() значит «не нашли». В цикле const auto& [name, price] распаковывает пару без копирования.",
+   "hints": [
+    "Словарь в стандартной библиотеке — map.",
+    "Поиск без побочных эффектов — find."
+   ]
+  },
+  {
+   "task_id": "cpp-collections-04",
+   "topic_id": "cpp-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товары по бюджету",
+   "story": "Стас: «Покупатель ввёл бюджет. Оставь цены, которые в него укладываются, в том же порядке.»",
+   "content": {
+    "question": "Напиши affordable(const std::vector<int>& prices, int budget) — новый вектор цен не дороже бюджета, в исходном порядке.",
+    "entry": "affordable",
+    "code": "#include <iostream>\n#include <vector>\n\n// цены, которые укладываются в бюджет\nstd::vector<int> affordable(const std::vector<int>& prices, int budget) {\n    std::vector<int> result;\n    return result;\n}\n\nint main() {\n    for (int p : affordable({500, 1500, 999, 2000}, 1000)) {\n        std::cout << p << \"\\n\";\n    }\n}",
+    "correct_answer": "#include <iostream>\n#include <vector>\n\n// цены, которые укладываются в бюджет\nstd::vector<int> affordable(const std::vector<int>& prices, int budget) {\n    std::vector<int> result;\n    for (int price : prices) {\n        if (price <= budget) {\n            result.push_back(price);\n        }\n    }\n    return result;\n}\n\nint main() {\n    for (int p : affordable({500, 1500, 999, 2000}, 1000)) {\n        std::cout << p << \"\\n\";\n    }\n}",
+    "tests_code": "using Prices = std::vector<int>;\n\nvoid tests() {\n    check::eq(\"бюджет 1000\", [] { return affordable({500, 1500, 999, 2000}, 1000); }, Prices{500, 999});\n    check::eq(\"ровно бюджет\", [] { return affordable({1000, 1001}, 1000); }, Prices{1000});\n    check::eq(\"всё дорого\", [] { return affordable({3000, 4000}, 100); }, Prices{});\n    check::eq(\"пустой список\", [] { return affordable({}, 500); }, Prices{});\n}",
+    "requirements": [
+     {
+      "input": "сравнивает цену с бюджетом",
+      "expected": {
+       "regex": "<=\\s*budget|budget\\s*>="
+      }
+     },
+     {
+      "input": "собирает подходящие цены",
+      "expected": {
+       "regex": "push_back|emplace_back|copy_if"
+      }
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Обходим цены и подходящие добавляем в новый вектор через push_back — исходный не трогаем (он и так const&). «Не дороже» — это <=. Вернуть локальный вектор из функции дёшево: компилятор не копирует его, а переносит.",
+   "hints": [
+    "for (int price : prices) и if (price <= budget).",
+    "Подходящие — в result.push_back(price)."
+   ]
+  },
+  {
+   "task_id": "cpp-collections-05",
+   "topic_id": "cpp-collections",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Склад растёт сам",
+   "story": "Ира: «Мы просто проверяем наличие, а товаров в базе становится всё больше. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "#include <iostream>\n#include <map>\n#include <string>\n\nstd::map<std::string, int> stock{{\"лампа\", 3}};\n\nbool inStock(const std::string& item) {\n    return stock[item] > 0;\n}\n\nint main() {\n    std::cout << inStock(\"шкаф\") << \" \" << inStock(\"стол\") << \"\\n\";\n    std::cout << \"товаров в базе: \" << stock.size() << \"\\n\";\n}",
+    "bug_line": 8,
+    "options": [
+     "operator[] добавляет в map отсутствующий ключ со значением 0 — каждая проверка раздувает склад",
+     "Глобальную map нельзя читать из функции",
+     "Сравнение > 0 не работает с map",
+     "Функция должна возвращать int"
+    ],
+    "correct_answer": 0,
+    "language": "cpp"
+   },
+   "explanation": "stock[item] для отсутствующего товара не просто возвращает 0 — он добавляет товар в map. После двух проверок в базе уже три позиции. Для чтения используют find, contains или at: return stock.contains(item) && stock.at(item) > 0;",
+   "hints": [
+    "Что делает operator[], если ключа нет?",
+    "Проверка без побочных эффектов — contains или find."
+   ]
+  },
+  {
+   "task_id": "cpp-functions-01",
+   "topic_id": "cpp-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Скидка на месте",
+   "story": "Гена: «Функция скидки должна менять цены в самом векторе — копия никому не нужна.»",
+   "content": {
+    "question": "Допиши applyDiscount(std::vector<int>& prices, int percent): уменьши каждую цену на percent процентов (целочисленно: цена - цена * percent / 100) прямо в векторе.",
+    "entry": "applyDiscount",
+    "code": "#include <iostream>\n#include <vector>\n\n// уменьшить каждую цену на percent процентов — в самом векторе\nvoid applyDiscount(std::vector<int>& prices, int percent) {\n}\n\nint main() {\n    std::vector<int> prices{1000, 250};\n    applyDiscount(prices, 10);\n    for (int p : prices) {\n        std::cout << p << \"\\n\";\n    }\n}",
+    "correct_answer": "#include <iostream>\n#include <vector>\n\n// уменьшить каждую цену на percent процентов — в самом векторе\nvoid applyDiscount(std::vector<int>& prices, int percent) {\n    for (int& p : prices) {\n        p -= p * percent / 100;\n    }\n}\n\nint main() {\n    std::vector<int> prices{1000, 250};\n    applyDiscount(prices, 10);\n    for (int p : prices) {\n        std::cout << p << \"\\n\";\n    }\n}",
+    "tests_code": "using Prices = std::vector<int>;\n\nvoid tests() {\n    check::eq(\"скидка 10%\", [] { Prices p{1000, 250}; applyDiscount(p, 10); return p; }, Prices{900, 225});\n    check::eq(\"скидка 0%\", [] { Prices p{500}; applyDiscount(p, 0); return p; }, Prices{500});\n    check::eq(\"99 со скидкой 50%\", [] { Prices p{99}; applyDiscount(p, 50); return p; }, Prices{50});\n    check::eq(\"пустой вектор\", [] { Prices p; applyDiscount(p, 30); return p; }, Prices{});\n}",
+    "requirements": [
+     {
+      "input": "меняет сами элементы (int& в цикле или индекс)",
+      "expected": {
+       "regex": "(int|auto)\\s*&\\s*\\w+\\s*:|prices\\s*\\[\\s*\\w+\\s*\\]\\s*[-*]?="
+      }
+     },
+     {
+      "input": "считает процент от цены",
+      "expected": {
+       "regex": "/\\s*100"
+      }
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Вектор пришёл по ссылке, но в цикле тоже нужна ссылка: for (int p : prices) даёт копии, и изменения пропадут. for (int& p : prices) — сами элементы. 99 × 50 / 100 = 49 в целых числах, поэтому остаётся 50.",
+   "hints": [
+    "for (int& p : prices) — без & меняются копии.",
+    "p -= p * percent / 100;"
+   ]
+  },
+  {
+   "task_id": "cpp-functions-02",
+   "topic_id": "cpp-functions",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Копии, ссылки и лямбды",
+   "story": "Гена: «Одни функции меняют переменные, другие — нет, а лямбда помнит старое значение. Проверь себя.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "#include <iostream>\n#include <string>\n\nvoid bump(int x) { x += 10; }\nvoid bumpRef(int& x) { x += 10; }\n\nstd::string kind(int) { return \"int\"; }\nstd::string kind(double) { return \"double\"; }\n\nstd::string price(int rub, const std::string& cur = \"₽\") {\n    return std::to_string(rub) + \" \" + cur;\n}\n\nint main() {\n    int a = 1, b = 1;\n    bump(a);\n    bumpRef(b);\n    std::cout << a << \" \" << b << \"\\n\";\n    std::cout << kind(5) << \" \" << kind(5.0) << \" \" << kind('A') << \"\\n\";\n    std::cout << price(500) << \" | \" << price(7, \"$\") << \"\\n\";\n    int k = 3;\n    auto addK = [k](int n) { return n + k; };\n    auto addRef = [&k](int n) { return n + k; };\n    k = 100;\n    std::cout << addK(1) << \" \" << addRef(1) << \"\\n\";\n}",
+    "language": "cpp",
+    "output": "1 11\nint double int\n500 ₽ | 7 $\n4 101"
+   },
+   "explanation": "bump получает копию — a остаётся 1, bumpRef меняет саму b — 11. char 'A' ближе всего к int (это просто число 65), поэтому выбран kind(int). Параметр cur по умолчанию «₽». [k] копирует k в момент создания лямбды — 1 + 3 = 4, а [&k] смотрит на саму переменную — 1 + 100 = 101.",
+   "hints": [
+    "Без & функция меняет свою копию.",
+    "[k] — копия на момент создания, [&k] — ссылка."
+   ]
+  },
+  {
+   "task_id": "cpp-functions-03",
+   "topic_id": "cpp-functions",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма без копий",
+   "story": "Гена: «Функция суммы получает вектор на миллион цен. Собери её так, чтобы вектор не копировался.»",
+   "content": {
+    "question": "Собери total(const std::vector<int>& prices) — сумму всех цен.",
+    "lines": [
+     "long long total(const std::vector<int>& prices) {",
+     "    long long sum = 0;",
+     "    for (int p : prices) {",
+     "        sum += p;",
+     "    }",
+     "    return sum;",
+     "}"
+    ],
+    "distractors": [
+     "    long long sum;",
+     "    return prices;"
+    ],
+    "language": "cpp"
+   },
+   "explanation": "const& — вектор не копируется и не меняется. sum обязательно инициализировать нулём: long long sum; без значения — мусор из памяти. return prices не соберётся: функция возвращает число.",
+   "hints": [
+    "Сначала sum = 0, потом цикл.",
+    "Переменная без начального значения — не ноль."
+   ]
+  },
+  {
+   "task_id": "cpp-functions-04",
+   "topic_id": "cpp-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Сумма цифр артикула",
+   "story": "Стас: «Контрольная цифра артикула — сумма его цифр. Минус в начале бывает у возвратов, его не считаем.»",
+   "content": {
+    "question": "Напиши digitSum(long long n) — сумму цифр числа. Знак не учитывается: digitSum(-1990) == 19. Можно рекурсией.",
+    "entry": "digitSum",
+    "code": "#include <iostream>\n\n// сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\nint digitSum(long long n) {\n    return 0;\n}\n\nint main() {\n    std::cout << digitSum(1990) << \"\\n\";\n}",
+    "correct_answer": "#include <cstdlib>\n#include <iostream>\n\n// сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\nint digitSum(long long n) {\n    n = std::llabs(n);\n    if (n < 10) {\n        return static_cast<int>(n);\n    }\n    return static_cast<int>(n % 10) + digitSum(n / 10);\n}\n\nint main() {\n    std::cout << digitSum(1990) << \"\\n\";\n}",
+    "tests_code": "void tests() {\n    check::eq(\"0\", [] { return digitSum(0); }, 0);\n    check::eq(\"7\", [] { return digitSum(7); }, 7);\n    check::eq(\"1990\", [] { return digitSum(1990); }, 19);\n    check::eq(\"123456789\", [] { return digitSum(123456789); }, 45);\n    check::eq(\"возврат -1990\", [] { return digitSum(-1990); }, 19);\n    check::eq(\"длинный 9999999999\", [] { return digitSum(9999999999LL); }, 90);\n}",
+    "requirements": [
+     {
+      "input": "берёт последнюю цифру остатком от деления на 10",
+      "expected": {
+       "regex": "%\\s*10"
+      }
+     },
+     {
+      "input": "отбрасывает последнюю цифру делением на 10",
+      "expected": {
+       "regex": "/\\s*10"
+      }
+     },
+     {
+      "input": "убирает знак",
+      "expected": {
+       "regex": "\\babs\\s*\\(|llabs|<\\s*0|-\\s*n\\b"
+      }
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Последняя цифра — n % 10, остальное число — n / 10. Рекурсия: сумма цифр = последняя цифра + сумма цифр остального, базовый случай — однозначное число. Для отрицательных остаток тоже отрицательный (-199 % 10 == -9), поэтому знак убирают сразу: std::llabs для long long из <cstdlib>.",
+   "hints": [
+    "n % 10 — последняя цифра, n / 10 — число без неё.",
+    "Сначала n = std::llabs(n)."
+   ]
+  },
+  {
+   "task_id": "cpp-functions-05",
+   "topic_id": "cpp-functions",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Сумма корзины скачет",
+   "story": "Ира: «Сумма одной и той же корзины каждый раз разная. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "#include <iostream>\n#include <vector>\n\nint total(const std::vector<int>& prices) {\n    int sum;\n    for (int p : prices) {\n        sum += p;\n    }\n    return sum;\n}\n\nint main() {\n    std::cout << total({100, 250, 40}) << \"\\n\";\n}",
+    "bug_line": 5,
+    "options": [
+     "sum не инициализирована — в ней мусор из памяти, нужно int sum = 0;",
+     "Вектор нужно передавать без const",
+     "Цикл должен идти по индексам",
+     "Функция должна возвращать long long"
+    ],
+    "correct_answer": 0,
+    "language": "cpp"
+   },
+   "explanation": "В C++ локальная переменная без начального значения не равна нулю — в ней то, что лежало в этой памяти. К мусору прибавляется сумма цен, и результат каждый раз разный. Правильно: int sum = 0;.",
+   "hints": [
+    "Чему равна sum до первого прибавления?",
+    "Инициализируй переменную при объявлении."
+   ]
+  },
+  {
+   "task_id": "cpp-classes-01",
+   "topic_id": "cpp-classes",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Корзина-объект",
+   "story": "Гена: «Хватит считать корзину отдельными функциями — пусть объект Cart сам копит сумму.»",
+   "content": {
+    "question": "Допиши класс Cart: метод add(int price, int qty) добавляет позицию, total() возвращает сумму всех позиций.",
+    "entry": "Cart",
+    "code": "#include <iostream>\n\nclass Cart {\npublic:\n    // добавить позицию: цена × количество\n    void add(int price, int qty) {\n    }\n\n    int total() const { return sum_; }\n\nprivate:\n    int sum_ = 0;\n};\n\nint main() {\n    Cart cart;\n    cart.add(1990, 2);\n    cart.add(500, 1);\n    std::cout << cart.total() << \"\\n\";\n}",
+    "correct_answer": "#include <iostream>\n\nclass Cart {\npublic:\n    // добавить позицию: цена × количество\n    void add(int price, int qty) {\n        sum_ += price * qty;\n    }\n\n    int total() const { return sum_; }\n\nprivate:\n    int sum_ = 0;\n};\n\nint main() {\n    Cart cart;\n    cart.add(1990, 2);\n    cart.add(500, 1);\n    std::cout << cart.total() << \"\\n\";\n}",
+    "tests_code": "void tests() {\n    check::eq(\"пустая корзина\", [] { return Cart().total(); }, 0);\n    check::eq(\"1990 × 2 + 500\", [] {\n        Cart c;\n        c.add(1990, 2);\n        c.add(500, 1);\n        return c.total();\n    }, 4480);\n    check::eq(\"позиция с количеством 0\", [] {\n        Cart c;\n        c.add(700, 0);\n        c.add(100, 3);\n        return c.total();\n    }, 300);\n    check::eq(\"у каждой корзины своя сумма\", [] {\n        Cart a, b;\n        a.add(100, 1);\n        b.add(5, 2);\n        return std::to_string(a.total()) + \"/\" + std::to_string(b.total());\n    }, \"100/10\");\n}",
+    "requirements": [
+     {
+      "input": "накапливает сумму в поле sum_",
+      "expected": {
+       "regex": "\\bsum_\\s*\\+=|sum_\\s*=\\s*sum_\\s*\\+"
+      }
+     },
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Поле sum_ живёт внутри объекта: у каждой корзины своё, и оно private — снаружи сумму не испортить. = 0 при объявлении поля обязателен: без него sum_ начиналась бы с мусора. total() помечен const — он только читает объект.",
+   "hints": [
+    "В add: sum_ += price * qty;",
+    "Поле доступно в методах класса по имени."
+   ]
+  },
+  {
+   "task_id": "cpp-classes-02",
+   "topic_id": "cpp-classes",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Копия, ссылка и деструкторы",
+   "story": "Гена: «Объекты в C++ ведут себя не так, как в Java. Проверь себя: что напечатается и в каком порядке?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "#include <iostream>\n#include <string>\n\nstruct Guard {\n    std::string name;\n    Guard(const std::string& n) : name(n) { std::cout << \"+\" << name << \"\\n\"; }\n    ~Guard() { std::cout << \"-\" << name << \"\\n\"; }\n};\n\nstruct Point {\n    int x = 0, y = 0;\n};\n\nint main() {\n    Point a{1, 2};\n    Point b = a;\n    b.x = 10;\n    Point& c = a;\n    c.y = 20;\n    std::cout << a.x << \" \" << a.y << \" \" << b.x << \" \" << b.y << \"\\n\";\n    {\n        Guard g1(\"файл\");\n        Guard g2(\"сеть\");\n        std::cout << \"работаю\\n\";\n    }\n    std::cout << \"конец\\n\";\n}",
+    "language": "cpp",
+    "output": "1 20 10 2\n+файл\n+сеть\nработаю\n-сеть\n-файл\nконец"
+   },
+   "explanation": "Point b = a — копия: b.x = 10 не трогает a. Point& c = a — ссылка, c.y = 20 меняет a. Объекты g1 и g2 живут до закрывающей скобки блока; деструкторы вызываются сами и в обратном порядке: последний созданный уничтожается первым. На этом и держится RAII.",
+   "hints": [
+    "Без & — копия, с & — тот же объект.",
+    "Деструкторы — при выходе из блока, в обратном порядке."
+   ]
+  },
+  {
+   "task_id": "cpp-classes-03",
+   "topic_id": "cpp-classes",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Товар с ценой",
+   "story": "Гена: «Класс товара почти готов, но лампа объявлена константой — и её цену уже не прочитать. Заполни пропуски.»",
+   "content": {
+    "question": "Заполни пропуски: список инициализации, const-метод и оператор вывода.",
+    "code": "#include <iostream>\n#include <string>\n\nclass Product {\npublic:\n    Product(std::string name, int price) [[1]] name_(std::move(name)), price_(price) {}\n\n    int price() [[2]] { return price_; }\n\n    friend std::ostream& operator[[3]](std::ostream& out, const Product& p) {\n        return out << p.name_ << \" — \" << p.price_ << \" ₽\";\n    }\n\nprivate:\n    std::string name_;\n    int price_;\n};\n\nint main() {\n    const Product lamp(\"Лампа\", 1990);\n    std::cout << lamp << \" / \" << lamp.price() << \"\\n\";\n}",
+    "blanks": [
+     {
+      "answer": [
+       ":"
+      ]
+     },
+     {
+      "answer": [
+       "const"
+      ]
+     },
+     {
+      "answer": [
+       "<<"
+      ]
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Список инициализации начинается с двоеточия после параметров конструктора. lamp объявлена const, поэтому у неё можно вызвать только const-методы — price() обязан обещать, что ничего не меняет. operator<< учит объект печататься через std::cout; friend даёт ему доступ к private-полям.",
+   "hints": [
+    "Инициализация полей — после двоеточия.",
+    "Метод, который только читает, помечают const."
+   ]
+  },
+  {
+   "task_id": "cpp-classes-04",
+   "topic_id": "cpp-classes",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товар печатает себя сам",
+   "story": "Стас: «В логах вместо товаров пишется просто Product. Пусть товар печатается по-человечески.»",
+   "content": {
+    "question": "Допиши operator<< для Product: «Лампа — 1990 ₽» (название, пробел, длинное тире, пробел, цена, пробел, ₽).",
+    "entry": "Product",
+    "code": "#include <iostream>\n#include <string>\n\nclass Product {\npublic:\n    Product(std::string name, int price) : name_(std::move(name)), price_(price) {}\n    const std::string& name() const { return name_; }\n    int price() const { return price_; }\n\nprivate:\n    std::string name_;\n    int price_;\n};\n\n// как товар печатается через std::cout\nstd::ostream& operator<<(std::ostream& out, const Product& p) {\n    return out << \"Product\";\n}\n\nint main() {\n    std::cout << Product(\"Лампа\", 1990) << \"\\n\";\n}",
+    "correct_answer": "#include <iostream>\n#include <string>\n\nclass Product {\npublic:\n    Product(std::string name, int price) : name_(std::move(name)), price_(price) {}\n    const std::string& name() const { return name_; }\n    int price() const { return price_; }\n\nprivate:\n    std::string name_;\n    int price_;\n};\n\n// как товар печатается через std::cout\nstd::ostream& operator<<(std::ostream& out, const Product& p) {\n    return out << p.name() << \" — \" << p.price() << \" ₽\";\n}\n\nint main() {\n    std::cout << Product(\"Лампа\", 1990) << \"\\n\";\n}",
+    "tests_code": "std::string print(const Product& p) {\n    std::ostringstream out;\n    out << p;\n    return out.str();\n}\n\nvoid tests() {\n    check::eq(\"Лампа\", [] { return print(Product(\"Лампа\", 1990)); }, \"Лампа — 1990 ₽\");\n    check::eq(\"бесплатный товар\", [] { return print(Product(\"Стол\", 0)); }, \"Стол — 0 ₽\");\n    check::eq(\"два товара подряд\", [] {\n        std::ostringstream out;\n        out << Product(\"Кресло\", 12500) << \"; \" << Product(\"Полка\", 700);\n        return out.str();\n    }, \"Кресло — 12500 ₽; Полка — 700 ₽\");\n}",
+    "requirements": [
+     {
+      "input": "выводит название и цену товара",
+      "expected": {
+       "regex": "p\\.name\\(\\)[\\s\\S]*p\\.price\\(\\)"
+      }
+     },
+     {
+      "input": "добавляет знак ₽",
+      "expected": {
+       "regex": "₽"
+      }
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "operator<< получает поток и товар, пишет в поток и возвращает этот же поток — поэтому вывод можно продолжать цепочкой: out << a << \"; \" << b. Поля private, поэтому читаем их через публичные методы name() и price().",
+   "hints": [
+    "return out << p.name() << … ;",
+    "Не забудь вернуть out — иначе цепочка << оборвётся."
+   ]
+  },
+  {
+   "task_id": "cpp-classes-05",
+   "topic_id": "cpp-classes",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Пополнение не работает",
+   "story": "Ира: «Пополняем счёт на 500, а баланс остаётся нулевым. Найди строку с багом.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "#include <iostream>\n\nstruct Account {\n    int balance = 0;\n};\n\nvoid deposit(Account acc, int amount) {\n    acc.balance += amount;\n}\n\nint main() {\n    Account acc;\n    deposit(acc, 500);\n    std::cout << acc.balance << \"\\n\";\n}",
+    "bug_line": 7,
+    "options": [
+     "Account передаётся по значению — функция пополняет копию; нужна ссылка Account&",
+     "Поле balance должно быть private",
+     "struct нельзя передавать в функции",
+     "+= не работает с полями структуры"
+    ],
+    "correct_answer": 0,
+    "language": "cpp"
+   },
+   "explanation": "В C++ объект без & передаётся копией — в отличие от Java и C#, где переменная хранит ссылку. deposit пополняет копию, а та исчезает при выходе из функции. Правильно: void deposit(Account& acc, int amount).",
+   "hints": [
+    "Что получает функция: сам счёт или его копию?",
+    "Добавь & к типу параметра."
+   ]
+  },
+  {
+   "task_id": "cpp-errors-01",
+   "topic_id": "cpp-errors",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Списание со счёта",
+   "story": "Гена: «Списание должно явно отказывать, а не уводить счёт в минус.»",
+   "content": {
+    "question": "Напиши withdraw(int balance, int amount): сумма ≤ 0 — std::invalid_argument; сумма больше баланса — std::runtime_error; иначе верни новый баланс.",
+    "entry": "withdraw",
+    "code": "#include <iostream>\n#include <stdexcept>\n\n// списание со счёта: новый баланс или исключение\nint withdraw(int balance, int amount) {\n    return balance - amount;\n}\n\nint main() {\n    std::cout << withdraw(1000, 300) << \"\\n\";\n}",
+    "correct_answer": "#include <iostream>\n#include <stdexcept>\n#include <string>\n\n// списание со счёта: новый баланс или исключение\nint withdraw(int balance, int amount) {\n    if (amount <= 0) {\n        throw std::invalid_argument(\"сумма должна быть больше нуля\");\n    }\n    if (amount > balance) {\n        throw std::runtime_error(\"недостаточно средств: \" + std::to_string(balance) + \" < \" + std::to_string(amount));\n    }\n    return balance - amount;\n}\n\nint main() {\n    std::cout << withdraw(1000, 300) << \"\\n\";\n}",
+    "tests_code": "void tests() {\n    check::eq(\"1000 - 300\", [] { return withdraw(1000, 300); }, 700);\n    check::eq(\"списать всё\", [] { return withdraw(500, 500); }, 0);\n    check::throws<std::runtime_error>(\"не хватает денег\", [] { withdraw(100, 500); });\n    check::throws<std::invalid_argument>(\"сумма 0\", [] { withdraw(100, 0); });\n    check::throws<std::invalid_argument>(\"сумма -5\", [] { withdraw(100, -5); });\n}",
+    "requirements": [
+     {
+      "input": "бросает std::invalid_argument",
+      "expected": {
+       "regex": "throw\\s+std::invalid_argument"
+      }
+     },
+     {
+      "input": "бросает std::runtime_error",
+      "expected": {
+       "regex": "throw\\s+std::runtime_error"
+      }
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Неверный аргумент — std::invalid_argument, невозможная сейчас операция — std::runtime_error. Оба из <stdexcept>, оба наследуют std::exception, и текст ошибки потом достаётся через what(). Проверки ставят в начало функции, до вычислений.",
+   "hints": [
+    "throw std::invalid_argument(\"…\");",
+    "Сначала проверь amount <= 0, потом amount > balance."
+   ]
+  },
+  {
+   "task_id": "cpp-errors-02",
+   "topic_id": "cpp-errors",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Деструктор вместо finally",
+   "story": "Гена: «В C++ нет finally, а лог всё равно пишется. И почему «4x» — это число? Что напечатает программа?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "#include <iostream>\n#include <stdexcept>\n#include <string>\n\nstruct Log {\n    ~Log() { std::cout << \"готово\\n\"; }\n};\n\nint parse(const std::string& s) {\n    Log log;\n    std::cout << \"разбираю \" << s << \"\\n\";\n    return std::stoi(s);\n}\n\nint main() {\n    std::cout << parse(\"42\") << \"\\n\";\n    std::cout << parse(\"4x\") << \"\\n\";\n    try {\n        std::cout << parse(\"x4\") << \"\\n\";\n    } catch (const std::invalid_argument&) {\n        std::cout << \"не число\\n\";\n    }\n}",
+    "language": "cpp",
+    "output": "разбираю 42\nготово\n42\nразбираю 4x\nготово\n4\nразбираю x4\nготово\nне число"
+   },
+   "explanation": "Деструктор log срабатывает при любом выходе из parse — и после return, и при исключении: это и есть замена finally. std::stoi разбирает цифры в начале строки и останавливается на первой не-цифре, поэтому «4x» даёт 4 без всякой ошибки. А «x4» не начинается с цифры — stoi бросает std::invalid_argument, и catch печатает «не число».",
+   "hints": [
+    "Деструктор локального объекта вызывается при выходе из функции.",
+    "stoi читает цифры с начала строки, пока может."
+   ]
+  },
+  {
+   "task_id": "cpp-errors-03",
+   "topic_id": "cpp-errors",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Порт с понятной ошибкой",
+   "story": "Гена: «Если в конфиге порт „x80“, сервис должен сказать, что именно не так.»",
+   "content": {
+    "question": "Заполни пропуски: попробуй разобрать число, поймай ошибку разбора и брось своё исключение.",
+    "code": "#include <iostream>\n#include <stdexcept>\n#include <string>\n\nint port(const std::string& s) {\n    [[1]] {\n        return std::stoi(s);\n    } [[2]] (const std::invalid_argument&) {\n        [[3]] std::invalid_argument(\"порт \\\"\" + s + \"\\\" — не число\");\n    }\n}\n\nint main() {\n    std::cout << port(\"8080\") << \"\\n\";\n}",
+    "blanks": [
+     {
+      "answer": [
+       "try"
+      ]
+     },
+     {
+      "answer": [
+       "catch"
+      ]
+     },
+     {
+      "answer": [
+       "throw"
+      ]
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "try пробует разобрать строку, catch ловит std::invalid_argument по const& (имя переменной можно не писать, если оно не нужно), а throw бросает новое исключение с понятным текстом. Функция либо возвращает число, либо бросает — поэтому return после try/catch не нужен.",
+   "hints": [
+    "try — попытка, catch — перехват.",
+    "Бросают исключение словом throw."
+   ]
+  },
+  {
+   "task_id": "cpp-errors-04",
+   "topic_id": "cpp-errors",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Порт по умолчанию",
+   "story": "Гена: «Если порт в конфиге кривой или вне диапазона, запускаемся на 8080. Собери функцию.»",
+   "content": {
+    "question": "Собери portOrDefault(const std::string& s): разбери число, проверь диапазон 1…65535, при любой ошибке верни 8080.",
+    "lines": [
+     "int portOrDefault(const std::string& s) {",
+     "    try {",
+     "        int port = std::stoi(s);",
+     "        if (port <= 0 || port > 65535) throw std::out_of_range(\"порт вне диапазона\");",
+     "        return port;",
+     "    } catch (const std::exception&) {",
+     "        return 8080;",
+     "    }",
+     "}"
+    ],
+    "distractors": [
+     "    } finally {",
+     "    } catch (std::exception e) {"
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Все исключения стандартной библиотеки наследуют std::exception, поэтому один catch по const std::exception& ловит и invalid_argument от stoi, и наш out_of_range. Ловят по ссылке: catch (std::exception e) копирует и «срезает» исключение до базового класса. finally в C++ нет — эту роль играют деструкторы.",
+   "hints": [
+    "Проверка диапазона — внутри try, сразу после разбора.",
+    "Лови по const std::exception&."
+   ]
+  },
+  {
+   "task_id": "cpp-errors-05",
+   "topic_id": "cpp-errors",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Резерв на складе",
+   "story": "Стас: «Если товара не хватает, фронт должен показать, сколько есть. Исключение с данными уже готово — осталось им воспользоваться.»",
+   "content": {
+    "question": "Допиши reserve(int have, int want): want ≤ 0 — std::invalid_argument; want > have — брось StockError(want, have); иначе верни остаток have - want.",
+    "entry": "reserve",
+    "code": "#include <iostream>\n#include <stdexcept>\n#include <string>\n\nclass StockError : public std::runtime_error {\npublic:\n    StockError(int want, int have)\n        : std::runtime_error(\"не хватает товара: нужно \" + std::to_string(want) + \", есть \" + std::to_string(have)),\n          want(want), have(have) {}\n    const int want, have;\n};\n\n// резерв товара: остаток или исключение\nint reserve(int have, int want) {\n    return have - want;\n}\n\nint main() {\n    std::cout << reserve(10, 3) << \"\\n\";\n}",
+    "correct_answer": "#include <iostream>\n#include <stdexcept>\n#include <string>\n\nclass StockError : public std::runtime_error {\npublic:\n    StockError(int want, int have)\n        : std::runtime_error(\"не хватает товара: нужно \" + std::to_string(want) + \", есть \" + std::to_string(have)),\n          want(want), have(have) {}\n    const int want, have;\n};\n\n// резерв товара: остаток или исключение\nint reserve(int have, int want) {\n    if (want <= 0) {\n        throw std::invalid_argument(\"количество должно быть больше нуля\");\n    }\n    if (want > have) {\n        throw StockError(want, have);\n    }\n    return have - want;\n}\n\nint main() {\n    std::cout << reserve(10, 3) << \"\\n\";\n}",
+    "tests_code": "// ловим StockError, чтобы тест увидел его данные\nstd::string call(int have, int want) {\n    try {\n        return std::to_string(reserve(have, want));\n    } catch (const StockError& e) {\n        return \"StockError(want=\" + std::to_string(e.want) + \", have=\" + std::to_string(e.have) + \")\";\n    }\n}\n\nvoid tests() {\n    check::eq(\"резерв 3 из 10\", [] { return call(10, 3); }, \"7\");\n    check::eq(\"забрать всё\", [] { return call(4, 4); }, \"0\");\n    check::eq(\"не хватает: нужно 5, есть 2\", [] { return call(2, 5); }, \"StockError(want=5, have=2)\");\n    check::throws<std::invalid_argument>(\"количество 0\", [] { call(10, 0); });\n}",
+    "requirements": [
+     {
+      "input": "проверяет количество ≤ 0",
+      "expected": {
+       "regex": "want\\s*<=\\s*0|want\\s*<\\s*1"
+      }
+     },
+     {
+      "input": "бросает StockError с данными",
+      "expected": {
+       "regex": "throw\\s+StockError\\s*\\("
+      }
+     }
+    ],
+    "language": "cpp"
+   },
+   "explanation": "Своё исключение несёт данные: фронт ловит StockError и показывает «есть только 2» из e.have. Оно наследует std::runtime_error — значит, и общий catch (const std::exception&) его поймает, а what() вернёт готовый текст. Неверное количество — ошибка вызывающего кода, для неё хватает std::invalid_argument.",
+   "hints": [
+    "throw StockError(want, have);",
+    "Проверку want <= 0 поставь первой."
+   ]
+  }
+ ]
+}

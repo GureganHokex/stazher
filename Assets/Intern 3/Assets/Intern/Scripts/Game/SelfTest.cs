@@ -549,6 +549,17 @@ namespace Intern.Game
                 string ce; T(LangBox.ErrorLine("Program.cs(16,33): error CS0266: Cannot implicitly convert type 'double' to 'int'. An explicit conversion exists (are you missing a cast?)\n", "Program.cs", out ce) == 16 && ce.Contains("(int)"), "c#: строка ошибки " + ce);
                 var csharp = LangBox.For("csharp");
                 T(csharp != null && csharp.extraFiles.ContainsKey("stazher-cs.sh") && csharp.extraFiles["Check.cs"].Contains("##TEST|") && !csharp.extraFiles["stazher-cs.sh"].Contains("\r"), "c#: раннер, Check.cs и скрипт сборки");
+                // C++ (спринт 14): ошибки g++, санитайзеры, необработанное исключение
+                var gp = LangBox.ParseCheck("", "main.cpp: In function 'int cartTotal(int, int)':\nmain.cpp:4:12: error: \u2018prce\u2019 was not declared in this scope; did you mean \u2018price\u2019?\n    4 |     return prce * qty;\n", "main.cpp", 1);
+                T(gp.buildFailed && gp.errLine == 4 && gp.errText.Contains("price?"), "c++: ошибка g++ " + gp.errLine + " " + gp.errText);
+                var gr = LangBox.ParseCheck("", "main.cpp:10:1: error: control reaches end of non-void function [-Werror=return-type]\n", "main.cpp", 1);
+                T(gr.buildFailed && gr.errLine == 10 && gr.errText.Contains("return") && !gr.errText.Contains("[-Werror"), "c++: нет return " + gr.errText);
+                var ga = LangBox.ParseCheck("##TEST|1990 × 2|PASS\n", "==417==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x502000000024\nREAD of size 4 at 0x502000000024 thread T0\n    #0 0x563eaa50356d in at5(std::vector<int> const&) /work/.stazher/run/x/main.cpp:6\n    #1 0x563eaa5038a1 in operator() /work/.stazher/run/x/tests.cpp:3\n", "main.cpp", 134);
+                T(ga.results.Count == 2 && !ga.results[1].Passed && ga.errLine == 6 && ga.results[1].Note.Contains("границ"), "c++: AddressSanitizer " + ga.errLine + " " + (ga.results.Count > 1 ? ga.results[1].Note : "-"));
+                string gm; T(LangBox.ErrorLine("main.cpp:6:18: runtime error: division by zero\n    #0 0x55 in cartTotal(int, int) /work/.stazher/run/x/main.cpp:6\n", "main.cpp", out gm) == 6 && gm.Contains("деление на ноль"), "c++: UBSan " + gm);
+                T(LangBox.ErrorLine("terminate called after throwing an instance of 'std::invalid_argument'\n  what():  stoi\n", "main.cpp", out gm) == -1 && gm.Contains("std::invalid_argument: stoi"), "c++: исключение " + gm);
+                var cpp = LangBox.For("cpp");
+                T(cpp != null && cpp.dockerfile != null && cpp.dockerfile.Contains("g++") && cpp.extraFiles["check.hpp"].Contains("##TEST|") && cpp.extraFiles["stazher-cpp.sh"].Contains("LC_ALL=C g++"), "c++: раннер, check.hpp и Dockerfile");
                 var java = LangBox.For("java");
                 T(java != null && java.extraFiles.ContainsKey("Check.java") && java.extraFiles["Check.java"].Contains("##TEST|") && java.testMarker == "Check.", "java: раннер и Check.java");
             }

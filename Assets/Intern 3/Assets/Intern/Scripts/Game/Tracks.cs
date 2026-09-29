@@ -72,6 +72,7 @@ namespace Intern.Game
                 case "lang-go": return "GO";
                 case "lang-java": return "JAVA";
                 case "lang-csharp": return "CS";
+                case "lang-cpp": return "CPP";
                 case "warmup": return "WU";
                 default: return "KOD";
             }

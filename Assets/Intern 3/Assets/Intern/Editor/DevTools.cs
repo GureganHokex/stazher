@@ -121,6 +121,7 @@ namespace Intern.EditorTools
                         log.AppendLine((good && starterFails ? "ок   " : "FAIL ") + t.id + ": эталон " + r.results.Count(x => x.Passed) + "/" + r.results.Count +
                                        ", заготовка " + st.results.Count(x => x.Passed) + "/" + st.results.Count + ", " + (r.ms / 1000.0).ToString("0.0") + " с" +
                                        (r.setupError != null ? " — " + r.setupError : "") + (!good && r.results.Count > 0 ? " — " + string.Join(" | ", r.results.Where(x => !x.Passed).Select(x => x.InputsText + ": " + x.Note).ToArray()) : ""));
+                        try { File.WriteAllText(outFile + ".partial", log.ToString(), new UTF8Encoding(false)); } catch (Exception) { }   // видно ход проверки
                     }
                 }
                 catch (Exception e) { log.AppendLine("ошибка: " + e); }
@@ -135,6 +136,34 @@ namespace Intern.EditorTools
                     }
                 }
                 catch (Exception e) { log.AppendLine("размеры образов: " + e.Message); }
+                try { File.WriteAllText(outFile, log.ToString(), new UTF8Encoding(false)); } catch (Exception) { }
+            }) { IsBackground = true }.Start();
+        }
+
+        // Пересобрать образ компилятора C++ с нуля (docker rmi + docker build) и записать полный вывод — если сборка в игре не удалась
+        [MenuItem("Стажёр/Пересобрать образ C++ (лог в Temp)", false, 24)]
+        public static void RebuildCppImage()
+        {
+            string outFile = Path.Combine(Root, "Temp", "cppimage.txt");
+            var spec = Intern.Game.LangBox.Cpp;
+            File.WriteAllText(Out, "cppimage " + DateTime.Now.ToString("HH:mm:ss") + ": пересборка " + spec.image + " запущена, итог — в Temp/cppimage.txt\n", new UTF8Encoding(false));
+            if (File.Exists(outFile)) File.Delete(outFile);
+            new System.Threading.Thread(() =>
+            {
+                var log = new StringBuilder("пересборка " + spec.image + " " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\n");
+                try
+                {
+                    Intern.Game.DevEnv.DockerCmd("rm -f " + spec.container, 30000);
+                    var rm = Intern.Game.DevEnv.DockerCmd("image rm -f " + spec.image, 60000);
+                    log.AppendLine("image rm → " + rm.Code + " " + rm.Text.Trim());
+                    var sw = Stopwatch.StartNew();
+                    var b = Intern.Game.DevEnv.DockerCmd("build --no-cache --progress=plain --label " + Intern.Game.DevEnv.Label + " -t " + spec.image + " -", 20 * 60 * 1000, spec.dockerfile);
+                    log.AppendLine("build → код " + b.Code + (b.TimedOut ? " (таймаут)" : "") + ", " + sw.Elapsed.TotalSeconds.ToString("0") + " с");
+                    log.AppendLine("--- stdout ---\n" + b.Out + "\n--- stderr ---\n" + b.Err);
+                    var sz = Intern.Game.DevEnv.DockerCmd("image ls --format \"{{.Repository}}:{{.Tag}} {{.Size}}\" " + spec.image, 20000);
+                    log.AppendLine("размер: " + sz.Out.Trim());
+                }
+                catch (Exception e) { log.AppendLine("ошибка: " + e); }
                 try { File.WriteAllText(outFile, log.ToString(), new UTF8Encoding(false)); } catch (Exception) { }
             }) { IsBackground = true }.Start();
         }

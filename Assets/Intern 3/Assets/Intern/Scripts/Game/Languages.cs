@@ -25,6 +25,7 @@ namespace Intern.Game
             new LangInfo { id = "go", name = "Go", badge = "GO", runner = "docker", ready = true, professions = new[] { "backend", "devops" } },
             new LangInfo { id = "java", name = "Java", badge = "JAVA", runner = "docker", ready = true, professions = new[] { "backend" } },
             new LangInfo { id = "csharp", name = "C#", badge = "C#", runner = "docker", ready = true, professions = new[] { "backend" } },
+            new LangInfo { id = "cpp", name = "C++", badge = "C++", runner = "docker", ready = true, professions = new[] { "backend" } },
             new LangInfo { id = "php", name = "PHP", badge = "PHP", runner = "docker", soon = "позже", professions = new[] { "backend" } },
         };
 
@@ -57,6 +58,7 @@ namespace Intern.Game
                 case "go": return "Быстрый компилируемый язык серверов и DevOps-инструментов. Код и тесты (go test) запускаются в песочнице Docker — образ golang (около 400 МБ на диске) скачается при первом запуске. Без Docker задачи проверяются по коду.";
                 case "java": return "Строгий язык больших корпоративных систем, банков и Android. Код компилируется javac и тестируется в песочнице Docker — образ JDK (около 550 МБ на диске) скачается при первом запуске. Без Docker задачи проверяются по коду.";
                 case "csharp": return "Язык платформы .NET: бэкенды банков и маркетплейсов, игры на Unity. Код собирается компилятором C# и тестируется в песочнице Docker — образ .NET SDK (около 1,1 ГБ на диске) скачается при первом запуске. Без Docker задачи проверяются по коду.";
+                case "cpp": return "Язык высоких нагрузок: базы данных, движки, биржи, игры. Код собирает g++ с проверками памяти — выход за границы и деление на ноль видны со строкой. Образ компилятора (около 500 МБ на диске) игра соберёт при первом запуске. Без Docker задачи проверяются по коду.";
                 default: return "Ветка языка появится в " + (Get(id) != null ? Get(id).soon : "следующих обновлениях") + ": задачи запускаются в песочнице Docker, без Docker — задачи без запуска.";
             }
         }
