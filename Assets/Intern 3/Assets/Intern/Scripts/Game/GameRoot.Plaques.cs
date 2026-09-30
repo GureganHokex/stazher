@@ -71,6 +71,21 @@ namespace Intern.Game
             return p;
         }
 
+        // Дверь дома в городе: сколько гуманитариев внутри, есть ли технари, награда за зачистку
+        public PlaqueInfo HallPlaque(CityHall h)
+        {
+            var p = new PlaqueInfo { icon = "door", title = h != null && h.name != null ? h.name : "Дом" };
+            if (h == null) return p;
+            int alive, total; bool spawnedNow, cleared;
+            if (lunch == null || !lunch.HallStatus(h, out alive, out total, out spawnedNow, out cleared)) { p.sub = "Сюда можно зайти"; return p; }
+            if (cleared) { p.sub = "Зачищено — награда получена"; p.Item("Награда", "+" + Balance.D.hallBonus + " монет"); return p; }
+            p.sub = "Внутри гуманитарии: сидят за столами и прячутся за шкафами";
+            p.Item("Гуманитариев", spawnedNow ? alive + " из " + total : h.humanitarians.Length.ToString());
+            if (h.techies.Length > 0) p.Item("Технари", h.techies.Length + " — не трогать");
+            p.Item("За зачистку", "+" + Balance.D.hallBonus + " монет");
+            return p;
+        }
+
         public PlaqueInfo ArsenalPlaque()
         {
             var p = new PlaqueInfo { icon = "lock", title = "Арсенал", sub = "Оружие и обвесы на обед — открываются по грейду" };

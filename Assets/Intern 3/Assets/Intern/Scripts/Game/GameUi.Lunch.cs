@@ -376,6 +376,7 @@ namespace Intern.Game
             if (r.fines > 0) lunchSumCard.Add(StatRow("warning", "Штрафы за технарей", "−" + r.fines + "  (" + r.techHits + ")", Pink));
             if (r.spent > 0) lunchSumCard.Add(StatRow("stack", "Потрачено в магазинах", r.spent.ToString(), Text));
             lunchSumCard.Add(StatRow("door", "Убежали", r.escaped.ToString(), Text));
+            if (r.halls > 0) lunchSumCard.Add(StatRow("check", "Зачищено зданий", r.halls + "  (+" + r.halls * Balance.D.hallBonus + ")", Mint));
             if (r.hidden > 0) lunchSumCard.Add(StatRow("folder", "Спрятались в архиве", r.hidden.ToString(), Text));
             if (r.bestSeries > 0) lunchSumCard.Add(StatRow("fire", "Лучшая серия", "+" + r.bestSeries, Mint));
             if (r.coupon) lunchSumCard.Add(StatRow("star", "Декан гумфака", "купон −20% в «Патче»", Sun));

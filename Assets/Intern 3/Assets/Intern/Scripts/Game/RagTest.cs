@@ -59,6 +59,137 @@ namespace Intern.Game
         static string Root { get { return Path.GetFullPath(Path.Combine(Application.dataPath, "..")); } }
         static string Out { get { return Path.Combine(Root, "Temp", "devtools.txt"); } }
 
+        // Дома, куда можно войти (спринт 6): у каждой двери — снаружи, внутри от входа, из середины, из глубины, после стычки
+        public static void LaunchHalls()
+        {
+            if (!Application.isPlaying) { File.WriteAllText(Out, "halltest: нужен режим Play\n", new UTF8Encoding(false)); return; }
+            var go = new GameObject("HallTest"); var t = go.AddComponent<RagTest>(); t.halls = true;
+        }
+        bool halls;
+
+        IEnumerator HallsRun()
+        {
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            log.AppendLine("halltest " + DateTime.Now.ToString("HH:mm:ss"));
+            var gr = FindFirstObjectByType<GameRoot>(); var pl = FindFirstObjectByType<PlayerController>();
+            if (gr == null || pl == null) { Finish("нет игры"); yield break; }
+            gr.UiResume(); gr.DevCity();
+            var city = gr.DevCityRefs;
+            var run = new LunchRun(city, 600f, () => pl.Position, () => pl.cam.transform, false, false);
+            run.Cleanup();
+            string dir = Path.Combine(Root, "Temp", "rag", "halls"); Directory.CreateDirectory(dir);
+            log.AppendLine("домов: " + city.halls.Count);
+            var blog = new StringBuilder();
+            foreach (var bl in city.blockers) blog.AppendLine(string.Format(ci, "{0:0.000} {1:0.000} {2:0.000} {3:0.000}", bl.xMin, bl.xMax, bl.yMin, bl.yMax));
+            File.WriteAllText(Path.Combine(Root, "Temp", "blockers.txt"), blog.ToString());
+            foreach (var h in city.halls)
+            {
+                var outN = h.doorOut - h.doorIn; outN.y = 0; outN.Normalize();
+                var inN = -outN; var side = Vector3.Cross(Vector3.up, inN);
+                float yawIn = Mathf.Atan2(inN.x, inN.z) * Mathf.Rad2Deg;
+                log.AppendLine(string.Format(ci, "{0} «{1}»: внутри {2:0.0}×{3:0.0} м, кресел {4}, укрытий {5}, узлов {6}", h.id, h.name, h.rect.width, h.rect.height, h.seats.Count, h.hides.Count, h.nodes.Count));
+                // у самой двери: подсказка «E Войти» и плашка
+                Pose(pl, h.doorOut + outN * 0.2f, yawIn, 6f, false);
+                yield return new WaitForSeconds(0.6f);
+                yield return new WaitForEndOfFrame(); Capture(Path.Combine(dir, h.id + "_0door.jpg"));
+                // снаружи, дверь закрыта
+                Pose(pl, h.doorOut + outN * 3.5f, yawIn, 6f, false);
+                yield return new WaitForSeconds(0.6f);
+                yield return new WaitForEndOfFrame(); Capture(Path.Combine(dir, h.id + "_1out.jpg"));
+                h.door.Open(); run.DevSpawnHall(h.id); run.Paused = true;
+                yield return new WaitForSeconds(0.6f);
+                yield return new WaitForEndOfFrame(); Capture(Path.Combine(dir, h.id + "_2open.jpg"));
+                Pose(pl, h.doorIn + inN * 0.2f, yawIn, 10f, true);
+                yield return new WaitForSeconds(0.5f);
+                yield return new WaitForEndOfFrame(); Capture(Path.Combine(dir, h.id + "_3in.jpg"));
+                // FPS внутри (без снимков)
+                var dts = new List<float>(); float t0 = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - t0 < 1f) { yield return null; dts.Add(Time.unscaledDeltaTime); }
+                log.AppendLine(string.Format(ci, "  кадр внутри {0:0.0} мс", dts.Average() * 1000f));
+                var c = new Vector3(h.rect.center.x, 0.1f, h.rect.center.y);
+                Pose(pl, c - inN * 1.0f, Mathf.Atan2(side.x, side.z) * Mathf.Rad2Deg, 8f, true);
+                yield return new WaitForSeconds(0.4f);
+                yield return new WaitForEndOfFrame(); Capture(Path.Combine(dir, h.id + "_4side.jpg"));
+                float depth = Mathf.Abs(inN.x) > 0.5f ? h.rect.width : h.rect.height;
+                Pose(pl, h.doorIn + inN * (depth - 4.2f) + side * 1.6f, yawIn + 180f, 10f, true);
+                yield return new WaitForSeconds(0.4f);
+                yield return new WaitForEndOfFrame(); Capture(Path.Combine(dir, h.id + "_5back.jpg"));
+                // стычка: от входа, кто заметит — реагирует; двоих гуманитариев выбиваем
+                Pose(pl, h.doorIn, yawIn, 8f, true);
+                run.Paused = false;
+                yield return new WaitForSeconds(1.2f);
+                int killed = 0;
+                foreach (var n in FindObjectsByType<CityNpc>(FindObjectsSortMode.None))
+                    if (n.hall == h && n.Alive && n.Humanitarian && killed < 2) { var d = n.transform.position - pl.Position; d.y = 0; n.DebugKill(d.normalized, 0f); killed++; }
+                yield return new WaitForSeconds(2.5f);
+                yield return new WaitForEndOfFrame(); Capture(Path.Combine(dir, h.id + "_6fight.jpg"));
+                int alive = 0, outside = 0, stuck = 0;
+                foreach (var n in FindObjectsByType<CityNpc>(FindObjectsSortMode.None))
+                {
+                    if (n.hall != h || !n.Alive) continue; alive++;
+                    if (!h.Contains(n.transform.position)) outside++;
+                    foreach (var b in city.blockers) if (b.Contains(new Vector2(n.transform.position.x, n.transform.position.z))) { stuck++; break; }
+                }
+                log.AppendLine("  после стычки: живых " + alive + ", вышли на улицу " + outside + ", внутри мебели " + stuck + ", дверь " + (h.door.IsOpen ? "открыта" : "закрыта"));
+                if (h.id == "acc" || h.id == "law")
+                {
+                    // ещё 6 с: убегающие должны выйти через дверь, никто не застревает (след каждые 0,5 с)
+                    var trace = new Dictionary<CityNpc, StringBuilder>();
+                    for (int k = 0; k < 12; k++)
+                    {
+                        foreach (var n in FindObjectsByType<CityNpc>(FindObjectsSortMode.None))
+                        {
+                            if (n.hall != h || !n.Alive || !n.gameObject.activeSelf) continue;
+                            StringBuilder tb; if (!trace.TryGetValue(n, out tb)) trace[n] = tb = new StringBuilder();
+                            tb.Append(string.Format(ci, " ({0:0.0} {1:0.0})", n.transform.position.x, n.transform.position.z));
+                        }
+                        yield return new WaitForSeconds(0.5f);
+                    }
+                    foreach (var kv in trace) if (kv.Key != null && kv.Key.State == CityNpc.St.Flee) log.AppendLine("    след " + kv.Key.Type + ":" + kv.Value);
+                    foreach (var kv in trace)
+                    {
+                        if (kv.Key == null || kv.Key.State != CityNpc.St.Flee) continue;
+                        var q = kv.Key.transform.position;
+                        foreach (var bl in city.blockers)
+                            if (q.x > bl.xMin - 0.6f && q.x < bl.xMax + 0.6f && q.z > bl.yMin - 0.6f && q.z < bl.yMax + 0.6f)
+                                log.AppendLine(string.Format(ci, "      рядом препятствие x {0:0.00}..{1:0.00}, z {2:0.00}..{3:0.00}", bl.xMin, bl.xMax, bl.yMin, bl.yMax));
+                    }
+                    alive = outside = 0; int moving = 0;
+                    foreach (var n in FindObjectsByType<CityNpc>(FindObjectsSortMode.None))
+                    {
+                        if (n.hall != h || !n.Alive || !n.gameObject.activeSelf) continue; alive++;
+                        if (!h.Contains(n.transform.position)) outside++;
+                        log.AppendLine(string.Format(ci, "    {0}: {1}, {2}, {3}", n.Type, n.State, h.Contains(n.transform.position) ? "внутри" : "снаружи", n.DevPathInfo));
+                    }
+                    log.AppendLine("  через 6 с: на месте " + alive + " (снаружи " + outside + "), убежали " + run.escaped);
+                    // декан снаружи бежит к стажёру, который стоит внутри
+                    Pose(pl, h.doorIn + inN * 4f, yawIn + 180f, 8f, true);
+                    var dean = run.DevSpawn("dean", h.doorOut + outN * 7f, 0f);
+                    dean.DevUnfreeze();
+                    yield return new WaitForSeconds(0.3f);
+                    dean.Alert();
+                    float tt = Time.time; float best = 99f;
+                    while (Time.time - tt < 9f && dean != null && dean.Alive)
+                    {
+                        var d = dean.transform.position - pl.Position; d.y = 0; best = Mathf.Min(best, d.magnitude);
+                        if (best < 1.6f) break;
+                        yield return null;
+                    }
+                    log.AppendLine(string.Format(ci, "  декан с улицы: ближе всего {0:0.0} м за {1:0.0} с, {2}", best, Time.time - tt, dean != null && h.Contains(dean.transform.position) ? "вошёл в дом" : "остался снаружи"));
+                    yield return new WaitForEndOfFrame(); Capture(Path.Combine(dir, h.id + "_7dean.jpg"));
+                }
+                run.Cleanup();
+                yield return null;
+            }
+            Finish("готово");
+        }
+
+        static void Pose(PlayerController pl, Vector3 at, float yaw, float pitch, bool fp)
+        {
+            pl.Teleport(new Vector3(at.x, 0.1f, at.z), yaw); pl.SetCamPitch(pitch);
+            if (fp != pl.firstPerson) pl.ToggleView();
+        }
+
         public static void Launch()
         {
             if (!Application.isPlaying) { File.WriteAllText(Out, "ragtest: нужен режим Play\n", new UTF8Encoding(false)); return; }
@@ -70,6 +201,7 @@ namespace Intern.Game
 
         IEnumerator Start()
         {
+            if (halls) { yield return HallsRun(); yield break; }
             var ci = System.Globalization.CultureInfo.InvariantCulture;
             string tagFile = Path.Combine(Root, "Temp", "ragtag.txt");
             string tag = File.Exists(tagFile) ? File.ReadAllText(tagFile).Trim() : "cur";

@@ -41,6 +41,10 @@ namespace Intern.Game
         float speed, yaw, idleUntil, nextThink, nextAct, windupAt = -1f, bubbleUntil, curiousUntil, alertEnd, lane, calledAt = -1f, frozenUntil, staggerUntil;
         Vector3 listenAt, knockVel, fleeDoor, prevPos, velocity;
         public Vector3 DevRunVel;        // только для проверки в редакторе: бежит с этой скоростью, ни на что не реагируя
+        public CityHall hall;            // живёт в доме (спринт 6 версии 0.9): сидит за столом или стоит за шкафом
+        bool seated;
+        List<Vector3> chasePath = new List<Vector3>(); int chasePi; float chaseRepath;
+        float stuckCheckAt, noSlideUntil; Vector3 stuckRef;
         bool hitOnce, toArchive;
         int scatter;
 
@@ -156,6 +160,12 @@ namespace Intern.Game
         void NewWalk(System.Random rnd)
         {
             if (leader != null && leader.Alive && leader.Calm) { st = St.Follow; return; }
+            // в своём доме — бродит между столами и шкафами
+            if (hall != null && hall.nodes.Count > 0 && city.HallAt(transform.position) == hall)
+            {
+                var to = city.nodes[hall.nodes[rnd.Next(hall.nodes.Count)]];
+                path = city.Path(transform.position, to, lane * 0.3f); pi = 0; st = St.Walk; return;
+            }
             string street = null;
             var here = city.StreetAt(transform.position);
             if (rnd.NextDouble() < 0.65) street = here != null ? here.id : def.street;
@@ -240,11 +250,36 @@ namespace Intern.Game
             if (!def.humanitarian) return;   // технари не боятся ножа, только выстрелов
             float range = run.NoticeRange;
             if (dist > range) return;
-            var eye = transform.position + Vector3.up * 1.6f; var tgt = run.PlayerPos + Vector3.up * 1.3f;
+            if (!SeesPlayer()) return;   // за стеной
+            Alert();
+        }
+
+        // Видит ли стажёра: между глазами и им нет стены, шкафа, машины
+        bool SeesPlayer()
+        {
+            var eye = transform.position + Vector3.up * (seated ? 1.25f : 1.6f); var tgt = run.PlayerPos + Vector3.up * 1.3f;
             RaycastHit h;
             int mask = Physics.DefaultRaycastLayers & ~(1 << 2);
-            if (Physics.Linecast(eye, tgt, out h, mask, QueryTriggerInteraction.Ignore) && h.collider.GetComponentInParent<CityNpc>() == null) return;   // за стеной
-            Alert();
+            return !(Physics.Linecast(eye, tgt, out h, mask, QueryTriggerInteraction.Ignore) && h.collider.GetComponentInParent<CityNpc>() == null);
+        }
+
+        // Встать из-за стола (заметил, испугался, позвали)
+        void StandUp()
+        {
+            if (!seated) return;
+            seated = false; anim.sitTarget = 0f; anim.typing = false;
+            staggerUntil = Mathf.Max(staggerUntil, Time.time + 0.4f);
+        }
+
+        // Посадить или поставить в доме: sit — в кресло за стол, иначе стоит (за шкафом, в углу)
+        public void PlaceInHall(CityHall h, Vector3 at, float yawDeg, bool sit)
+        {
+            hall = h; at.y = 0f;
+            transform.position = at; transform.rotation = Quaternion.Euler(0, yawDeg, 0); yaw = yawDeg;
+            prevPos = at; velocity = Vector3.zero; path.Clear(); pi = 0;
+            st = St.Idle; seated = sit;
+            idleUntil = sit ? float.MaxValue : Time.time + Random.Range(8f, 30f);
+            if (sit) { anim.SetSitInstant(1f); anim.typing = !def.humanitarian || Random.value < 0.4f; }
         }
 
         // Услышал выстрел
@@ -257,6 +292,7 @@ namespace Intern.Game
 
         public void Alert()
         {
+            StandUp();
             if (!Alive || !Calm) return;
             st = St.Alert; alertEnd = Time.time + 0.35f;
             anim.React(3, 1.2f);
@@ -281,13 +317,13 @@ namespace Intern.Game
             }
         }
 
-        void Panic() { if (st != St.Flee) { anim.React(3, 2f); Flee(); } }
+        void Panic() { if (st != St.Flee) { StandUp(); anim.React(3, 2f); Flee(); } }
 
         // Стихи поэта: соседи идут послушать
         public void Listen(Vector3 at)
         {
             if (!Alive || !Calm || !def.humanitarian || def.id == "poet") return;
-            listenAt = at; st = St.Listen; curiousUntil = Time.time + 6f;
+            StandUp(); listenAt = at; st = St.Listen; curiousUntil = Time.time + 6f;
             path = city.Path(transform.position, at + Random.insideUnitSphere * 2f, lane); pi = 0;
         }
 
@@ -300,7 +336,7 @@ namespace Intern.Game
 
         void Flee()
         {
-            st = St.Flee;
+            StandUp(); st = St.Flee;
             fleeDoor = toArchive && city.archiveDoor != Vector3.zero ? city.archiveDoor : run.FleeDoor(transform.position, def.id == "critic" ? scatter : 0);
             path = city.Path(transform.position, fleeDoor, lane * 0.5f); pi = 0;
         }
@@ -314,7 +350,7 @@ namespace Intern.Game
         // ---------- нападение ----------
         void AttackTick(Vector3 pl, float dist, float dt)
         {
-            if (!city.InStreets(run.PlayerPos)) { anim.moveSpeed = 0f; Face(pl, dt); return; }   // в магазин не заходят
+            if (city.AreaOf(run.PlayerPos) == null) { anim.moveSpeed = 0f; Face(pl, dt); return; }   // в магазин не заходят
             if (windupAt > 0f)
             {
                 anim.moveSpeed = 0f; Face(pl, dt);
@@ -325,7 +361,7 @@ namespace Intern.Game
                 }
                 return;
             }
-            if (dist > 1.3f) { MoveTo(pl, def.run, dt, 1.2f); return; }
+            if (dist > 1.3f || city.AreaOf(transform.position) != city.AreaOf(run.PlayerPos)) { Chase(run.PlayerPos, def.run, dt, 1.2f); return; }
             anim.moveSpeed = 0f; Face(pl, dt);
             if (Time.time >= nextAct) { windupAt = Time.time + 0.45f; anim.swingStart = Time.time + 0.15f; }
         }
@@ -333,10 +369,10 @@ namespace Intern.Game
         // Нотариус: держит дистанцию и кидает печать
         void ThrowTick(Vector3 pl, float dist, float dt)
         {
-            if (dist > 11f) { MoveTo(pl, def.walk * 1.4f, dt, 9f); return; }
+            if (dist > 11f || !SameArea()) { Chase(run.PlayerPos, def.walk * 1.4f, dt, 9f); return; }
             if (dist < 4.5f) { MoveTo(transform.position + (transform.position - pl).normalized * 3f, def.run, dt, 0.2f); return; }
             anim.moveSpeed = 0f; Face(pl, dt);
-            if (Time.time >= nextAct && city.InStreets(run.PlayerPos))
+            if (Time.time >= nextAct && SameArea() && SeesPlayer())
             {
                 nextAct = Time.time + 2.5f; anim.swingStart = Time.time;
                 Stamp.Throw(run, transform.position + Vector3.up * 1.6f + transform.forward * 0.4f, run.PlayerPos + Vector3.up * 1f, def.damage);
@@ -348,7 +384,7 @@ namespace Intern.Game
         {
             anim.aimGun = true; anim.aimPitch = 0f;
             if (dist < 5f) { anim.aimGun = false; Flee(); return; }
-            if (dist > 13f) { MoveTo(pl, def.walk * 1.5f, dt, 10f); return; }
+            if (dist > 13f || !SameArea()) { Chase(run.PlayerPos, def.walk * 1.5f, dt, 10f); return; }
             if (dist < 8f) { MoveTo(transform.position + (transform.position - pl).normalized * 3f, def.walk * 1.6f, dt, 0.2f); return; }
             anim.moveSpeed = 0f; Face(pl, dt);
         }
@@ -363,6 +399,22 @@ namespace Intern.Game
                 Say("А зачем?", 2f);
                 run.SlowPlayer(2f);
             }
+        }
+
+        bool SameArea() { var a = city.AreaOf(run.PlayerPos); return a != null && a == city.AreaOf(transform.position); }
+
+        // Догнать точку: в том же пространстве (улица или этот дом) — напрямую, иначе по графу через дверь
+        bool Chase(Vector3 target, float spd, float dt, float stopAt)
+        {
+            string a = city.AreaOf(transform.position), b = city.AreaOf(target);
+            if (a != null && a == b) { chasePath.Clear(); return MoveTo(target, spd, dt, stopAt); }
+            if (Time.time >= chaseRepath || chasePi >= chasePath.Count)
+            {
+                chasePath = city.Path(transform.position, target, 0f); chasePi = 0; chaseRepath = Time.time + 0.7f;
+            }
+            if (chasePi < chasePath.Count && MoveTo(chasePath[chasePi], spd, dt, 0.4f)) chasePi++;
+            var d = target - transform.position; d.y = 0;
+            return d.magnitude <= stopAt;
         }
 
         // ---------- движение ----------
@@ -388,7 +440,13 @@ namespace Intern.Game
             yaw = Mathf.MoveTowardsAngle(yaw, Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg, 540f * dt);
             transform.rotation = Quaternion.Euler(0, yaw, 0);
             var np = me + dir * Mathf.Min(d, spd * dt);
-            transform.position = city != null ? city.Slide(me, np, target) : np;   // у стоящей машины — вдоль борта
+            // застрял между мебелью (за секунду почти не сдвинулся) — полсекунды идёт, не обходя препятствия
+            if (Time.time >= stuckCheckAt)
+            {
+                if (stuckCheckAt > 0f && (me - stuckRef).magnitude < 0.15f && spd > 0.5f) noSlideUntil = Time.time + 0.6f;
+                stuckCheckAt = Time.time + 1f; stuckRef = me;
+            }
+            transform.position = city != null && Time.time >= noSlideUntil ? city.Slide(me, np, target) : np;   // у машины и мебели — вдоль борта
             anim.moveSpeed = spd;
             return false;
         }
@@ -422,6 +480,7 @@ namespace Intern.Game
                 return;
             }
             hp -= damage;
+            if (hp > 0) StandUp();
             anim.React(4, 1.5f);
             if (run.training) stun = Mathf.Max(stun, 0.7f);   // обучение: после удара чуть замирает
             if (knock > 0f) { var k = dir; k.y = 0; knockVel = k.normalized * knock * 6f; }
@@ -480,6 +539,7 @@ namespace Intern.Game
         {
             StopAllCoroutines();
             if (rag != null) { rag.Restore(); DestroyImmediate(rag); rag = null; }
+            hall = null; seated = false; anim.sitTarget = 0f; anim.SetSitInstant(0f); anim.typing = false;
             foreach (var p in props) if (p != null) Destroy(p);
             props.Clear();
             if (tag != null) Destroy(tag.gameObject);
@@ -523,6 +583,10 @@ namespace Intern.Game
             if (!Alive) return;
             Hit(hp + 1, transform.position - dir * 5f, transform.position + Vector3.up * 1.25f, dir, knock, 0f);
         }
+
+        // Только для проверки в редакторе: снять заморозку DebugPlace и что сейчас на пути
+        public void DevUnfreeze() { frozenUntil = 0f; idleUntil = 0f; }
+        public string DevPathInfo { get { return "шаг " + pi + "/" + path.Count + (pi < path.Count ? " к " + path[pi].ToString("0.0") : "") + " из " + transform.position.ToString("0.0"); } }
 
         // Только для проверки в редакторе: поставить перед игроком и заморозить
         public void DebugPlace(Vector3 at, float yaw)

@@ -26,7 +26,7 @@ namespace Intern.Game
     // Итоги одного обеда
     public class LunchReport
     {
-        public int coins, kills, escaped, hidden, fines, spent, bestSeries, lost, techHits, hpLeft;
+        public int coins, kills, escaped, hidden, fines, spent, bestSeries, lost, techHits, hpLeft, halls;
         public bool knockedOut, coupon, deanMet, earlyReturn;
         public float seconds;
     }
@@ -64,12 +64,19 @@ namespace Intern.Game
         readonly List<float> frames = new List<float>(8192);
         public int MaxAlive { get; private set; }
 
+        // дома, куда можно войти (спринт 6): обитатели появляются, когда стажёр подходит к двери; зачистка — награда
+        class HallRun { public CityHall hall; public bool spawned, cleared; public int total, kills, escaped; }
+        readonly List<HallRun> hallRuns = new List<HallRun>();
+        public int HallsCleared { get; private set; }
+        float hallT;
+
         public readonly bool training;   // первый обед с обучением: урон вдвое меньше, замечают ближе, подписи видно издалека
 
         public LunchRun(CityRefs city, float seconds, Func<Vector3> playerPos, Func<Transform> cam, bool hoodie, bool training = false)
         {
             this.city = city; duration = timeLeft = seconds; this.playerPos = playerPos; this.cam = cam; this.hoodie = hoodie; this.training = training;
             maxHp = hp = B.playerHp;
+            foreach (var h in city.halls) { hallRuns.Add(new HallRun { hall = h }); if (h.door != null) h.door.ResetClosed(); }
             // на обучении первые юристы гуляют прямо на проспекте
             if (training) { var law = Balance.Citizen("lawyer"); for (int i = 0; i < 4 && law != null; i++) { var at = SpawnPoint("av", true); if (at != null) { Add(law, at.Value); spawned++; } } }
             // сразу на улицах: гуманитарии в переулках и на площади, технари на проспекте
@@ -117,6 +124,8 @@ namespace Intern.Game
             int film = 0; foreach (var n in npcs) if (n.Alive && n.State == CityNpc.St.Film) film++;
             Filming = film;
             MaxAlive = Mathf.Max(MaxAlive, npcs.Count);
+            hallT -= dt;
+            if (hallT <= 0f) { hallT = 0.2f; HallsTick(); }
             // подписи над головами — только у тех, кто рядом
             lodT -= dt;
             if (lodT <= 0f)
@@ -272,6 +281,7 @@ namespace Intern.Game
         public void OnKill(CityNpc n)
         {
             if (!n.Humanitarian) return;
+            var hr = HallOf(n); if (hr != null) hr.kills++;
             coins += B.reward; kills++;
             series += B.reward; seriesAt = Time.unscaledTime;
             bestSeries = Mathf.Max(bestSeries, series);
@@ -287,15 +297,84 @@ namespace Intern.Game
 
         public void OnEscaped(CityNpc n)
         {
-            if (n.Humanitarian) escaped++;
+            if (n.Humanitarian) { escaped++; var hr = HallOf(n); if (hr != null) hr.escaped++; }
             n.gameObject.SetActive(false); n.Recyclable = true;   // исчез в подъезде; тело заберём в пул в своём кадре
         }
 
         public void OnHidden(CityNpc n)
         {
             hidden++; hiddenInArchive.Add(n.def);
+            if (n.Humanitarian) { var hr = HallOf(n); if (hr != null) hr.escaped++; }
             n.gameObject.SetActive(false); n.Recyclable = true;
         }
+
+        // ---------- дома ----------
+        HallRun HallOf(CityNpc n) { if (n == null || n.hall == null) return null; foreach (var hr in hallRuns) if (hr.hall == n.hall) return hr; return null; }
+
+        void HallsTick()
+        {
+            var p = playerPos();
+            foreach (var hr in hallRuns)
+            {
+                var h = hr.hall;
+                if (!hr.spawned) { var d = p - h.doorOut; d.y = 0f; if (d.sqrMagnitude < 28f * 28f) SpawnHall(hr); }
+                // горожанин у закрытой двери открывает её сам
+                if (h.door != null && !h.door.IsOpen)
+                    foreach (var n in npcs)
+                        if (n != null && n.Alive && n.gameObject.activeSelf && ((n.transform.position - h.doorIn).sqrMagnitude < 2.2f || (n.transform.position - h.doorOut).sqrMagnitude < 2.2f)) { h.door.Open(); break; }
+                if (hr.spawned && !hr.cleared && hr.total > 0 && hr.kills > 0 && hr.kills + hr.escaped >= hr.total)
+                {
+                    hr.cleared = true; HallsCleared++; coins += B.hallBonus;
+                    if (Say != null) Say("Здание «" + h.name + "» зачищено: +" + B.hallBonus + " монет");
+                }
+            }
+        }
+
+        // Обитатели дома: гуманитарии сидят за столами или стоят за шкафами, технари работают за столами
+        void SpawnHall(HallRun hr)
+        {
+            hr.spawned = true;
+            var h = hr.hall;
+            var seats = new List<int>(); for (int i = 0; i < h.seats.Count; i++) seats.Add(i);
+            var hides = new List<int>(); for (int i = 0; i < h.hides.Count; i++) hides.Add(i);
+            Shuffle(seats); Shuffle(hides);
+            int si = 0, hi = 0;
+            foreach (var id in h.humanitarians)
+            {
+                var def = Balance.Citizen(id); if (def == null) continue;
+                bool sit = si < seats.Count && (hi >= hides.Count || Rnd.NextDouble() < 0.6);
+                Vector3 at; float yaw;
+                if (sit) { at = h.seats[seats[si]]; yaw = h.seatYaw[seats[si]]; si++; }
+                else if (hi < hides.Count) { at = h.hides[hides[hi]]; yaw = h.hideYaw[hides[hi]]; hi++; }
+                else continue;
+                var n = Add(def, at); n.PlaceInHall(h, at, yaw, sit); hr.total++; spawned++;
+            }
+            foreach (var id in h.techies)
+            {
+                var def = Balance.Citizen(id); if (def == null || si >= seats.Count) continue;
+                var at = h.seats[seats[si]]; float yaw = h.seatYaw[seats[si]]; si++;
+                var n = Add(def, at); n.PlaceInHall(h, at, yaw, true);
+            }
+        }
+
+        void Shuffle(List<int> l) { for (int i = l.Count - 1; i > 0; i--) { int k = Rnd.Next(i + 1); int t = l[i]; l[i] = l[k]; l[k] = t; } }
+
+        // Для плашки у двери: сколько гуманитариев ещё там, зачищено ли
+        public bool HallStatus(CityHall h, out int alive, out int total, out bool spawnedNow, out bool cleared)
+        {
+            alive = total = 0; spawnedNow = cleared = false;
+            foreach (var hr in hallRuns)
+            {
+                if (hr.hall != h) continue;
+                spawnedNow = hr.spawned; cleared = hr.cleared; total = hr.total;
+                foreach (var n in npcs) if (n != null && n.Alive && n.Humanitarian && n.hall == h) alive++;
+                return true;
+            }
+            return false;
+        }
+
+        // Только для инструментов редактора: сразу заселить дом
+        public void DevSpawnHall(string id) { foreach (var hr in hallRuns) if (hr.hall.id == id && !hr.spawned) SpawnHall(hr); }
 
         // Покупки в городе: сначала из монет обеда, потом из кошелька
         public int SpendFromLunch(int price) { int take = Mathf.Clamp(coins, 0, price); coins -= take; spent += price; return price - take; }
@@ -329,7 +408,7 @@ namespace Intern.Game
 
         public LunchReport Report(bool early)
         {
-            return new LunchReport { coins = coins, kills = kills, escaped = escaped, hidden = hidden, fines = fines, spent = spent, bestSeries = bestSeries,
+            return new LunchReport { coins = coins, kills = kills, escaped = escaped, hidden = hidden, fines = fines, spent = spent, bestSeries = bestSeries, halls = HallsCleared,
                                      techHits = techHits, hpLeft = hp, knockedOut = knockedOut, coupon = couponDropped, deanMet = deanMet, seconds = Elapsed, earlyReturn = early };
         }
 

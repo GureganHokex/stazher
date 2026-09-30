@@ -15,8 +15,12 @@ namespace Intern.Game
     {
         // Сетка на группу «обводка + свечение»: цвет каждой коробки — в её вершинах (шейдер Intern/Toon, _VColor).
         // Без мультяшного шейдера — сетка на цвет, как раньше
-        class Buf { public readonly List<Vector3> v = new List<Vector3>(); public readonly List<Vector3> n = new List<Vector3>(); public readonly List<Color32> col = new List<Color32>(); public readonly List<int> t = new List<int>(); public Color c; public float outline, emission; }
+        class Buf { public readonly List<Vector3> v = new List<Vector3>(); public readonly List<Vector3> n = new List<Vector3>(); public readonly List<Color32> col = new List<Color32>(); public readonly List<int> t = new List<int>(); public Color c; public float outline, emission; public string group; }
+        public string group;   // свои сетки для группы (дом) — чтобы её можно было прятать целиком
         readonly Dictionary<string, Buf> bufs = new Dictionary<string, Buf>();
+        readonly Color? shade;   // свой цвет тени (внутри домов — тёплый), иначе как у всего города
+        public BoxBatch() { }
+        public BoxBatch(Color shadeColor) { shade = shadeColor; }
         static readonly Vector3[] Dirs = { Vector3.right, Vector3.left, Vector3.up, Vector3.down, Vector3.forward, Vector3.back };
         const int MaxVerts = 60000;   // сетки делятся на куски: 16-битные индексы и отсечение по частям города
 
@@ -29,13 +33,13 @@ namespace Intern.Game
         {
             bool vcol = Look.ToonAvailable;
             // кусок города 48 × 48 м — чтобы невидимое за спиной отсекалось
-            string cell = Mathf.FloorToInt(at.x / 48f) + ":" + Mathf.FloorToInt(at.z / 48f);
+            string cell = group ?? (Mathf.FloorToInt(at.x / 48f) + ":" + Mathf.FloorToInt(at.z / 48f));
             string key = (vcol ? "v" : ColorUtility.ToHtmlStringRGBA(c)) + "|" + outline + "|" + emission + "|" + cell;
             Buf b;
             if (!bufs.TryGetValue(key, out b) || b.v.Count > MaxVerts)
             {
                 if (b != null) { int k = 1; while (bufs.ContainsKey(key + "#" + k)) k++; bufs[key + "#" + k] = b; }
-                b = new Buf { c = c, outline = outline, emission = emission };
+                b = new Buf { c = c, outline = outline, emission = emission, group = group };
                 bufs[key] = b;
             }
             return b;
@@ -138,11 +142,11 @@ namespace Intern.Game
                 if (b.v.Count > 65000) m.indexFormat = IndexFormat.UInt32;
                 m.SetVertices(b.v); m.SetNormals(b.n); m.SetColors(b.col); m.SetTriangles(b.t, 0);
                 m.RecalculateBounds();
-                var go = new GameObject(name);
+                var go = new GameObject(b.group != null ? name + "_" + b.group : name);
                 go.transform.SetParent(parent, false);
                 go.AddComponent<MeshFilter>().sharedMesh = m;
                 var r = go.AddComponent<MeshRenderer>();
-                r.sharedMaterial = Look.VertexColorMat(b.outline, b.emission) ?? Look.Mat(b.c, b.outline, b.emission);
+                r.sharedMaterial = Look.VertexColorMat(b.outline, b.emission, shade) ?? Look.Mat(b.c, b.outline, b.emission);
                 r.shadowCastingMode = shadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
             }
             bufs.Clear();

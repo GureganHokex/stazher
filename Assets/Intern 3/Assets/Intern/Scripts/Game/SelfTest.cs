@@ -91,6 +91,9 @@ namespace Intern.Game
             foreach (var line in es) { fail++; sb.AppendLine("FAIL окружение: " + line); }
             foreach (var line in envInfo) sb.AppendLine(line);
             sb.AppendLine("фильтр docker и сценарии: " + (es.Count == 0 ? "проверки прошли" : es.Count + " ошибок"));
+            var hallBad = HallSim(); 
+            foreach (var line in hallBad) { fail++; sb.AppendLine("FAIL дома: " + line); }
+            sb.AppendLine("дома, куда можно войти: " + (hallBad.Count == 0 ? "проверки прошли" : hallBad.Count + " ошибок"));
             var rdBad = new List<string>(); var rdInfo = new List<string>();
             yield return RagdollSim(rdBad, rdInfo);
             foreach (var line in rdBad) { fail++; sb.AppendLine("FAIL ragdoll: " + line); }
@@ -101,6 +104,43 @@ namespace Intern.Game
             File.WriteAllText(file, sb.ToString(), new UTF8Encoding(false));
             Debug.Log("[Стажёр] Самопроверка: " + ok + " ок, " + fail + " ошибок → " + file);
             Application.Quit(fail == 0 ? 0 : 1);
+        }
+
+        // Дома, куда можно войти (спринт 6 версии 0.9): четыре дома, у каждого дверь, кресла и укрытия для обитателей,
+        // все узлы внутри связаны с улицей, а из любого кресла есть путь до двери бизнес-центра
+        public static List<string> HallSim()
+        {
+            var bad = new List<string>();
+            var city = CityBuilder.Build();
+            try
+            {
+                if (city.halls.Count != 4) bad.Add("домов " + city.halls.Count + " вместо 4");
+                // связность графа: обход от первого уличного узла
+                var seen = new bool[city.nodes.Count]; var q = new Queue<int>(); q.Enqueue(0); seen[0] = true;
+                while (q.Count > 0) { int u = q.Dequeue(); foreach (var v in city.links[u]) if (!seen[v]) { seen[v] = true; q.Enqueue(v); } }
+                foreach (var h in city.halls)
+                {
+                    if (h.door == null) bad.Add(h.name + ": нет двери");
+                    if (h.seats.Count < h.humanitarians.Length + h.techies.Length) bad.Add(h.name + ": кресел " + h.seats.Count + " на " + (h.humanitarians.Length + h.techies.Length) + " обитателей");
+                    if (h.hides.Count == 0) bad.Add(h.name + ": негде спрятаться");
+                    foreach (var n in h.nodes) if (!seen[n]) { bad.Add(h.name + ": узел внутри не связан с улицей"); break; }
+                    foreach (var p in h.seats)
+                    {
+                        if (!h.Contains(p)) { bad.Add(h.name + ": кресло вне дома"); break; }
+                        foreach (var r in city.blockers) if (r.Contains(new Vector2(p.x, p.z))) { bad.Add(h.name + ": кресло внутри мебели"); break; }
+                    }
+                    var path = city.Path(h.seats[0], city.officeDoor, 0f);
+                    if (path.Count < 3) bad.Add(h.name + ": нет пути от кресла до офиса");
+                    else
+                    {
+                        // путь выходит через дверь: одна из точек рядом с дверью снаружи
+                        bool viaDoor = false; foreach (var p in path) if ((p - h.doorOut).sqrMagnitude < 1.5f) viaDoor = true;
+                        if (!viaDoor) bad.Add(h.name + ": путь наружу не через дверь");
+                    }
+                }
+            }
+            finally { UnityEngine.Object.Destroy(city.root.gameObject); }
+            return bad;
         }
 
         // Ragdoll (спринт 5 версии 0.9): горожанин падает с толчком на бегу и замирает; суставы в пределах, тело не под полом,

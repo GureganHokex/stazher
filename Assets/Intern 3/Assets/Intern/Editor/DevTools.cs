@@ -353,6 +353,7 @@ namespace Intern.EditorTools
                     case "stats": Stats(); break;
                     case "rig": RigDump(); break;
                     case "ragtest": Intern.Game.RagTest.Launch(); break;
+                    case "halltest": Intern.Game.RagTest.LaunchHalls(); break;
                     case "continue":
                         {
                             var gr = EditorApplication.isPlaying ? UnityEngine.Object.FindFirstObjectByType<Intern.Game.GameRoot>() : null;

@@ -36,7 +36,16 @@ namespace Intern.Game
         public readonly List<Vector3> nodes = new List<Vector3>();     // мир
         public readonly List<float> nodeLane = new List<float>();
         public readonly List<float> nodeMin = new List<float>();     // полоса не ближе этого к оси (проспект: только по тротуарам)
-        public readonly List<Rect> blockers = new List<Rect>();      // мир (x, z): стоящие машины — горожане их обходят
+        public readonly List<Rect> blockers = new List<Rect>();      // мир (x, z): машины, мебель, стены — горожане их обходят
+        public readonly List<CityHall> halls = new List<CityHall>();   // дома, куда можно войти (спринт 6 версии 0.9)
+
+        public CityHall HallAt(Vector3 world) { foreach (var h in halls) if (h.Contains(world)) return h; return null; }
+        // Где точка: "street" — улицы и площадь, "hall:<id>" — внутри дома, null — магазин, подъезд, за домами
+        public string AreaOf(Vector3 world)
+        {
+            var h = HallAt(world); if (h != null) return h.Area;
+            return InStreets(world) ? "street" : null;
+        }
         public readonly List<string> nodeStreet = new List<string>();
         public readonly List<List<int>> links = new List<List<int>>();
         public readonly List<Vector3> alleyEnds = new List<Vector3>();
@@ -96,11 +105,19 @@ namespace Intern.Game
         }
         public bool InStreets(Vector3 world) { return StreetAt(world) != null; }
 
+        // Ближайший узел того же пространства: из дома — узел внутри этого дома, с улицы — уличный (не сквозь стену)
         public int Nearest(Vector3 world)
         {
-            int best = 0; float bd = float.MaxValue;
-            for (int i = 0; i < nodes.Count; i++) { var d = nodes[i] - world; d.y = 0; float m = d.sqrMagnitude; if (m < bd) { bd = m; best = i; } }
-            return best;
+            var h = HallAt(world); string area = h != null ? h.Area : null;
+            int best = -1; float bd = float.MaxValue;
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                bool inHall = nodeStreet[i].StartsWith("hall:");
+                if (area != null ? nodeStreet[i] != area : inHall) continue;
+                var d = nodes[i] - world; d.y = 0; float m = d.sqrMagnitude; if (m < bd) { bd = m; best = i; }
+            }
+            if (best < 0) for (int i = 0; i < nodes.Count; i++) { var d = nodes[i] - world; d.y = 0; float m = d.sqrMagnitude; if (m < bd) { bd = m; best = i; } }
+            return Mathf.Max(0, best);
         }
 
         // Кратчайший путь по графу (узлы — точки; последняя точка — сама цель)
@@ -133,6 +150,8 @@ namespace Intern.Game
                 dir.y = 0; if (dir.sqrMagnitude < 0.01f) dir = Vector3.forward; dir.Normalize();
                 var side = new Vector3(dir.z, 0, -dir.x);
                 int ni = chain[i];
+                // на проспекте тротуары вдоль оси: смещение всегда поперёк проспекта, даже если путь ведёт к двери дома
+                if (nodeMin[ni] > 0f) side = Vector3.right;
                 pts.Add(n + side * ((lane >= 0f ? 1f : -1f) * nodeMin[ni] + lane * nodeLane[ni]));
             }
             // первая точка пути — не назад к узлу, если цель в другую сторону
@@ -147,6 +166,18 @@ namespace Intern.Game
 
         // Шаг горожанина from → to не заходит в машину: у борта скользит вдоль него, в сторону цели
         public Vector3 Slide(Vector3 from, Vector3 to, Vector3 goal)
+        {
+            // два прохода: выталкивание из одного препятствия может задвинуть в соседнее
+            for (int pass = 0; pass < 2; pass++)
+            {
+                var before = to;
+                to = SlideOnce(from, to, goal);
+                if ((to - before).sqrMagnitude < 1e-8f) break;
+            }
+            return to;
+        }
+
+        Vector3 SlideOnce(Vector3 from, Vector3 to, Vector3 goal)
         {
             const float R = 0.35f;
             for (int i = 0; i < blockers.Count; i++)
@@ -180,13 +211,13 @@ namespace Intern.Game
         public Vector3 RandomNode(System.Random rnd, string street = null)
         {
             var list = new List<int>();
-            for (int i = 0; i < nodes.Count; i++) if (street == null || nodeStreet[i] == street) list.Add(i);
+            for (int i = 0; i < nodes.Count; i++) if (street == null ? !nodeStreet[i].StartsWith("hall:") : nodeStreet[i] == street) list.Add(i);
             if (list.Count == 0) return nodes[rnd.Next(nodes.Count)];
             return nodes[list[rnd.Next(list.Count)]];
         }
     }
 
-    public static class CityBuilder
+    public static partial class CityBuilder
     {
         public static readonly Vector3 Origin = new Vector3(0f, 0f, 300f);
         static readonly Dictionary<string, Material> facades = new Dictionary<string, Material>();
@@ -205,6 +236,10 @@ namespace Intern.Game
             public readonly Dictionary<char, string> signs = new Dictionary<char, string>();   // N S E W → вывеска
             public char roomFace; public string roomKind, roomSign;                              // заходить можно
             public int style = -1;
+            // дом, куда можно войти: сторона с дверью, планировка (acc, eng, law, news) и что узнал HallFront о двери
+            public char hallFace; public string hallKind, hallName, hallStreet;
+            public Vector3 hallDoor, hallAlong; public float hallT, hallLen;
+            public Bld Hall(char f, string kind) { hallFace = f; hallKind = kind; return this; }
             public Bld(float x0, float x1, float z0, float z1, float h, string color) { this.x0 = x0; this.x1 = x1; this.z0 = z0; this.z1 = z1; this.h = h; this.color = color; }
             public Bld Sign(char f, string s) { signs[f] = s; return this; }
             public Bld Room(char f, string kind, string sign) { roomFace = f; roomKind = kind; roomSign = sign; return this; }
@@ -214,6 +249,7 @@ namespace Intern.Game
         public static CityRefs Build()
         {
             R = new CityRefs(); rnd = new System.Random(11); bb = new BoxBatch();
+            hb = new BoxBatch(new Color(0.96f, 0.9f, 0.82f));   // внутри домов — тёплый свет ламп
             var root = new GameObject("City").transform; root.position = Origin;
             R.root = root;
 
@@ -234,25 +270,25 @@ namespace Intern.Game
                 new Bld(-30, 30, -12, 0, 30, "7FA6D6").Style(2),
                 // проспект, запад
                 new Bld(-30, -7, 0, 15, 18, "E8B4A0").Sign('E', "Аптека"),
-                new Bld(-30, -7, 15, 30, 24, "A8C5E0").Sign('E', "Бухгалтерия"),
+                new Bld(-30, -7, 15, 30, 24, "A8C5E0").Sign('E', "Бухгалтерия").Hall('E', "acc"),
                 new Bld(-30, -7, 30, 45, 15, "C9B8E8").Sign('E', "IT-парк").Style(2),
                 new Bld(-30, -7, 45, 60, 21, "F0D38C").Sign('E', "Почта").Room('N', "food", "Шаурма"),
                 // проспект, восток
                 new Bld(7, 30, 0, 15, 21, "9ED9C4").Sign('W', "Продукты"),
-                new Bld(7, 30, 15, 30, 15, "E8A0B8").Sign('W', "Инженерный центр").Style(2),
+                new Bld(7, 30, 15, 30, 15, "E8A0B8").Sign('W', "Инженерный центр").Style(2).Hall('W', "eng"),
                 new Bld(7, 30, 30, 45, 24, "B8C9A0").Sign('W', "Банк").Style(2),
                 new Bld(7, 30, 45, 60, 18, "D9C4A8").Sign('W', "Кафе «Стек»").Sign('N', "Кафе «Стек»"),
                 // Юридический переулок
                 new Bld(-56, -43, 60, 72, 18, "D8A48F").Sign('N', "Адвокатское бюро"),
                 new Bld(-43, -30, 60, 72, 21, "E6C9A8").Room('N', "notary", "Нотариальная контора"),
-                new Bld(-30, -16, 60, 72, 15, "C4B0D8").Sign('N', "Юристы 24/7"),
+                new Bld(-30, -16, 60, 72, 15, "C4B0D8").Sign('N', "Юристы 24/7").Hall('N', "law"),
                 new Bld(-56, -43, 80, 92, 24, "A8B8D8").Sign('S', "Юридическая консультация"),
                 new Bld(-43, -30, 80, 92, 18, "E8C8A0").Sign('S', "Коллегия адвокатов"),
                 new Bld(-30, -16, 80, 92, 21, "B0C8B8").Room('E', "weapons", "Оружейная «Железо»"),
                 new Bld(-62, -56, 68, 84, 20, "D9C4A8").Sign('E', "Суд"),
                 // Книжный переулок
                 new Bld(16, 30, 60, 72, 21, "E0B8C8").Sign('N', "Книжный"),
-                new Bld(30, 43, 60, 72, 15, "B8D0E0").Sign('N', "Редакция газеты"),
+                new Bld(30, 43, 60, 72, 15, "B8D0E0").Sign('N', "Редакция газеты").Hall('N', "news"),
                 new Bld(43, 56, 60, 72, 24, "D8D0A0").Sign('N', "Типография"),
                 new Bld(16, 30, 80, 92, 18, "A8D8C0").Room('W', "patch", "Мастерская «Патч»"),
                 new Bld(30, 43, 80, 92, 24, "E8B898").Room('S', "library", "Библиотека"),
@@ -298,6 +334,9 @@ namespace Intern.Game
             foreach (var z in new[] { 9.5f, 15.8f, 31f, 43.5f }) Car(root, new Vector3(-3.05f, 0, z + (float)carRnd.NextDouble() * 0.6f), 180f, ci++);
 
             bb.Flush(root, "CityDetails");
+            hb.Flush(root, "HallDetails");
+            CollectHallRenderers();
+            root.gameObject.AddComponent<CityHallCull>().halls = R.halls;
             BatchStatic(root);
             root.gameObject.AddComponent<CityAtmosphere>();
 
@@ -342,6 +381,7 @@ namespace Intern.Game
             foreach (var r in root.GetComponentsInChildren<MeshRenderer>(true))
             {
                 if (r.GetComponent<TextMesh>() != null || r.GetComponent<WaterSurface>() != null || r.GetComponentInParent<CharacterAnim>() != null) continue;
+                if (r.GetComponentInParent<EnterableDoor>() != null) continue;   // створка двери двигается
                 var mf = r.GetComponent<MeshFilter>(); if (mf == null || mf.sharedMesh == null || !mf.sharedMesh.isReadable) continue;
                 if (r.sharedMaterial != null && r.sharedMaterial.renderQueue >= 3000) continue;   // прозрачное стекло
                 list.Add(r.gameObject);
@@ -401,17 +441,18 @@ namespace Intern.Game
             var root = R.root;
             var c = Pal.Hex(b.color);
             float w = b.x1 - b.x0, d = b.z1 - b.z0, xc = (b.x0 + b.x1) / 2f, zc = (b.z0 + b.z1) / 2f;
-            bool room = b.roomKind != null;
+            bool room = b.roomKind != null || b.hallKind != null;
             const float gf = 3.8f;   // высота первого этажа
             if (b.style < 0) b.style = new[] { 0, 1, 3, 0, 3, 1 }[Mathf.Abs((int)(b.x0 * 3f + b.z0 * 7f)) % 6];
             if (!room) Look.RBox("House", root, new Vector3(xc, b.h / 2f, zc), new Vector3(w - 0.1f, b.h, d - 0.1f), c, 0.1f, true, 0.6f);
             else
             {
                 Look.RBox("House", root, new Vector3(xc, gf + (b.h - gf) / 2f, zc), new Vector3(w - 0.1f, b.h - gf, d - 0.1f), c, 0.1f, true, 0.6f);
-                HollowGround(b, c, gf);
+                if (b.roomKind != null) HollowGround(b, c, gf);
             }
             // каждая сторона дома: где она выходит на улицу — фасад с окнами, первый этаж с витринами и дверями
             foreach (var f in new[] { 'N', 'S', 'E', 'W' }) Face(b, f, c, gf);
+            if (b.hallKind != null) BuildHall(b, gf);
             Roof(b, c);
         }
 
@@ -464,6 +505,7 @@ namespace Intern.Game
             var band = Color.Lerp(c, Dark, b.style == 2 ? 0.7f : 0.45f);
             string sign; b.signs.TryGetValue(f, out sign);
             bool roomHere = b.roomKind != null && b.roomFace == f;
+            bool hallHere = b.hallKind != null && b.hallFace == f;
             var brand = Pal.Hex(Brands[Mathf.Abs((sign ?? b.roomSign ?? b.color).GetHashCode()) % Brands.Length]);
             foreach (var sg in segs)
             {
@@ -473,6 +515,7 @@ namespace Intern.Game
                 // верхние этажи: окна по стилю дома, карниз и межэтажный пояс
                 Upper(b, mid3, d3, n3, sl, gf, c, yaw);
                 // первый этаж: полоса с цоколем
+                if (hallHere) { HallFront(b, a, dir, n, sg, gf, band, len, sign ?? b.hallName, brand, StreetOf((mid3 + n3 * 1f).x, (mid3 + n3 * 1f).z)); continue; }
                 if (!roomHere)
                 {
                     Look.RBox("Band", R.root, mid3 + n3 * 0.05f + Vector3.up * (gf / 2f), Rot(new Vector3(sl - 0.3f, gf, 0.1f), d3), band, 0.02f, false, 0.5f);
@@ -885,6 +928,7 @@ namespace Intern.Game
             Chain(s02, r0, r1, r2, r3);
             int u0 = Node(10.5f, 97, 2.3f, "uni"), u1 = Node(10.5f, 107, 2.3f, "uni"), u2 = Node(10.5f, 117, 2.3f, "uni"), u3 = Node(10.5f, 127, 2.3f, "uni");
             Chain(s22, u0, u1, u2, u3);
+            HallGraph();
         }
     }
 

@@ -112,10 +112,10 @@ namespace Intern.Game
 
         // Мультяшный материал с цветом из вершин — для сеток, где слиты детали разных цветов (BoxBatch).
         // Без шейдера Intern/Toon — null: тогда сетки делятся по цветам, как раньше
-        public static Material VertexColorMat(float outline, float emission)
+        public static Material VertexColorMat(float outline, float emission, Color? shade = null)
         {
             if (!ToonAvailable) return null;
-            string key = "vcol|" + outline + "|" + emission;
+            string key = "vcol|" + outline + "|" + emission + (shade.HasValue ? "|" + ColorUtility.ToHtmlStringRGB(shade.Value) : "");
             Material m;
             if (mats.TryGetValue(key, out m) && m != null) return m;
             m = new Material(toon) { name = "Intern_" + key };
@@ -123,7 +123,7 @@ namespace Intern.Game
             m.SetFloat("_VColor", 1f);
             m.SetFloat("_OutlineWidth", 0.0035f * outline);
             m.SetColor("_OutlineColor", Pal.Ink);                  // обводка = цвет вершины, смешанный с чернилами на 78%
-            m.SetColor("_ShadeColor", Color.Lerp(new Color(0.58f, 0.56f, 0.9f), Color.white, 0.12f));
+            m.SetColor("_ShadeColor", shade ?? Color.Lerp(new Color(0.58f, 0.56f, 0.9f), Color.white, 0.12f));
             if (emission > 0) m.SetColor("_EmissionColor", Color.white * emission * 0.6f);
             mats[key] = m;
             return m;

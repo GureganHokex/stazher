@@ -67,6 +67,7 @@ namespace Intern.Game
         public int playerHp = 100;
         public float deanChance = 0.3f; public int deanHp = 300; public float couponDiscount = 0.2f;
         public float knockedLose = 0.5f;
+        public int hallBonus = 40;   // за зачистку дома, куда можно войти (спринт 6 версии 0.9)
         // улучшения: доли цены за уровни 1..5, прибавка урона за уровень
         public float[] upgradeCost = { 0.2f, 0.3f, 0.45f, 0.65f, 0.9f };
         public float upgradeDamage = 0.1f, fastReload = 0.7f;

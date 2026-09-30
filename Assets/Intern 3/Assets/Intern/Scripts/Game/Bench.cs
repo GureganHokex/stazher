@@ -21,7 +21,7 @@ namespace Intern.Game
         public static bool NoSave;   // проверки из редактора (команды DevTools): игра идёт, но сохранение не трогаем
 
         static readonly string[] DefaultPoses = { "office|4.5 0.05 6.8 75 8 0", "hall|-5 0.08 -4.8 0 12 1", "lead|8.2 0.05 4.1 0 6 1",
-                                                    "city|0 0.1 302.2 0 8 0", "square|-6 0.1 370 45 4 1" };
+                                                    "city|0 0.1 302.2 0 8 0", "square|-6 0.1 370 45 4 1", "buh|-10 0.1 322.5 -90 8 1" };
         const float Warmup = 2f, Measure = 5f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
