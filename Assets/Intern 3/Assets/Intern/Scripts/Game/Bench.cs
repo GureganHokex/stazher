@@ -18,7 +18,7 @@ namespace Intern.Game
         public static bool Requested { get { return Environment.GetCommandLineArgs().Any(a => a == "-bench"); } }
         public static bool Running { get; private set; }
 
-        static readonly string[] DefaultPoses = { "office|4.5 0.05 6.8 75 8 0" };
+        static readonly string[] DefaultPoses = { "office|4.5 0.05 6.8 75 8 0", "hall|-5 0.08 -4.8 0 12 1", "lead|8.2 0.05 4.1 0 6 1" };
         const float Warmup = 2f, Measure = 5f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]

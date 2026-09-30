@@ -182,79 +182,41 @@ namespace Intern.Game
         }
     }
 
-    // Облачко с репликой над головой: всегда лицом к камере
+    // Облачко с репликой у головы персонажа. Рисует его интерфейс (GameUi, слой облачков) чётким шрифтом поверх экрана —
+    // раньше это был 3D-текст на скруглённом ящике, он расплывался (спринт 2 версии 0.9). Здесь только данные.
     public class SpeechBubble : MonoBehaviour
     {
-        TextMesh text;
-        GameObject box, tail;
-        MeshRenderer textR;
-        string shown;
-        bool sized;
-        Transform owner;
-        float headY, width, height;
-        int side = 1;                    // 1 — справа от головы, -1 — слева
-        Color fill = Color.white;
+        public static readonly List<SpeechBubble> Active = new List<SpeechBubble>();
+        public Transform Owner { get; private set; }
+        public float HeadY { get; private set; }
+        public string Text { get; private set; }
+        public Color Fill { get; private set; }
+        public int Version { get; private set; }     // растёт с каждой новой репликой — интерфейс перерисовывает облачко
+        public string Speaker;                         // имя над текстом: «Гена», «Филолог»
 
-        // Облачко сбоку от головы (как в комиксе): так его видно, даже когда Гена стоит вплотную
         public static SpeechBubble Create(Transform owner, float headHeight)
         {
             var node = new GameObject("SpeechBubble");
             node.transform.SetParent(owner, false);
-            node.AddComponent<Billboard>();
             var b = node.AddComponent<SpeechBubble>();
-            b.owner = owner; b.headY = headHeight;
-            b.text = OfficeBuilder.Label("", new Vector3(0, 0, -0.07f), 0.0082f, Pal.Ink, node.transform);
-            b.text.transform.localRotation = Quaternion.identity;
-            b.textR = b.text.GetComponent<MeshRenderer>();
+            b.Owner = owner; b.HeadY = headHeight;
             node.SetActive(false);
             return b;
         }
 
         public void Show(string line, Color bg)
         {
+            Text = line; Fill = bg; Version++;
             gameObject.SetActive(true);
-            shown = Wrap(line, 30); fill = bg;
-            text.text = shown; sized = false;
         }
 
         public void Hide() { gameObject.SetActive(false); }
 
-        void LateUpdate()
-        {
-            Place();
-            if (sized || textR == null) return;
-            // размер текста известен после генерации сетки — подгоняем под него фон
-            var b = textR.localBounds.size;
-            if (b.x < 0.01f)
-            {
-                int lines = shown.Split('\n').Length, len = 0;
-                foreach (var l in shown.Split('\n')) len = Mathf.Max(len, l.Length);
-                b = new Vector3(len * 0.028f, lines * 0.06f, 0);
-            }
-            var s = text.transform.localScale;
-            float bw = Mathf.Round((b.x * s.x + 0.22f) * 20f) / 20f, bh = Mathf.Round((b.y * s.y + 0.16f) * 20f) / 20f;
-            if (box != null) Destroy(box);
-            if (tail != null) Destroy(tail);
-            box = Look.RBox("Bubble", transform, Vector3.zero, new Vector3(bw, bh, 0.1f), fill, 0.05f, false, 0.7f, 0.55f, false);
-            tail = Look.RBox("Tail", transform, new Vector3(-bw * 0.5f, -bh * 0.25f, 0.01f), new Vector3(0.16f, 0.16f, 0.08f), fill, 0.02f, false, 0.7f, 0.55f, false);
-            tail.transform.localRotation = Quaternion.Euler(0, 0, 45f);
-            text.transform.localPosition = new Vector3(0, 0, -0.07f);
-            width = bw; height = bh; sized = true;
-            Place();
-        }
+        void OnEnable() { if (!Active.Contains(this)) Active.Add(this); }
+        void OnDisable() { Active.Remove(this); }
 
-        // справа от головы Гены с точки зрения камеры
-        void Place()
-        {
-            var cam = Camera.main; if (cam == null || owner == null) return;
-            var right = cam.transform.right; right.y = 0; right.Normalize();
-            var head = owner.position + Vector3.up * headY;
-            // облачко с той стороны, где больше места на экране
-            float vx = cam.WorldToViewportPoint(head).x;
-            if (side > 0 && vx > 0.6f) side = -1; else if (side < 0 && vx < 0.4f) side = 1;
-            transform.position = head + right * side * (width * 0.5f + 0.28f);
-            if (tail != null) tail.transform.localPosition = new Vector3(-side * width * 0.5f, -height * 0.25f, 0.01f);
-        }
+        // точка над макушкой, к которой крепится хвостик облачка
+        public Vector3 Anchor { get { return Owner != null ? Owner.position + Vector3.up * (HeadY * Owner.lossyScale.y + 0.2f) : transform.position; } }
 
         public static string Wrap(string s, int width)
         {
@@ -282,7 +244,6 @@ namespace Intern.Game
         Action<string> say;              // текст реплики — в уведомление (видно и за компьютером)
         Action<string> sayFar;           // не дошёл — крикнул издалека
         SpeechBubble bubble;
-        GameObject nameTag;
 
         St st = St.Home;
         OfficeGrid grid;
@@ -295,6 +256,7 @@ namespace Intern.Game
 
         public const float Speed = 2.1f, GiveUp = 22f;
         public bool Busy { get { return st != St.Home; } }
+        public bool HasNews { get { return lines.Count > 0; } }   // пришёл что-то сказать — на плашке «хочет что-то сказать»
         public string State { get { return st.ToString(); } }
 
         public void Init(CharacterAnim a, Func<Vector3> player, Func<Vector3> view, Func<bool> isActive, Action<string> onSay, Action<string> onFar)
@@ -305,8 +267,7 @@ namespace Intern.Game
             home = transform.position; homeYaw = transform.eulerAngles.y; yaw = homeYaw;
             playerPos = player; active = isActive; say = onSay; sayFar = onFar;
             bubble = SpeechBubble.Create(transform, 1.75f);
-            // табличка «Тимлид Гена» прячется, пока над головой облачко
-            foreach (var tm in GetComponentsInChildren<TextMesh>(true)) if (tm.text == "Тимлид Гена") nameTag = tm.gameObject;
+            bubble.Speaker = "Гена";
         }
 
         // Подойти к стажёру и сказать. Если уже идёт или говорит — реплика встаёт в очередь.
@@ -404,7 +365,6 @@ namespace Intern.Game
             mood = l.Key;
             lineLeft = Mathf.Clamp(2.5f + l.Value.Length * 0.045f, 4f, 9f);
             bubble.Show(l.Value, BubbleColor(mood));
-            if (nameTag != null) nameTag.SetActive(false);
             if (anim != null)
             {
                 anim.React(Emotion(mood), lineLeft);
@@ -413,7 +373,7 @@ namespace Intern.Game
             if (say != null) say(l.Value);
         }
 
-        void HideBubble() { bubble.Hide(); if (nameTag != null) nameTag.SetActive(true); }
+        void HideBubble() { bubble.Hide(); }
 
         static int Emotion(LeadMood m) { return m == LeadMood.Praise || m == LeadMood.Info ? 1 : m == LeadMood.Warn ? 3 : 5; }
         static Color BubbleColor(LeadMood m)

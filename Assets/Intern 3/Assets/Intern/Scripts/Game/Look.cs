@@ -320,6 +320,38 @@ namespace Intern.Game
     // ================= Персонаж: риг и анимации =================
     public class CharacterAnim : MonoBehaviour
     {
+        // ---------- гладкие модели (настройка «Модели персонажей») ----------
+        static readonly HashSet<CharacterAnim> live = new HashSet<CharacterAnim>();
+        static int smoothLevel = -1;
+        public int maxSmooth = 2;                     // горожанам хватает «гладких»: их на экране десятки
+        readonly List<KeyValuePair<Component, Mesh>> lowMeshes = new List<KeyValuePair<Component, Mesh>>();
+        int smoothShown;
+
+        public static void SmoothAll(int level)
+        {
+            smoothLevel = level;
+            foreach (var a in live) if (a != null) a.ApplySmooth();
+        }
+
+        void OnEnable() { live.Add(this); ApplySmooth(); }
+        void OnDisable() { live.Remove(this); }
+
+        void ApplySmooth()
+        {
+            int lv = Mathf.Min(smoothLevel < 0 ? GameConfig.S.models : smoothLevel, maxSmooth);
+            if (lv == smoothShown || lowMeshes.Count == 0) return;
+            smoothShown = lv;
+            foreach (var kv in lowMeshes)
+            {
+                var m = MeshSmooth.Get(kv.Value, lv);
+                var smr = kv.Key as SkinnedMeshRenderer;
+                if (smr != null) smr.sharedMesh = m;
+                else { var mf = kv.Key as MeshFilter; if (mf != null) mf.sharedMesh = m; }
+            }
+        }
+
+        public void SetMaxSmooth(int level) { maxSmooth = level; smoothShown = -1; ApplySmooth(); }
+
         public Transform rig, hips, torso, head, legL, legR, kneeL, kneeR, armL, armR, neck, elbowL, elbowR;
         public bool imported;
         public string model;
@@ -647,6 +679,10 @@ namespace Intern.Game
             rig = NormalizeRig(srcRoot, transform);
             rig.name = "Rig";
             int skins = BindSkins(inst.transform);
+            lowMeshes.Clear();
+            foreach (var s in rig.GetComponentsInChildren<SkinnedMeshRenderer>(true)) if (s.sharedMesh != null) lowMeshes.Add(new KeyValuePair<Component, Mesh>(s, s.sharedMesh));
+            foreach (var mf in rig.GetComponentsInChildren<MeshFilter>(true)) if (mf.sharedMesh != null) lowMeshes.Add(new KeyValuePair<Component, Mesh>(mf, mf.sharedMesh));
+            smoothShown = 0; ApplySmooth();
             if (skins > 0 && loggedModels.Add(modelName + "|skins")) Debug.Log("[Стажёр] " + modelName + ": модель со скелетом, сеток с костями: " + skins);
             inst.SetActive(false); Destroy(inst);
             hips = F("Hips"); torso = F("Torso"); neck = F("Neck"); head = F("Head");

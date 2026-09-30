@@ -57,7 +57,7 @@ namespace Intern.Game
                 if (a.imported) a.Tint(ap); else a.Build(ap);
                 a.SetEmotion(0);
             }
-            else if (ModelLib.HasCharacter(model)) { a = CharacterAnim.Spawn(model, run.City.root, pos, yaw0, null); a.Tint(ap); a.SetEmotion(0); }
+            else if (ModelLib.HasCharacter(model)) { a = CharacterAnim.Spawn(model, run.City.root, pos, yaw0, null); a.SetMaxSmooth(1); a.Tint(ap); a.SetEmotion(0); }
             else a = Look.Bean(model, run.City.root, pos - run.City.root.position, yaw0, ap);
             a.transform.position = pos;
             a.transform.localScale = Vector3.one * (def.id == "dean" ? 1.12f : 1f);
@@ -378,7 +378,7 @@ namespace Intern.Game
 
         void Say(string line, float seconds)
         {
-            if (bubble == null) bubble = SpeechBubble.Create(transform, 2.05f);
+            if (bubble == null) { bubble = SpeechBubble.Create(transform, 2.05f); bubble.Speaker = def.name; }
             bubble.Show(line, def.humanitarian ? Pal.Hex("FFF3C4") : Pal.Hex("D8F7E4")); bubbleUntil = Time.time + seconds;
         }
 

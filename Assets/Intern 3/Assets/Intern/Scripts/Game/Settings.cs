@@ -22,6 +22,7 @@ namespace Intern.Game
         public int aa = 3;                  // см. GameConfig.AaNames
         public int shadows = 2;             // 0 выкл, 1 средние, 2 высокие, 3 очень высокие (карта теней 4096)
         public int ao = 2;                  // затенение углов (SSAO): 0 выкл, 1 среднее, 2 высокое
+        public int models = 1;              // модели персонажей: 0 угловатые (low-poly), 1 гладкие, 2 очень гладкие (MeshSmooth)
         public bool post = true;
         public bool screenAnim = true;      // прокрутка кода на мониторах коллег
         // звук
@@ -55,6 +56,7 @@ namespace Intern.Game
         public static readonly string[] AaNames = { "Выключено", "FXAA — быстрое", "SMAA — чёткое", "MSAA 4× + SMAA", "MSAA 8× + SMAA" };
         public static readonly string[] ShadowNames = { "Выключены", "Средние", "Высокие", "Очень высокие" };
         public static readonly string[] AoNames = { "Выключено", "Среднее", "Высокое" };
+        public static readonly string[] ModelNames = { "Угловатые", "Гладкие", "Очень гладкие" };
 
         public static void Load()
         {
@@ -70,6 +72,7 @@ namespace Intern.Game
             S.dayLength = Mathf.Clamp(S.dayLength, 0, 2);
             S.shadows = Mathf.Clamp(S.shadows, 0, ShadowNames.Length - 1);
             S.ao = Mathf.Clamp(S.ao, 0, AoNames.Length - 1);
+            S.models = Mathf.Clamp(S.models, 0, ModelNames.Length - 1);
             if (S.quality < 4) SetQuality(S.quality);   // пресеты могли поменяться с прошлой версии — берём актуальные
         }
 
@@ -82,14 +85,14 @@ namespace Intern.Game
 
         // Предустановки качества графики: масштаб рендера, сглаживание, тени, затенение углов, пост-обработка
         static readonly float[] PresetScale = { 0.75f, 1f, 1f, 1.25f };
-        static readonly int[] PresetAa = { 1, 2, 3, 4 }, PresetShadows = { 0, 1, 2, 3 }, PresetAo = { 0, 1, 2, 2 };
+        static readonly int[] PresetAa = { 1, 2, 3, 4 }, PresetShadows = { 0, 1, 2, 3 }, PresetAo = { 0, 1, 2, 2 }, PresetModels = { 0, 1, 1, 2 };   // угловатые — только на «Низком»
         static readonly bool[] PresetPost = { false, true, true, true };
 
         public static void SetQuality(int q)
         {
             S.quality = q;
             if (q < 0 || q > 3) return;
-            S.renderScale = PresetScale[q]; S.aa = PresetAa[q]; S.shadows = PresetShadows[q]; S.ao = PresetAo[q]; S.post = PresetPost[q];
+            S.renderScale = PresetScale[q]; S.aa = PresetAa[q]; S.shadows = PresetShadows[q]; S.ao = PresetAo[q]; S.post = PresetPost[q]; S.models = PresetModels[q];
         }
 
         // Поменяли отдельный параметр графики: если совпало с предустановкой — показываем её, иначе «своё»
@@ -97,7 +100,7 @@ namespace Intern.Game
         {
             S.quality = 4;
             for (int q = 0; q < 4; q++)
-                if (Mathf.Approximately(S.renderScale, PresetScale[q]) && S.aa == PresetAa[q] && S.shadows == PresetShadows[q] && S.ao == PresetAo[q] && S.post == PresetPost[q]) { S.quality = q; return; }
+                if (Mathf.Approximately(S.renderScale, PresetScale[q]) && S.aa == PresetAa[q] && S.shadows == PresetShadows[q] && S.ao == PresetAo[q] && S.post == PresetPost[q] && S.models == PresetModels[q]) { S.quality = q; return; }
         }
 
         // Разрешения монитора без повторов (частоты обновления не различаем), от большего к меньшему
@@ -150,6 +153,7 @@ namespace Intern.Game
             foreach (var l in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
                 if (l.type == LightType.Directional) l.shadows = S.shadows == 0 ? LightShadows.None : S.shadows == 1 ? LightShadows.Hard : LightShadows.Soft;
             ScreenScroller.Animate = S.screenAnim;
+            CharacterAnim.SmoothAll(S.models);
         }
 
         public static void ApplyAudio() { AudioListener.volume = Mathf.Clamp01(S.master); }

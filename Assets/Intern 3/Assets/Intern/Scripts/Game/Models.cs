@@ -53,11 +53,22 @@ namespace Intern.Game
             if (m.HasProperty("_EmissionColor")) m.SetColor("_EmissionColor", c);
         }
 
-        static void Matte(Material m, bool shiny)
+        static void Matte(Material m, bool shiny, float smooth = 0.08f)
         {
-            if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", shiny ? 0.75f : 0.08f);
-            if (m.HasProperty("_Glossiness")) m.SetFloat("_Glossiness", shiny ? 0.75f : 0.08f);
+            if (shiny) smooth = 0.75f;
+            if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smooth);
+            if (m.HasProperty("_Glossiness")) m.SetFloat("_Glossiness", smooth);
             if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0f);
+        }
+
+        // полу и столам — лёгкий блеск: в них отражается комната (зонд отражений офиса)
+        static float SmoothFor(string n)
+        {
+            if (n.StartsWith("floor") || n.StartsWith("plank")) return 0.5f;
+            if (n.StartsWith("monshell")) return 0.6f;
+            if (n.StartsWith("wood")) return 0.35f;
+            if (n.StartsWith("white")) return 0.3f;
+            return 0.08f;
         }
 
         static float EmissionFor(string n)
@@ -85,7 +96,7 @@ namespace Intern.Game
             m = new Material(Lit) { name = src.name + "_lp" };
             SetColor(m, c);
             string n = src.name.ToLowerInvariant();
-            Matte(m, n.Contains("mirror") || n.Contains("chrome") || n.Contains("water"));
+            Matte(m, n.Contains("mirror") || n.Contains("chrome") || n.Contains("water"), SmoothFor(n));
             if (n.Contains("mirror") && m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0.9f);
             float e = EmissionFor(n);
             if (e > 0) Emit(m, c * e);
@@ -313,12 +324,10 @@ namespace Intern.Game
 
             refs.spawn = new GameObject("Spawn").transform; refs.spawn.position = new Vector3(-5, 0.1f, -4.8f);
             refs.lockerSpot = new GameObject("LockerSpot").transform; refs.lockerSpot.position = new Vector3(-8f, 0.1f, -6.1f);
-            refs.board = OfficeBuilder.Label("", new Vector3(7.5f, 3.2f, 7.78f), 0.013f, Pal.Ink, office.transform.parent);
-            refs.board.transform.position = new Vector3(7.5f, 3.2f, 7.78f);
-            refs.board.transform.rotation = Quaternion.identity;
 
             Lighting();
             SpawnPeople(refs);
+            OfficeProbe.Place(new Vector3(0f, 1.6f, 0.6f), new Vector3(22f, 3.4f, 16f));
             Debug.Log("[Стажёр] Офис из Blender загружен: " + office.GetComponentsInChildren<MeshRenderer>(true).Length + " объектов, экран " + refs.screenSize);
             return refs;
         }
@@ -327,14 +336,15 @@ namespace Intern.Game
         {
             foreach (var l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None)) l.gameObject.SetActive(false);
             var sun = new GameObject("Sun").AddComponent<Light>();
-            sun.type = LightType.Directional; sun.color = Pal.Hex("FFF3E0"); sun.intensity = 1.6f;
-            sun.shadows = LightShadows.Soft; sun.shadowStrength = 0.85f;
+            // свет «B — ярко и сочно» (спринт 1 версии 0.9): солнце сильнее и теплее, рассеянного света меньше — появляется объём
+            sun.type = LightType.Directional; sun.color = Pal.Hex("FFE8C8"); sun.intensity = 2.0f;
+            sun.shadows = LightShadows.Soft; sun.shadowStrength = 0.95f;
             sun.transform.rotation = Quaternion.Euler(50, 160, 0);
             RenderSettings.sun = sun;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = Pal.Hex("C9DDF2");
-            RenderSettings.ambientEquatorColor = Pal.Hex("E9E1D6");
-            RenderSettings.ambientGroundColor = Pal.Hex("A89A86");
+            RenderSettings.ambientSkyColor = Pal.Hex("C9DDF2") * 0.65f;
+            RenderSettings.ambientEquatorColor = Pal.Hex("E9E1D6") * 0.65f;
+            RenderSettings.ambientGroundColor = Pal.Hex("A89A86") * 0.65f;
             RenderSettings.fog = false;
             // тёплый свет от подвесных ламп
             foreach (var x in new[] { -6f, 0f, 6f })
@@ -366,11 +376,34 @@ namespace Intern.Game
                 lead.lookAtPlayer = true;
                 var cap = lead.gameObject.AddComponent<CapsuleCollider>(); cap.center = new Vector3(0, 0.95f, 0); cap.height = 1.9f; cap.radius = 0.35f;
                 lead.gameObject.AddComponent<TeamLeadNpc>();
-                refs.lead = lead;
-                // табличка ходит вместе с Геной
-                var tag = OfficeBuilder.Label("Тимлид Гена", new Vector3(0, 2.35f, 0), 0.017f, Pal.Ink, lead.transform);
-                tag.gameObject.AddComponent<Billboard>();
+                refs.lead = lead;   // имя и что можно сделать — на плашке сверху экрана, когда подходишь (спринт 2 версии 0.9)
             }
+        }
+    }
+}
+
+namespace Intern.Game
+{
+    // Зонд отражений офиса: снимает комнату один раз, когда всё расставлено, — глянцевый пол и столы отражают её
+    public class OfficeProbe : MonoBehaviour
+    {
+        public static void Place(Vector3 center, Vector3 size)
+        {
+            var go = new GameObject("OfficeReflectionProbe");
+            go.transform.position = center;
+            var p = go.AddComponent<ReflectionProbe>();
+            p.mode = UnityEngine.Rendering.ReflectionProbeMode.Realtime;
+            p.refreshMode = UnityEngine.Rendering.ReflectionProbeRefreshMode.ViaScripting;
+            p.timeSlicingMode = UnityEngine.Rendering.ReflectionProbeTimeSlicingMode.NoTimeSlicing;
+            p.resolution = 256; p.boxProjection = true; p.size = size;
+            go.AddComponent<OfficeProbe>();
+        }
+
+        System.Collections.IEnumerator Start()
+        {
+            yield return null; yield return null;   // люди и мебель на местах
+            var p = GetComponent<ReflectionProbe>();
+            if (p != null) p.RenderProbe();
         }
     }
 }

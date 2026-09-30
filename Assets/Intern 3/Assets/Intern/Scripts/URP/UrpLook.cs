@@ -10,7 +10,7 @@ using UnityEngine.Rendering.Universal;
 
 namespace Intern.Look
 {
-    public class UrpLook : MonoBehaviour
+    public partial class UrpLook : MonoBehaviour
     {
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
@@ -63,15 +63,23 @@ namespace Intern.Look
             SetField(st, "NormalSamples", 2);                     // High
             SetField(st, "BlurQuality", 0);                       // High (bilateral)
             SetField(st, "Downsample", cfgAo < 2);                // «Среднее» — половинное разрешение
+            SetField(st, "Intensity", L.aoIntensity);
+            SetField(st, "Radius", L.aoRadius);
+            SetField(st, "DirectLightingStrength", L.aoDirect);
         }
 
         Camera configured;
         int applied;
         Volume vol;
         ColorAdjustments ca;
+        Tonemapping tm;
+        Bloom bloom;
+        WhiteBalance wb;
+        Vignette vg;
 
         void Start()
         {
+            inst = this;
             ApplyPipeline();
 
             // Отключаем чужие Volume из шаблонной сцены, чтобы эффекты не складывались
@@ -82,12 +90,13 @@ namespace Intern.Look
             vol.priority = 100;
             var p = ScriptableObject.CreateInstance<VolumeProfile>();
 
-            var tm = p.Add<Tonemapping>(true); tm.mode.Override(TonemappingMode.Neutral);
-            var bloom = p.Add<Bloom>(true); bloom.threshold.Override(0.95f); bloom.intensity.Override(0.4f); bloom.scatter.Override(0.65f);
-            ca = p.Add<ColorAdjustments>(true); ca.saturation.Override(4f); ca.contrast.Override(8f); ca.postExposure.Override(0.1f);
-            var wb = p.Add<WhiteBalance>(true); wb.temperature.Override(2f);
-            var vg = p.Add<Vignette>(true); vg.intensity.Override(0.16f); vg.smoothness.Override(0.5f);
+            tm = p.Add<Tonemapping>(true);
+            bloom = p.Add<Bloom>(true); bloom.scatter.Override(0.65f);
+            ca = p.Add<ColorAdjustments>(true);
+            wb = p.Add<WhiteBalance>(true);
+            vg = p.Add<Vignette>(true); vg.smoothness.Override(0.5f);
             vol.sharedProfile = p;
+            ApplyLook();
             applied = 0;
         }
 
@@ -97,7 +106,7 @@ namespace Intern.Look
             if (applied == cfgVersion && c == configured) return;
             applied = cfgVersion;
             if (vol != null) vol.enabled = cfgPost;
-            if (ca != null) ca.postExposure.Override(cfgExposure);
+            ApplyLook();
             if (c == null) return;
             var data = c.GetUniversalAdditionalCameraData();
             data.renderPostProcessing = cfgPost;
@@ -163,7 +172,9 @@ namespace Intern.Look
             var ssao = FindFeature("ScreenSpaceAmbientOcclusion");
             var st = SsaoSettings(ssao);
             var asset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
-            if (key == "reset") { ApplyPipeline(); return "reset"; }
+            if (key == "reset") { L = Defaults.Clone(); RestoreExperiments(); ApplyPipeline(); if (inst != null) inst.ApplyLook(); return "reset"; }
+            string look = TweakLook(key, val);
+            if (look != null) return look;
             if (key == "dump")
             {
                 var sb = new StringBuilder("ssao: " + (ssao == null ? "нет" : ssao.isActive ? "вкл" : "выкл"));

@@ -350,7 +350,7 @@ namespace Intern.EditorTools
 
         // ---------- снимки для проверки графики (только в режиме Play) ----------
         // Temp/pose.txt — ракурс «x y z yaw pitch fp»; Temp/shots.txt — варианты «имя|настройки», настройки — как у UrpLook.Tweak,
-        // плюс quality=0..3 (пресет игры). Снимки — Temp/shots/<имя>.png, журнал — Temp/devtools.txt
+        // плюс quality=0..3 (пресет игры) и models=0..2 (модели персонажей). Снимки — Temp/shots/<имя>.png, журнал — Temp/devtools.txt
         static System.Reflection.MethodInfo UrpTweak()
         {
             var t = Type.GetType("Intern.Look.UrpLook, Intern.URP");
@@ -424,6 +424,7 @@ namespace Intern.EditorTools
                         foreach (var kv in spec.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
                         {
                             if (kv.Trim().StartsWith("quality=")) { Intern.Game.GameConfig.SetQuality(int.Parse(kv.Trim().Substring(8))); Intern.Game.GameConfig.ApplyGraphics(); }
+                            else if (kv.Trim().StartsWith("models=")) { Intern.Game.GameConfig.S.models = int.Parse(kv.Trim().Substring(7)); Intern.Game.GameConfig.ApplyGraphics(); }
                             else rest.Add(kv.Trim());
                         }
                         string res = rest.Count > 0 && tweak != null ? (string)tweak.Invoke(null, new object[] { string.Join(";", rest.ToArray()) }) : "";

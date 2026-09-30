@@ -245,16 +245,9 @@ namespace Intern.Game
             }
         }
 
-        void UpdateBoard()
-        {
-            int done = DoneCount, total = TotalCount;
-            var cur = CurrentTask;
-            var tp = cur != null ? Path.TopicOf(cur) : null;
-            refs.board.text = ProfessionName.ToUpperInvariant() + " · " + RankName + "\n\nСделано: " + done + " / " + total +
-                         (cur != null && !PathComplete ? "\nТема: " + (tp != null ? tp.title : "") + "\nСейчас: " + cur.key + " " + cur.title : "\nНаправление пройдено!" + (Save.daily.Count > 0 ? "\nТикеты дня: " + DailyDone + " / " + DailyTotal : "")) +
-                         (Sprint != null && Sprint.Planned ? "\n\nСПРИНТ " + Sprint.Number + ": " + Sprint.DoneCount + " / " + Sprint.Goal : "") +
-                         "\n\nБагов поймано: " + Save.bugsCaught;
-        }
+        // Доска задач раньше писала сводку парящим текстом над собой. Теперь сводка — на плашке сверху экрана (BoardPlaque),
+        // она считается при каждом показе, поэтому обновлять нечего; метод оставлен для мест, где прогресс меняется
+        void UpdateBoard() { }
 
         // ================== Цикл ==================
         void Update()

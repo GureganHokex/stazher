@@ -94,6 +94,7 @@ namespace Intern.Game
         {
             codeBg = BuildCodeBackground(); root.Add(codeBg);
             dim = Layer(); dim.style.backgroundColor = new Color(0.05f, 0.06f, 0.17f, 0.74f); root.Add(dim);
+            bubbleLayer = Layer(); root.Add(bubbleLayer);   // облачка реплик — под карточками интерфейса
             hud = BuildHud(); root.Add(hud);
             lunchHud = BuildLunchHud(); root.Add(lunchHud);
             shopLayer = Centered(); root.Add(shopLayer);
@@ -686,6 +687,8 @@ def deploy(env=""staging""):
                             new UiSelect(GameConfig.ShadowNames, S.shadows, v => { S.shadows = v; GameConfig.GraphicsTouched(); GameConfig.Commit(); RefreshSettings(); })));
                         c.Add(Row("Затенение углов", "Мягкая тень в углах и у предметов на стене. Выключенное — быстрее.",
                             new UiSelect(GameConfig.AoNames, S.ao, v => { S.ao = v; GameConfig.GraphicsTouched(); GameConfig.Commit(); RefreshSettings(); })));
+                        c.Add(Row("Модели персонажей", "Гладкие — без видимых граней; очень гладкие — ещё мельче, для мощных видеокарт.",
+                            new UiSelect(GameConfig.ModelNames, S.models, v => { S.models = v; GameConfig.GraphicsTouched(); GameConfig.Commit(); RefreshSettings(); })));
                         c.Add(Row("Пост-обработка", "Мягкое свечение, сочные цвета и виньетка.",
                             new UiToggle(S.post, v => { S.post = v; GameConfig.GraphicsTouched(); GameConfig.Commit(); RefreshSettings(); })));
                         c.Add(Row("Код на мониторах коллег", "Прокрутка кода на чужих экранах в офисе.",
@@ -850,6 +853,7 @@ def deploy(env=""staging""):
             cursorHint.style.justifyContent = Justify.Center; cursorHint.style.alignItems = Align.Center;
             cursorHint.Add(new Icon("mouse", Muted, 20f)); var ch = K.T("Кликни в окно игры, чтобы управлять мышью", 16f, Muted); ch.style.marginLeft = 8f; cursorHint.Add(ch);
             layer.Add(cursorHint);
+            layer.Add(BuildPlaque());   // плашка сверху экрана у доски, Гены и других точек
             return layer;
         }
 
@@ -987,7 +991,8 @@ def deploy(env=""staging""):
             keysPanel.style.display = GameConfig.S.keyHints && !inLunch ? DisplayStyle.Flex : DisplayStyle.None;
 
             if (inMenu) TickCode(dt);
-            if (inWalk || inLunch) UpdateHud();
+            if (inWalk || inLunch) UpdateHud(); else plaqueShown = false;
+            UpdateBubbles(inWalk || inLunch);
             if (lunchLive) UpdateLunchHud();
             UpdateToast(m == GameRoot.Mode.Ide || m == GameRoot.Mode.Transition);
             AnimatePops();
@@ -1096,6 +1101,7 @@ def deploy(env=""staging""):
             }
             // подсказка действия: «[E] Сесть за компьютер» → клавиша + текст
             string pr = g.FocusPrompt;
+            UpdatePlaque(pr);
             if (pr == null) promptRow.style.display = DisplayStyle.None;
             else
             {

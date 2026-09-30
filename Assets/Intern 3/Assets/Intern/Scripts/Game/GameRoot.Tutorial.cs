@@ -178,5 +178,6 @@ namespace Intern.Game
     {
         public override string Prompt { get { return "[E] Доска задач спринта"; } }
         public override void Interact(GameRoot g) { g.OpenBoard(); }
+        public override PlaqueInfo Plaque(GameRoot g) { return g.BoardPlaque(); }
     }
 }

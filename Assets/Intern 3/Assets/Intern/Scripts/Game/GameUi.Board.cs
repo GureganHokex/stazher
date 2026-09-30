@@ -33,6 +33,7 @@ namespace Intern.Game
         {
             var goal = g.TutorialGoal;
             row.style.display = goal != null ? DisplayStyle.Flex : DisplayStyle.None;
+            row.style.top = GoalRowTop();
             if (goal == null || goal == goalShown) return;
             goalShown = goal;
             goalText.text = K.Esc(goal);

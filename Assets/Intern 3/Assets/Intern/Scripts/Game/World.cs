@@ -12,7 +12,6 @@ namespace Intern.Game
         public Transform chairObj; // кресло целиком — его можно отодвигать при посадке
         public Transform screenQuad; // экран монитора игрока (свой прямоугольник перед корпусом), если есть
         public Vector2 screenSize;
-        public TextMesh board;
         public CharacterAnim lead;
     }
 
@@ -39,7 +38,8 @@ namespace Intern.Game
             go.transform.localPosition = pos;
             go.transform.localRotation = Quaternion.Euler(0, yaw, 0);
             var tm = go.AddComponent<TextMesh>();
-            tm.text = text; tm.font = DefaultFont; tm.fontSize = 64; tm.characterSize = size;
+            // глифы шрифта — 128 px (было 64): вблизи надпись не расплывается; размер в мире тот же
+            tm.text = text; tm.font = DefaultFont; tm.fontSize = 128; tm.characterSize = size * 0.5f;
             tm.anchor = TextAnchor.MiddleCenter; tm.alignment = TextAlignment.Center; tm.color = c;
             if (tm.font != null) go.GetComponent<MeshRenderer>().material = tm.font.material;
             return tm;
@@ -167,7 +167,6 @@ namespace Intern.Game
                         P("DuckEye", PrimitiveType.Sphere, new Vector3(0.03f, 0.11f, -0.09f), Vector3.one * 0.018f, Pal.Ink, false, 0, 0, duck);
                         P("DuckEye", PrimitiveType.Sphere, new Vector3(-0.03f, 0.11f, -0.09f), Vector3.one * 0.018f, Pal.Ink, false, 0, 0, duck);
                         duck.gameObject.AddComponent<Bobber>().amplitude = 0.01f;
-                        Label("Твоё место", new Vector3(-0.2f, 1.95f, 0.25f), 0.02f, Pal.Ink, d);
                         var arrow = P("Arrow", PrimitiveType.Sphere, new Vector3(-0.2f, 2.25f, 0.25f), Vector3.one * 0.18f, Pal.Pink, false, 1, 0.4f, d);
                         arrow.AddComponent<Bobber>();
                     }
@@ -186,7 +185,6 @@ namespace Intern.Game
             var board = new GameObject("Board").transform; board.SetParent(root, false); board.localPosition = new Vector3(7.5f, 0, 7.85f);
             B("Frame", new Vector3(0, 1.85f, 0), new Vector3(4.2f, 2.0f, 0.08f), Pal.Hex("B9BCD6"), 0.04f, true, 1, 0, true, board);
             B("Surface", new Vector3(0, 1.85f, -0.045f), new Vector3(4.0f, 1.8f, 0.02f), white, 0.02f, false, 0, 0, false, board);
-            refs.board = Label("", new Vector3(-1.05f, 1.9f, -0.07f), 0.015f, Pal.Ink, board);
             string[] cols = { "TODO", "В РАБОТЕ", "ГОТОВО" };
             Color[] notes = { Pal.Hex("FFE066"), Pal.Hex("FF9FC6"), Pal.Hex("9EE6B8"), Pal.Hex("A6D8FF") };
             for (int c = 0; c < 3; c++)
@@ -204,8 +202,6 @@ namespace Intern.Game
             var cap = lead.gameObject.AddComponent<CapsuleCollider>(); cap.center = new Vector3(0, 0.9f, 0); cap.height = 1.9f; cap.radius = 0.4f;
             lead.gameObject.AddComponent<TeamLeadNpc>();
             P("LeadMug", PrimitiveType.Cylinder, new Vector3(0, -0.38f, 0.12f), new Vector3(0.13f, 0.08f, 0.13f), Pal.Pink, false, 1, 0, lead.armL);
-            var tag = Label("Тимлид Гена", new Vector3(0, 2.55f / 1.12f, 0), 0.017f / 1.12f, Pal.Ink, lead.transform);
-            tag.gameObject.AddComponent<Billboard>();
 
             // ---------- Кофейный уголок (магазин) ----------
             var cm = new GameObject("CoffeeCorner").transform; cm.SetParent(root, false); cm.localPosition = new Vector3(-10.9f, 0, -5.5f);
@@ -217,8 +213,6 @@ namespace Intern.Game
             P("Cup", PrimitiveType.Cylinder, new Vector3(0.35f, 1.12f, 0.3f), new Vector3(0.12f, 0.06f, 0.12f), white, false, 1, 0, cm);
             for (int k = 0; k < 3; k++) P("Donut", PrimitiveType.Sphere, new Vector3(0.2f, 1.1f, -0.5f + k * 0.22f), new Vector3(0.18f, 0.07f, 0.18f), Pal.Hex(k == 1 ? "FF9FC6" : "C98E68"), false, 1, 0, cm);
             mach.AddComponent<CoffeeMachine>();
-            var shopTag = Label("Кофе и апгрейды", new Vector3(0, 2.3f, 0.3f), 0.015f, Pal.Ink, cm);
-            shopTag.gameObject.AddComponent<Billboard>();
 
             // Кулер
             var cool = new GameObject("Cooler").transform; cool.SetParent(root, false); cool.localPosition = new Vector3(-10.9f, 0, -2.6f);
@@ -379,16 +373,36 @@ namespace Intern.Game
     }
 
     // ------------------ Интерактивные объекты ------------------
+    // Плашка сверху экрана, пока стажёр рядом с точкой (вместо парящих надписей в мире): значок, заголовок, строка
+    // «что тут можно сделать» и пары «подпись — значение»
+    public class PlaqueInfo
+    {
+        public string icon = "task", title, sub;
+        public readonly List<string[]> items = new List<string[]>();
+        public PlaqueInfo Item(string label, string value) { items.Add(new[] { label, value }); return this; }
+        public string Key
+        {
+            get
+            {
+                var sb = new System.Text.StringBuilder(icon).Append('|').Append(title).Append('|').Append(sub);
+                foreach (var i in items) sb.Append('|').Append(i[0]).Append('=').Append(i[1]);
+                return sb.ToString();
+            }
+        }
+    }
+
     public abstract class Interactable : MonoBehaviour
     {
         public abstract string Prompt { get; }
         public abstract void Interact(GameRoot g);
+        public virtual PlaqueInfo Plaque(GameRoot g) { return null; }
     }
 
     public class ComputerDesk : Interactable
     {
         public override string Prompt { get { return "[E] Сесть за компьютер"; } }
         public override void Interact(GameRoot g) { g.OpenIde(); }
+        public override PlaqueInfo Plaque(GameRoot g) { return g.DeskPlaque(); }
     }
 
     public class TeamLeadNpc : Interactable
@@ -399,18 +413,21 @@ namespace Intern.Game
             var a = GetComponent<CharacterAnim>(); if (a != null) a.Wave();
             g.TalkToLead();
         }
+        public override PlaqueInfo Plaque(GameRoot g) { return g.LeadPlaque(); }
     }
 
     public class Wardrobe : Interactable
     {
         public override string Prompt { get { return "[E] Переодеться"; } }
         public override void Interact(GameRoot g) { g.OpenWardrobe(false); }
+        public override PlaqueInfo Plaque(GameRoot g) { return new PlaqueInfo { icon = "shirt", title = "Шкафчик", sub = "Одежда, причёска и аксессуары стажёра" }; }
     }
 
     public class CoffeeMachine : Interactable
     {
         public override string Prompt { get { return "[E] Кофе и апгрейды"; } }
         public override void Interact(GameRoot g) { g.OpenShop(); }
+        public override PlaqueInfo Plaque(GameRoot g) { return g.ShopPlaque(); }
     }
 
     public class BugCritter : Interactable

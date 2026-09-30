@@ -20,6 +20,7 @@ namespace Intern.Game
             }
         }
         public override void Interact(GameRoot g) { g.TryStartLunch(); }
+        public override PlaqueInfo Plaque(GameRoot g) { return g.DoorPlaque(); }
     }
 
     // Итоги одного обеда

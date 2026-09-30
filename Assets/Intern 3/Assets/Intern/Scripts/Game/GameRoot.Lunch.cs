@@ -298,8 +298,6 @@ namespace Intern.Game
             Look.RBox("CaseBody", root, new Vector3(0, 0.55f, 0), new Vector3(0.9f, 1.1f, 0.45f), Pal.Hex("2B2D42"), 0.05f, true, 0.6f);
             Look.RBox("CaseLid", root, new Vector3(0, 1.12f, 0), new Vector3(0.95f, 0.06f, 0.5f), Pal.Hex("C8453A"), 0.02f, false, 0.6f);
             Look.RBox("CaseGun", root, new Vector3(0, 0.75f, 0.23f), new Vector3(0.7f, 0.1f, 0.03f), Pal.Hex("8A8FA8"), 0.02f, false, 0.6f);
-            var tag = OfficeBuilder.Label("Арсенал", new Vector3(0, 1.5f, 0), 0.014f, Pal.Ink, root);
-            tag.gameObject.AddComponent<Billboard>();
             root.GetComponentInChildren<BoxCollider>().gameObject.AddComponent<ArsenalCase>();
         }
     }
@@ -309,5 +307,6 @@ namespace Intern.Game
     {
         public override string Prompt { get { return "[E] Арсенал: оружие и обвесы"; } }
         public override void Interact(GameRoot g) { g.OpenCityShop("arsenal", "Арсенал"); }
+        public override PlaqueInfo Plaque(GameRoot g) { return g.ArsenalPlaque(); }
     }
 }

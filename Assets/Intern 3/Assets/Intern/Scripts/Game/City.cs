@@ -59,6 +59,7 @@ namespace Intern.Game
                 string m = models[i % models.Length];
                 if (!ModelLib.HasCharacter(m)) continue;
                 var a = CharacterAnim.Spawn(m, root, root.position + Vector3.down * 20f, 0f, null);
+                a.SetMaxSmooth(1);   // горожан на экране десятки — «очень гладкие» только у офиса
                 a.gameObject.SetActive(false);
                 Stack<CharacterAnim> st;
                 if (!pool.TryGetValue(m, out st)) pool[m] = st = new Stack<CharacterAnim>();
