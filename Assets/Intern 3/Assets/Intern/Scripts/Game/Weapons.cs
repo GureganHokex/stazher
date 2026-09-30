@@ -143,6 +143,7 @@ namespace Intern.Game
     public class WeaponModel : MonoBehaviour
     {
         public Transform muzzle, sight, rail, magPoint;
+        public Transform grip;   // за что держит правая рука (рукоять)
         public string id;
         public bool melee, twoHanded;
 
@@ -228,6 +229,7 @@ namespace Intern.Game
                     m.muzzle = pt("Muzzle", new Vector3(0, 0.03f, 0.82f)); m.sight = pt("Sight", new Vector3(0, 0.1f, 0.0f));
                     m.rail = pt("Rail", new Vector3(0, -0.05f, 0.36f)); m.magPoint = pt("Mag", new Vector3(-0.07f, -0.12f, 0.08f)); m.twoHanded = true; break;
             }
+            m.grip = t.Find("Grip") ?? t.Find("Handle");
             if (!def.Melee && ars != null) m.AddAttachments(save, ars);
             if (!def.Melee) go.transform.localScale = Vector3.one * 1.35f;   // стволы чуть крупнее — иначе их не видно из-за плеча
             foreach (var tr in go.GetComponentsInChildren<Transform>(true)) tr.gameObject.layer = 2;
@@ -249,6 +251,7 @@ namespace Intern.Game
     }
 
     // ======================= оружие в руках =======================
+    [DefaultExecutionOrder(100)]   // после анимации персонажа: ствол ставится в руку уже этого кадра
     public class PlayerCombat : MonoBehaviour
     {
         public Arsenal ars;
@@ -310,9 +313,20 @@ namespace Intern.Game
             if (gunModel != null) Destroy(gunModel.gameObject);
             var m = ars.Melee;
             meleeModel = WeaponModel.Build(m, ars.Get(m.id), ars);
-            var hand = Av != null && Av.elbowR != null ? Av.elbowR : transform;
-            meleeModel.transform.SetParent(hand, false);
-            meleeModel.transform.localPosition = new Vector3(0, -0.3f, 0.03f);
+            if (Av != null && Av.v4 && Av.handR != null)
+            {
+                // скелет v4: рукоять в кулаке, клинок выходит со стороны большого пальца
+                meleeModel.transform.SetParent(Av.handR, false);
+                float gz = meleeModel.grip != null ? meleeModel.grip.localPosition.z : 0f;
+                meleeModel.transform.localPosition = CharacterAnim.PalmR - new Vector3(0f, 0f, gz);
+                meleeModel.transform.localRotation = Quaternion.identity;
+            }
+            else
+            {
+                var hand = Av != null && Av.elbowR != null ? Av.elbowR : transform;
+                meleeModel.transform.SetParent(hand, false);
+                meleeModel.transform.localPosition = new Vector3(0, -0.3f, 0.03f);
+            }
             var g = ars.Gun;
             if (g != null) { gunModel = WeaponModel.Build(g, ars.Get(g.id), ars); gunModel.transform.SetParent(transform, false); }
             if (slot == 1 && g == null) slot = 0;
@@ -515,11 +529,15 @@ namespace Intern.Game
         void LateUpdate()
         {
             if (run == null || gunModel == null || slot != 1 || Av == null || Av.elbowR == null) return;
-            var hand = Av.elbowR.TransformPoint(new Vector3(0, -0.27f, 0.03f));
+            bool palm = Av.v4 && Av.handR != null;
+            var hand = palm ? Av.handR.TransformPoint(CharacterAnim.PalmR) : Av.elbowR.TransformPoint(new Vector3(0, -0.27f, 0.03f));
             var aim = player.AimPoint(60f);
             var dir = aim - hand; if (dir.sqrMagnitude < 0.25f) dir = player.cam.transform.forward;
             gunModel.transform.position = hand;
             gunModel.transform.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
+            // скелет v4: рукоять — в кулаке (кисть обхватывает её верх), а не начало ствола в запястье
+            if (palm && gunModel.grip != null)
+                gunModel.transform.position += hand - gunModel.transform.TransformPoint(gunModel.grip.localPosition + new Vector3(0f, 0.02f, 0f));
         }
     }
 

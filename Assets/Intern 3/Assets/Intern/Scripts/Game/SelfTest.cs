@@ -94,6 +94,10 @@ namespace Intern.Game
             var hallBad = HallSim(); 
             foreach (var line in hallBad) { fail++; sb.AppendLine("FAIL дома: " + line); }
             sb.AppendLine("дома, куда можно войти: " + (hallBad.Count == 0 ? "проверки прошли" : hallBad.Count + " ошибок"));
+            var anBad = new List<string>(); var anInfo = new List<string>();
+            yield return AnimSim(anBad, anInfo);
+            foreach (var line in anBad) { fail++; sb.AppendLine("FAIL анимация: " + line); }
+            foreach (var line in anInfo) sb.AppendLine(line);
             var rdBad = new List<string>(); var rdInfo = new List<string>();
             yield return RagdollSim(rdBad, rdInfo);
             foreach (var line in rdBad) { fail++; sb.AppendLine("FAIL ragdoll: " + line); }
@@ -143,6 +147,75 @@ namespace Intern.Game
             return bad;
         }
 
+        // Анимация v4 (спринт 7 версии 0.9): клипы прочитались, у модели скелет v4; горожанин идёт и бежит —
+        // обе ступни касаются земли и не уходят под неё, опорная ступня почти не скользит, таз на своей высоте, без NaN
+        IEnumerator AnimSim(List<string> bad, List<string> info)
+        {
+            if (!AnimLib.Ready) { bad.Add("клипы v4 не прочитались: " + (AnimLib.Error ?? "пусто")); yield break; }
+            string[] need = { "idle", "walk", "walk_b", "walk_l", "walk_r", "run", "run_b", "run_l", "run_r", "sprint", "jog", "sit", "sit_idle", "type",
+                              "wave", "swing", "throw", "hit", "land", "aim1", "aim2", "hold", "air_up", "air_down" };
+            foreach (var n in need) if (AnimLib.Get(n) == null) bad.Add("нет клипа " + n);
+            if (!ModelLib.HasCharacter("Dev1")) { info.Add("анимация v4: модели Dev1 нет — пропущено"); yield break; }
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            floor.transform.position = new Vector3(2000f, -0.5f, 1000f); floor.transform.localScale = new Vector3(40f, 1f, 40f);   // верх пола — y = 0
+            float ikD = CharacterAnim.IKDistance, lodD = CharacterAnim.LodDistance;
+            CharacterAnim.IKDistance = CharacterAnim.LodDistance = 1e6f;          // камера далеко — всё равно считать ступни
+            var a = CharacterAnim.Spawn("Dev1", null, new Vector3(2000f, 0f, 988f), 0f, null);
+            yield return null;
+            if (!a.v4) bad.Add("Dev1: скелет не v4 — анимация по-старому, кодом");
+            else
+            {
+                var feet = new[] { ModelLib.Find(a.rig, "FootL"), ModelLib.Find(a.rig, "FootR") };
+                var heel = new Vector3(0f, -0.1f, -0.072f); var ball = new Vector3(0f, -0.1f, 0.092f);
+                var parts = new List<string>();
+                foreach (float v in new[] { 1.4f, 3.8f })
+                {
+                    float t = 0f, low = float.MaxValue, slide = 0f, onGround = 0f, hipLo = float.MaxValue, hipHi = float.MinValue;
+                    var touched = new bool[2]; bool nan = false, have = false; float lastY = 0f; Vector3 lastP = Vector3.zero; int lastK = -1;
+                    a.transform.position = new Vector3(2000f, 0f, 988f);
+                    while (t < 2.6f)
+                    {
+                        float dt = Time.deltaTime;
+                        if (t > 0.6f)
+                        {
+                            // самая низкая точка подошв: не под полом; касание каждой ступни; скольжение опоры
+                            int best = -1; float by = float.MaxValue; Vector3 bp = Vector3.zero;
+                            for (int i = 0; i < 2; i++)
+                                foreach (var o in new[] { heel, ball })
+                                {
+                                    var pt = feet[i].position + feet[i].rotation * o;
+                                    if (float.IsNaN(pt.y)) nan = true;
+                                    if (pt.y < 0.03f) touched[i] = true;
+                                    if (pt.y < by) { by = pt.y; bp = pt; best = i * 2 + (o == heel ? 0 : 1); }
+                                }
+                            low = Mathf.Min(low, by);
+                            if (have && best == lastK && by < 0.01f && lastY < 0.01f && Mathf.Abs(by - lastY) < 0.006f)
+                            { var d = bp - lastP; d.y = 0f; slide += d.magnitude; onGround += dt; }
+                            have = true; lastY = by; lastP = bp; lastK = best;
+                            hipLo = Mathf.Min(hipLo, a.hips.position.y); hipHi = Mathf.Max(hipHi, a.hips.position.y);
+                        }
+                        a.moveSpeed = v;
+                        a.transform.position += a.transform.forward * v * dt;
+                        t += dt;
+                        yield return null;
+                    }
+                    string tag = v < 2f ? "шаг" : "бег";
+                    float sl = onGround > 0.1f ? slide / onGround : 0f;
+                    if (nan) bad.Add(tag + ": NaN в костях ступней");
+                    if (low < -0.04f) bad.Add(tag + ": ступня под полом на " + (-low).ToString("0.00") + " м");
+                    if (!touched[0] || !touched[1]) bad.Add(tag + ": ступня не касается земли (" + (touched[0] ? "" : "левая ") + (touched[1] ? "" : "правая") + ")");
+                    if (sl > (v < 2f ? 0.25f : 0.4f)) bad.Add(tag + ": опорная ступня скользит " + sl.ToString("0.00") + " м/с");
+                    if (hipLo < 0.7f || hipHi > 1.15f) bad.Add(tag + ": таз на высоте " + hipLo.ToString("0.00") + "…" + hipHi.ToString("0.00") + " м");
+                    parts.Add(tag + " " + v.ToString("0.0") + " м/с: скольжение " + sl.ToString("0.00") + " м/с, низ " + low.ToString("0.00") + ", таз " + hipLo.ToString("0.00") + "…" + hipHi.ToString("0.00"));
+                }
+                info.Add("анимация v4: клипов " + AnimLib.Count + ", " + string.Join("; ", parts.ToArray()));
+            }
+            CharacterAnim.IKDistance = ikD; CharacterAnim.LodDistance = lodD;
+            UnityEngine.Object.Destroy(a.gameObject);
+            UnityEngine.Object.Destroy(floor);
+            yield return null;
+        }
+
         // Ragdoll (спринт 5 версии 0.9): горожанин падает с толчком на бегу и замирает; суставы в пределах, тело не под полом,
         // после возврата в пул кости и сетки как были. Полное тело и упрощённое («Низкое»)
         IEnumerator RagdollSim(List<string> bad, List<string> info)
@@ -173,6 +246,10 @@ namespace Intern.Game
                 float kneeBend = Bend(a.kneeL), elbowBend = Bend(a.elbowL);
                 if (kneeBend < -4f || kneeBend > 140f) bad.Add(tag + ": колено согнуто на " + kneeBend.ToString("0") + "° (можно 0…135)");
                 if (elbowBend > 4f || elbowBend < -145f) bad.Add(tag + ": локоть согнут на " + elbowBend.ToString("0") + "° (можно −140…0)");
+                // замершее тело запечено в обычные сетки: размер как у тела (раньше сетки v4 запекались без масштаба и вырастали)
+                float rlo = float.MaxValue, rhi = float.MinValue;
+                foreach (var r in a.GetComponentsInChildren<Renderer>()) if (r.enabled && r.gameObject.activeInHierarchy && !r.name.StartsWith("Blob")) { rlo = Mathf.Min(rlo, r.bounds.min.y); rhi = Mathf.Max(rhi, r.bounds.max.y); }
+                if (rhi - rlo > 2.2f || rlo < -0.4f) bad.Add(tag + ": запечённое тело не того размера (" + rlo.ToString("0.00") + "…" + rhi.ToString("0.00") + " м)");
                 int parts = a.GetComponentsInChildren<Rigidbody>().Count(r => r.gameObject != a.gameObject);
                 info.Add("ragdoll " + tag + ": частей " + parts + ", отлетело на " + moved.ToString("0.0") + " м, колено " + kneeBend.ToString("0") + "°, низ " + low.ToString("0.00"));
                 rd.Restore(); UnityEngine.Object.DestroyImmediate(rd);

@@ -14,6 +14,22 @@ using UnityEngine;
 
 namespace Intern.Game
 {
+    // Горожанин для замера: ходит по кругу вокруг точки (или стоит, если скорость 0)
+    public class BenchWalker : MonoBehaviour
+    {
+        public CharacterAnim a; public Vector3 c; public float r = 3f, ang, dir = 1f, speed = 1.4f;
+        void Update()
+        {
+            if (a == null) return;
+            ang += speed / r * dir * Time.deltaTime;
+            var p = c + new Vector3(Mathf.Cos(ang) * r, 0f, Mathf.Sin(ang) * r);
+            var tan = new Vector3(-Mathf.Sin(ang), 0f, Mathf.Cos(ang)) * dir;
+            transform.position = p;
+            if (speed > 0.01f) transform.rotation = Quaternion.LookRotation(tan);
+            a.moveSpeed = speed;
+        }
+    }
+
     public class Bench : MonoBehaviour
     {
         public static bool Requested { get { return Environment.GetCommandLineArgs().Any(a => a == "-bench"); } }
@@ -21,7 +37,9 @@ namespace Intern.Game
         public static bool NoSave;   // проверки из редактора (команды DevTools): игра идёт, но сохранение не трогаем
 
         static readonly string[] DefaultPoses = { "office|4.5 0.05 6.8 75 8 0", "hall|-5 0.08 -4.8 0 12 1", "lead|8.2 0.05 4.1 0 6 1",
-                                                    "city|0 0.1 302.2 0 8 0", "square|-6 0.1 370 45 4 1", "buh|-10 0.1 322.5 -90 8 1" };
+                                                    "city|0 0.1 302.2 0 8 0", "square|-6 0.1 370 45 4 1", "buh|-10 0.1 322.5 -90 8 1",
+                                                    "crowd30|0 0.1 352 0 8 0", "crowd30old|0 0.1 352 0 8 0" };
+        // «crowd30» — 30 горожан ходят и бегают перед камерой (анимация v4 по клипам); «crowd30old» — те же, старая анимация кодом
         const float Warmup = 2f, Measure = 5f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -76,16 +94,38 @@ namespace Intern.Game
                     pl.SetCamPitch(float.Parse(v[4], ci));
                     if (v.Length >= 6 && (v[5] == "1") != pl.firstPerson) pl.ToggleView();
                 }
+                var crowd = new List<GameObject>();
+                if (name.StartsWith("crowd") && pl != null)
+                {
+                    int n = 30; int.TryParse(new string(name.Where(char.IsDigit).ToArray()), out n); if (n <= 0) n = 30;
+                    CharacterAnim.UseV4 = !name.EndsWith("old");
+                    string[] models = { "Dev1", "Dev2", "Dev3", "Dev4", "Gena" };
+                    var c = pl.Position + Quaternion.Euler(0f, pl.transform.eulerAngles.y, 0f) * Vector3.forward * 9f; c.y = 0f;
+                    var rnd = new System.Random(7);
+                    for (int i = 0; i < n; i++)
+                    {
+                        string m = models[i % models.Length];
+                        if (!ModelLib.HasCharacter(m)) continue;
+                        var a = CharacterAnim.Spawn(m, null, c, 0f, null);
+                        var w = a.gameObject.AddComponent<BenchWalker>();
+                        w.a = a; w.c = c; w.r = 1.5f + (float)rnd.NextDouble() * 6f; w.ang = (float)rnd.NextDouble() * 6.28f;
+                        w.dir = rnd.Next(2) == 0 ? 1f : -1f; w.speed = i % 5 == 0 ? 3.8f : i % 7 == 0 ? 0f : 1.3f + (float)rnd.NextDouble() * 0.3f;
+                        crowd.Add(a.gameObject);
+                    }
+                    CharacterAnim.UseV4 = true;
+                }
                 sb.AppendLine();
-                sb.AppendLine("ракурс «" + name + "»:");
+                sb.AppendLine("ракурс «" + name + "»" + (crowd.Count > 0 ? " (горожан " + crowd.Count + (name.EndsWith("old") ? ", старая анимация кодом" : ", анимация v4") + ")" : "") + ":");
                 for (int q = 0; q < 4; q++)
                 {
                     GameConfig.SetQuality(q); GameConfig.ApplyGraphics();
                     QualitySettings.vSyncCount = 0; Application.targetFrameRate = -1;
-                    yield return new WaitForSecondsRealtime(Warmup);
+                    // без автопаузы (2 минуты без ввода): замер идёт дольше, а на паузе горожане стоят
+                    float w0 = Time.realtimeSinceStartup;
+                    while (Time.realtimeSinceStartup - w0 < Warmup) { if (root != null) { root.DevKeepAlive(); root.UiResume(); } yield return null; }
                     var times = new List<float>();
                     float start = Time.realtimeSinceStartup;
-                    while (Time.realtimeSinceStartup - start < Measure) { yield return null; times.Add(Time.unscaledDeltaTime); }
+                    while (Time.realtimeSinceStartup - start < Measure) { if (root != null) root.DevKeepAlive(); yield return null; times.Add(Time.unscaledDeltaTime); }
                     float avg = times.Count > 0 ? times.Count / times.Sum() : 0f;
                     times.Sort();
                     int n1 = Mathf.Max(1, times.Count / 100);
@@ -96,6 +136,7 @@ namespace Intern.Game
                     sb.AppendLine(string.Format(ci, "  {0,-8} {1,5:0} FPS, 1% худших: {2:0} FPS ({3:0.0} мс)", GameConfig.QualityNames[q], avg, 1f / worst, worst * 1000f));
                     Debug.Log("[bench] " + name + " " + q + " " + avg.ToString("0", ci) + " FPS");
                 }
+                foreach (var g in crowd) if (g != null) Destroy(g);
             }
             GameConfig.SetQuality(savedQuality);
             sb.AppendLine();

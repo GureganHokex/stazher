@@ -939,8 +939,10 @@ namespace Intern.Game
         }
 
         // ================== Интерфейс ==================
+        public static bool DevHideUi;   // проверки из редактора: кадры без интерфейса
         void OnGUI()
         {
+            if (DevHideUi) return;
             if (Ui == null) Ui = new UiKit();
             float s = Screen.height / 900f;
             var baseMatrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(s, s, 1));
@@ -1327,6 +1329,9 @@ namespace Intern.Game
             return true;
         }
         public void UiResume() { if (mode == Mode.Pause) Resume(); }
+        public void DevKeepAlive() { lastInput = Time.unscaledTime; }   // проверки из редактора: без автопаузы
+        public LeadWalker DevLeadWalker { get { return leadWalker; } }  // проверка походки Гены
+        public Transform DevSpawn { get { return refs != null ? refs.spawn : null; } }
         public void UiWardrobe() { OpenWardrobe(false); }
         public void UiToggleView() { player.ToggleView(); Save.firstPerson = player.firstPerson; Persist(); }
         public void UiSetDifficulty(Difficulty d) { Save.difficulty = (int)d; Persist(); }

@@ -337,7 +337,7 @@ namespace Intern.Game
     }
 
     // ================= Персонаж: риг и анимации =================
-    public class CharacterAnim : MonoBehaviour
+    public partial class CharacterAnim : MonoBehaviour
     {
         // ---------- гладкие модели (настройка «Модели персонажей») ----------
         static readonly HashSet<CharacterAnim> live = new HashSet<CharacterAnim>();
@@ -352,7 +352,7 @@ namespace Intern.Game
             foreach (var a in live) if (a != null) a.ApplySmooth();
         }
 
-        void OnEnable() { live.Add(this); ApplySmooth(); }
+        void OnEnable() { live.Add(this); ApplySmooth(); ResetV4(); }
         void OnDisable() { live.Remove(this); }
 
         void ApplySmooth()
@@ -742,6 +742,7 @@ namespace Intern.Game
             lastPos = transform.position;
             if (ap != null) ApplyLook(ap); else { ShowAccessory(-1); SetEmotion(0); }
             if (transform.Find("BlobShadow") == null) Look.Blob(transform, 0.42f);
+            InitV4();
         }
 
         static readonly string[] AccNodes = { null, "Acc_Glasses", "Acc_Headphones", "Acc_Cap", "Acc_Beanie", "Acc_Crown" };
@@ -819,7 +820,7 @@ namespace Intern.Game
         public void React(int e, float seconds) { reactEmotion = e; reactUntil = Time.time + seconds; }
 
         // «Плюх» при посадке — бёдра проседают и пружинят
-        public void Plop() { land = 0.8f; }
+        public void Plop() { land = 0.8f; plopT = 0f; }
 
         void UpdateFace(float dt)
         {
@@ -952,7 +953,12 @@ namespace Intern.Game
             }
             head.localRotation = Quaternion.Slerp(head.localRotation, Quaternion.Euler(pitchHead + headLag.x, yawHead, headLag.y + Mathf.Sin(t * 0.7f) * 3f), dt * 8f);
 
-            // моргание: веками (новые модели) или сплющиванием глаза (старые)
+            FaceTick(dt);
+        }
+
+        // Лицо: эмоция, брови, веки, моргание — веками (новые модели) или сплющиванием глаза (старые)
+        void FaceTick(float dt)
+        {
             if (blinkT < 0 && Time.time > nextBlink) blinkT = 0;
             UpdateFace(dt);
             if (blinkT >= 0 && lidL != null)
@@ -1040,7 +1046,7 @@ namespace Intern.Game
         void Update()
         {
             if (hips == null) return;
-            if (imported) { UpdateImported(); return; }
+            if (imported) { if (!v4) UpdateImported(); return; }   // v4 — в LateUpdate (CharacterAnim.V4.cs)
             float dt = Time.deltaTime, t = Time.time + phase;
 
             sit = Mathf.MoveTowards(sit, sitTarget, dt * 2.6f);

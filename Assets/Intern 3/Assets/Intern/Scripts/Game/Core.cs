@@ -14,24 +14,29 @@ namespace Intern.Game
     {
         public static float LookScale = 1f;   // чувствительность мыши (настройки)
         public static bool InvertY;
+        // Проверка анимаций (AnimTest, только редактор): сцена сама «жмёт» клавиши — ход, бег, прыжок, поворот камеры
+        public static bool DevDrive; public static Vector2 DevMove, DevLook; public static bool DevSprint, DevJump;
+        static bool DevJumpNow() { if (!DevJump) return false; DevJump = false; return true; }
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
         static bool K(Key k) { return Keyboard.current != null && Keyboard.current[k].isPressed; }
         static bool KD(Key k) { return Keyboard.current != null && Keyboard.current[k].wasPressedThisFrame; }
         public static Vector2 Move()
         {
+            if (DevDrive) return DevMove;
             float x = (K(Key.D) ? 1 : 0) - (K(Key.A) ? 1 : 0);
             float y = (K(Key.W) ? 1 : 0) - (K(Key.S) ? 1 : 0);
             return new Vector2(x, y);
         }
         public static Vector2 Look()
         {
+            if (DevDrive) return DevLook;
             if (Mouse.current == null) return Vector2.zero;
             var d = Mouse.current.delta.ReadValue() * 0.08f * LookScale;
             if (InvertY) d.y = -d.y;
             return d;
         }
-        public static bool Sprint() { return K(Key.LeftShift); }
-        public static bool Jump() { return KD(Key.Space); }
+        public static bool Sprint() { return DevDrive ? DevSprint : K(Key.LeftShift); }
+        public static bool Jump() { return DevDrive ? DevJumpNow() : KD(Key.Space); }
         public static bool Interact() { return KD(Key.E); }
 #if UNITY_EDITOR
         public static bool Esc() { return KD(Key.Escape) || KD(Key.F4); }   // в редакторе F4 дублирует Esc (удалённое управление Esc не передаёт)
@@ -78,18 +83,20 @@ namespace Intern.Game
 #else
         public static Vector2 Move()
         {
+            if (DevDrive) return DevMove;
             float x = (Input.GetKey(KeyCode.D) ? 1 : 0) - (Input.GetKey(KeyCode.A) ? 1 : 0);
             float y = (Input.GetKey(KeyCode.W) ? 1 : 0) - (Input.GetKey(KeyCode.S) ? 1 : 0);
             return new Vector2(x, y);
         }
         public static Vector2 Look()
         {
+            if (DevDrive) return DevLook;
             var d = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * 2f * LookScale;
             if (InvertY) d.y = -d.y;
             return d;
         }
-        public static bool Sprint() { return Input.GetKey(KeyCode.LeftShift); }
-        public static bool Jump() { return Input.GetKeyDown(KeyCode.Space); }
+        public static bool Sprint() { return DevDrive ? DevSprint : Input.GetKey(KeyCode.LeftShift); }
+        public static bool Jump() { return DevDrive ? DevJumpNow() : Input.GetKeyDown(KeyCode.Space); }
         public static bool Interact() { return Input.GetKeyDown(KeyCode.E); }
         public static bool Esc() { return Input.GetKeyDown(KeyCode.Escape); }
         public static bool Click() { return Input.GetMouseButtonDown(0); }

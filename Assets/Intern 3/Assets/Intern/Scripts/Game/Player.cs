@@ -135,6 +135,11 @@ namespace Intern.Game
             {
                 avatar.moveSpeed = new Vector3(planarVel.x, 0, planarVel.z).magnitude;
                 avatar.grounded = !cc.enabled || cc.isGrounded;
+                // капсула висит над полом на толщину «кожи» (skinWidth): тело опускаем на пол, чтобы ступни стояли на нём
+                // (на стуле физика выключена — там опускать не нужно)
+                float sink = cc.enabled ? -cc.skinWidth : 0f;
+                var lp = avatar.transform.localPosition;
+                if (Mathf.Abs(lp.y - sink) > 0.0001f) avatar.transform.localPosition = new Vector3(lp.x, Mathf.MoveTowards(lp.y, sink, dt * 0.4f), lp.z);
             }
             if (!cinematic) UpdateCamera(dt);
         }

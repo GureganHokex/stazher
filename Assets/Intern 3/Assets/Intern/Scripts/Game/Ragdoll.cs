@@ -81,6 +81,7 @@ namespace Intern.Game
             a.enabled = false;
             var bones = new List<Transform> { a.rig, a.hips, a.torso, a.head, a.legL, a.kneeL, a.legR, a.kneeR, a.armL, a.elbowL, a.armR, a.elbowR };
             if (a.neck != null) bones.Add(a.neck);
+            foreach (var t in a.V4Bones) if (t != null && !bones.Contains(t)) bones.Add(t);   // скелет v4: позвонки, ключицы, кисти, пальцы, стопы
             saved.Clear();
             foreach (var b in bones) saved.Add(new KeyValuePair<Transform, Pose>(b, new Pose(b.localPosition, b.localRotation)));
             // поза покоя: у нормализованного скелета все кости без поворота относительно персонажа
@@ -88,8 +89,11 @@ namespace Intern.Game
 
             var pelvis = Body("pelvis", a.hips, 12f);
             Box(a.hips, new Vector3(0, -0.01f, 0), new Vector3(0.34f, 0.22f, 0.24f));
-            chest = Body("chest", a.torso, 18f);
-            Box(a.torso, new Vector3(0, 0.27f, 0), new Vector3(0.38f, 0.44f, 0.25f));
+            // у скелета v4 корпус гнётся в пояснице: тело груди — на нижнем позвонке (Spine), остальные позвонки едут с ним
+            var spine = a.spine != null ? a.spine : a.torso;
+            chest = Body("chest", spine, 18f);
+            if (a.spine != null) Box(spine, new Vector3(0, 0.23f, 0), new Vector3(0.38f, 0.48f, 0.25f));
+            else Box(a.torso, new Vector3(0, 0.27f, 0), new Vector3(0.38f, 0.44f, 0.25f));
             // поясница: вперёд до 50°, назад 20°, вбок и скрутка по 15° (пределы шире походки — иначе тело дёргает в первый кадр)
             Link(chest, pelvis, Vector3.right, Vector3.forward, -20f, 50f, 15f, 15f);
             Sphere(a.head, new Vector3(0, 0.2f, 0.03f), 0.2f);
@@ -259,7 +263,7 @@ namespace Intern.Game
             {
                 if (s == null || !s.enabled || s.sharedMesh == null) continue;
                 var m = new Mesh { name = s.sharedMesh.name + "_pose" };
-                s.BakeMesh(m, false);
+                s.BakeMesh(m, true);   // с масштабом сетки: у моделей v4 (FBX из Blender) он не 1 — без него тело вырастало в разы
                 var go = new GameObject(s.name + "_baked");
                 go.transform.SetParent(s.transform, false);
                 go.AddComponent<MeshFilter>().sharedMesh = m;

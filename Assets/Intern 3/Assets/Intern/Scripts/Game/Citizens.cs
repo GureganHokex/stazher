@@ -132,6 +132,8 @@ namespace Intern.Game
                 g.transform.rotation = transform.rotation;
                 g.transform.SetParent(anim.torso != null ? anim.torso : transform, true); return g;
             };
+            anim.gripRight = def.id == "lawyer" || def.id == "notary" || def.id == "philologist" || def.id == "journalist" || def.id == "philosopher"
+                || def.id == "historian" || def.id == "accountant" || def.id == "itguy" || def.id == "dean";
             switch (def.id)
             {
                 case "lawyer": Look.RBox("Briefcase", hand, new Vector3(0, -0.32f, 0.02f), new Vector3(0.1f, 0.3f, 0.42f), Pal.Hex("6B4226"), 0.03f, false, 0.6f); break;
@@ -374,7 +376,7 @@ namespace Intern.Game
             anim.moveSpeed = 0f; Face(pl, dt);
             if (Time.time >= nextAct && SameArea() && SeesPlayer())
             {
-                nextAct = Time.time + 2.5f; anim.swingStart = Time.time;
+                nextAct = Time.time + 2.5f; if (anim.v4) anim.Throw(); else anim.swingStart = Time.time;
                 Stamp.Throw(run, transform.position + Vector3.up * 1.6f + transform.forward * 0.4f, run.PlayerPos + Vector3.up * 1f, def.damage);
             }
         }
@@ -475,13 +477,14 @@ namespace Intern.Game
             if (!def.humanitarian)
             {
                 if (!hitOnce) { hitOnce = true; run.OnWrongHit(this, Cries[Mathf.Clamp(System.Array.IndexOf(new[] { "accountant", "engineer", "cashier", "itguy" }, def.id), 0, 3)]); }
-                anim.React(5, 2f); Say(Cries[Mathf.Clamp(System.Array.IndexOf(new[] { "accountant", "engineer", "cashier", "itguy" }, def.id), 0, 3)], 2f);
+                anim.React(5, 2f); anim.Flinch(); Say(Cries[Mathf.Clamp(System.Array.IndexOf(new[] { "accountant", "engineer", "cashier", "itguy" }, def.id), 0, 3)], 2f);
                 if (st != St.Flee) Flee();
                 return;
             }
             hp -= damage;
             if (hp > 0) StandUp();
             anim.React(4, 1.5f);
+            if (hp > 0) anim.Flinch();
             if (run.training) stun = Mathf.Max(stun, 0.7f);   // обучение: после удара чуть замирает
             if (knock > 0f) { var k = dir; k.y = 0; knockVel = k.normalized * knock * 6f; }
             if (stun > 0f) staggerUntil = Time.time + stun;
@@ -544,7 +547,7 @@ namespace Intern.Game
             props.Clear();
             if (tag != null) Destroy(tag.gameObject);
             if (bubble != null) Destroy(bubble.gameObject);
-            anim.enabled = true; anim.moveSpeed = 0f; anim.aimGun = false; anim.holdRight = false; anim.swingStart = -9f;
+            anim.enabled = true; anim.moveSpeed = 0f; anim.aimGun = false; anim.holdRight = false; anim.swingStart = -9f; anim.gripRight = false;
             foreach (var c in GetComponents<Collider>()) c.enabled = true;
             transform.localScale = Vector3.one;
             run = null;
