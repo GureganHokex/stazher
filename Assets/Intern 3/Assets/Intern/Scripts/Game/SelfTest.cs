@@ -579,6 +579,16 @@ namespace Intern.Game
                 T(LangBox.ErrorLine("Warning: Undefined variable $prce in /work/.stazher/run/x/main.php on line 3\n", "main.php", out pm) == 3 && pm.Contains("$prce"), "php: предупреждение " + pm);
                 var php = LangBox.For("php");
                 T(php != null && php.extraFiles["check.php"].Contains("##TEST|") && php.extraFiles.ContainsKey("stazher-tests.php") && php.src == "main.php", "php: раннер и check.php");
+                // Kotlin (спринт 17): kotlinc, исключения JVM с номером строки Main.kt
+                var kc = LangBox.ParseCheck("", "Main.kt:2:12: error: unresolved reference 'prce'.\n    return prce * qty\n           ^^^^\nMain.kt:7:14: error: only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'String?'.\n", "Main.kt", 1);
+                T(kc.buildFailed && kc.errLine == 2 && kc.errText.Contains("prce") && kc.errText.Contains("не найдено"), "kotlin: имя не найдено " + kc.errLine + " " + kc.errText);
+                var kv = LangBox.ParseCheck("", "Main.kt:3:5: error: 'val' cannot be reassigned.\n    total += 5\n    ^^^^^\n", "Main.kt", 1);
+                T(kv.buildFailed && kv.errLine == 3 && kv.errText.Contains("var"), "kotlin: val " + kv.errText);
+                var kt = LangBox.ParseCheck("##TEST|x|FAIL|исключение ArithmeticException: / by zero (Main.kt:1)\n", "", "Main.kt", 0);
+                T(kt.errLine == 1 && !kt.results[0].Passed, "kotlin: исключение в тесте " + kt.errLine);
+                string km; T(LangBox.ErrorLine("Exception in thread \"main\" java.lang.ArrayIndexOutOfBoundsException: Index 5 out of bounds for length 2\n\tat java.base/java.util.Arrays$ArrayList.get(Arrays.java:4266)\n\tat MainKt.main(Main.kt:3)\n\tat MainKt.main(Main.kt)\n", "Main.kt", out km) == 3, "kotlin: исключение при запуске " + km);
+                var kotlin = LangBox.For("kotlin");
+                T(kotlin != null && kotlin.extraFiles["Check.kt"].Contains("##TEST|") && kotlin.extraFiles["stazher-kt.sh"].Contains("K2JVMCompiler") && kotlin.src == "Main.kt" && kotlin.RunSec > LangBox.RunTimeoutSec, "kotlin: раннер и Check.kt");
                 var java = LangBox.For("java");
                 T(java != null && java.extraFiles.ContainsKey("Check.java") && java.extraFiles["Check.java"].Contains("##TEST|") && java.testMarker == "Check.", "java: раннер и Check.java");
             }

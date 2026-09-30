@@ -509,7 +509,7 @@ namespace Intern.Game
             else
             {
                 if (r.output.Length > 0) terminal.Append(K.Esc(r.output.TrimEnd('\n'))).Append('\n');
-                if (r.timedOut) terminal.Append("<color=#F14C4C>Программа не завершилась за " + LangBox.RunTimeoutSec + " с и остановлена — похоже на бесконечный цикл.</color>\n");
+                if (r.timedOut) terminal.Append("<color=#F14C4C>Программа не завершилась за " + (BoxSpec != null ? BoxSpec.RunSec : LangBox.RunTimeoutSec) + " с и остановлена — похоже на бесконечный цикл.</color>\n");
                 else if (r.errLine != 0 && r.errText != null)
                 {
                     runtimeErrorLine = r.errLine; runtimeErrorText = r.errText;

@@ -1,0 +1,1156 @@
+{
+ "track": "lang-kotlin",
+ "roadmap": [
+  {
+   "topic_id": "kt-basics",
+   "lang": "kotlin",
+   "replaces": [
+    "be-py-basics"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Kotlin: переменные и типы",
+   "grade": "junior",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "fun main и println, val и var, Int/Long/Double/Boolean/String, строковые шаблоны, целое деление, явные преобразования toLong/toDouble.",
+   "theory": "Kotlin — современный язык для JVM: на нём пишут бэкенды (Spring, Ktor) и Android-приложения. Он работает рядом с Java, но короче и строже к null.\n\n    fun main() {\n        println(\"Привет, Кодзилла!\")\n        val price = 1990\n        println(\"Цена: $price ₽\")              // шаблон: $имя\n        println(\"С доставкой: ${price + 300}\") // ${выражение}\n    }\n\n• Точка с запятой не нужна.\n• val — значение нельзя переприсвоить, var — можно. По умолчанию пишут val.\n• Тип выводится сам, но его можно указать: val qty: Int = 2.\n\nТипы: Int, Long, Double, Boolean, Char, String.\n• Kotlin не превращает типы сам: Int в Long — только явно, через toLong(); в Double — toDouble().\n• 7 / 2 == 3 — деление целых; 7 / 2.0 == 3.5.\n• Переполнение Int (больше 2 147 483 647) не падает, а молча даёт неправильное число. Большие значения считают в Long: daily.toLong() * days.\n• length у строки — число символов: у «Лампа» 5.\n• \"Итого: \" + 7 + 3 даёт \"Итого: 73\", а \"Итого: ${7 + 3}\" — \"Итого: 10\".\n\nФункции:\n\n    fun cartTotal(price: Int, qty: Int): Int {\n        return price * qty\n    }\n    fun cartTotal2(price: Int, qty: Int) = price * qty   // короткая форма\n\nВ настоящем проекте код собирает Gradle; игра для скорости вызывает компилятор kotlinc напрямую."
+  },
+  {
+   "topic_id": "kt-control",
+   "lang": "kotlin",
+   "replaces": [
+    "be-py-control"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Kotlin: условия, when и циклы",
+   "grade": "junior",
+   "requires": [
+    "kt-basics"
+   ],
+   "description": "if как выражение, when с условиями и диапазонами, диапазоны .., until, downTo, step, циклы for и while.",
+   "theory": "if — выражение, у него есть значение:\n\n    val kind = if (total > 10) \"много\" else \"мало\"\n\nwhen — удобная замена цепочки if и switch:\n\n    val grade = when {\n        score >= 90 -> \"отлично\"\n        score >= 75 -> \"хорошо\"\n        else -> \"на доработку\"\n    }\n    val title = when (level) {\n        1 -> \"junior\"\n        2, 3 -> \"middle\"\n        in 4..10 -> \"senior\"\n        else -> \"?\"\n    }\n\n• Ветки проверяются сверху вниз, выполняется первая подходящая; break не нужен.\n• Если when возвращает значение, else обязателен.\n\nДиапазоны и циклы:\n\n    for (i in 1..10) { … }          // 1, 2, …, 10 — обе границы включены\n    for (i in 0 until 10) { … }     // 0, …, 9\n    for (i in 10 downTo 1 step 2) { … }\n    for (i in list.indices) { … }   // все индексы списка\n    for (item in list) { … }\n    while (total < 100) { … }\n\n• 0..list.size — ловушка: включает size, а такого индекса нет. Для индексов — until или indices.\n• break выходит из цикла, continue переходит к следующему шагу."
+  },
+  {
+   "topic_id": "kt-collections",
+   "lang": "kotlin",
+   "replaces": [
+    "be-py-collections"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Kotlin: списки и словари",
+   "grade": "junior",
+   "requires": [
+    "kt-control"
+   ],
+   "description": "listOf и mutableListOf, mapOf и mutableMapOf, map[key] и null, getOrDefault, filter/map/sum/groupingBy.",
+   "theory": "Коллекции бывают только для чтения и изменяемые:\n\n    val names = listOf(\"лампа\", \"стол\")            // менять нельзя\n    val cart = mutableListOf(\"лампа\", \"стол\")      // можно\n    cart.add(\"стул\")\n    cart.add(0, \"полка\")\n    cart.remove(\"стол\")\n    cart.size; cart[1]; cart.last()\n    cart.getOrNull(10)                              // null вместо исключения\n\nСловари:\n\n    val stock = mutableMapOf(\"лампа\" to 3)\n    stock[\"лампа\"] = 5\n    stock[\"шкаф\"]                    // null — ключа нет\n    stock[\"шкаф\"] ?: 0               // ?: — значение, если слева null\n    stock.getOrDefault(\"шкаф\", 0)\n    for ((name, qty) in stock) { … }\n\n• map[key] возвращает Int? — «число или null». Kotlin заставит решить, что делать с null.\n• !! превращает null в исключение NullPointerException — это «я уверен, что тут не null». Обычно лучше ?:.\n\nОперации над коллекциями:\n\n    prices.sum(); prices.max()\n    prices.filter { it < 1000 }          // it — текущий элемент\n    prices.map { it * 2 }\n    prices.count { it > 500 }\n    tags.groupingBy { it }.eachCount()   // сколько раз встретился каждый"
+  },
+  {
+   "topic_id": "kt-functions",
+   "lang": "kotlin",
+   "replaces": [
+    "be-py-functions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Kotlin: функции и null-безопасность",
+   "grade": "junior",
+   "requires": [
+    "kt-collections"
+   ],
+   "description": "Параметры по умолчанию и именованные аргументы, функции-расширения, лямбды, nullable-типы, ?., ?:, let, return из лямбды.",
+   "theory": "Функции:\n\n    fun price(rub: Int, currency: String = \"₽\") = \"$rub $currency\"\n    price(500)                          // \"500 ₽\"\n    price(currency = \"$\", rub = 7)      // именованные аргументы — в любом порядке\n\nФункция-расширение добавляет метод существующему типу:\n\n    fun String.shout() = uppercase() + \"!\"\n    \"лампа\".shout()                     // \"ЛАМПА!\"\n\nЛямбда — функция в фигурных скобках: { n: Int -> n * 2 }. Если лямбда — последний аргумент, её пишут после скобок: list.filter { it > 0 }.\n\nNull-безопасность — главная фишка Kotlin:\n\n    val name: String = \"Гена\"     // null сюда положить нельзя\n    val nick: String? = null      // ? — может быть null\n    nick.length                    // ошибка компиляции: вдруг null\n    nick?.length                   // null, если nick — null\n    nick?.length ?: 0              // 0, если null\n    nick?.let { println(it) }      // выполнить, только если не null\n\n• Функции чтения чисел: \"42\".toInt() бросит исключение на «4x», а \"4x\".toIntOrNull() вернёт null.\n• return внутри лямбды forEach завершает всю функцию, а return@forEach — только текущий шаг (как continue)."
+  },
+  {
+   "topic_id": "kt-classes",
+   "lang": "kotlin",
+   "replaces": [
+    "be-py-oop"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Kotlin: классы и data class",
+   "grade": "junior",
+   "requires": [
+    "kt-functions"
+   ],
+   "description": "Классы с главным конструктором, свойства и private set, data class, object, интерфейсы, override, поле field в сеттере.",
+   "theory": "Класс с главным конструктором:\n\n    class Product(val name: String, var price: Int) {\n        override fun toString() = \"$name — $price ₽\"\n    }\n\n    val lamp = Product(\"Лампа\", 1990)   // new не пишут\n    println(lamp)\n\n• val/var в скобках сразу объявляют свойства.\n• var total = 0 с private set — читать можно всем, менять только внутри класса.\n• Без override fun toString() объект печатается как Product@1b6d3586.\n• override обязателен при переопределении, а метод или класс, который можно переопределять, помечают open (интерфейсы открыты сами).\n\ndata class — класс для данных: сам пишет equals (сравнение по значениям), toString и copy:\n\n    data class Point(val x: Int, val y: Int)\n    Point(1, 2) == Point(1, 2)       // true\n    val p2 = p.copy(x = 10)\n    val (x, y) = p2                  // деструктуризация\n\nУ обычного класса == сравнивает ссылки, как в Java.\n\nobject — класс из одного экземпляра: object Counter { var created = 0 }.\n\nСвой сеттер свойства пишет в field, а не в само свойство:\n\n    var balance = 0\n        set(value) {\n            require(value >= 0)\n            field = value           // balance = value вызвал бы сеттер снова — бесконечная рекурсия\n        }"
+  },
+  {
+   "topic_id": "kt-errors",
+   "lang": "kotlin",
+   "replaces": [
+    "be-py-exceptions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Kotlin: исключения",
+   "grade": "junior",
+   "requires": [
+    "kt-functions"
+   ],
+   "description": "try как выражение, throw, require и check, toIntOrNull вместо исключений, runCatching, свой класс исключения, finally.",
+   "theory": "Исключения — как в Java, но try — это выражение:\n\n    val port = try { text.toInt() } catch (e: NumberFormatException) { 8080 }\n\n    try {\n        …\n    } catch (e: IllegalArgumentException) {\n        println(\"ошибка: ${e.message}\")\n    } finally {\n        println(\"выполнится в любом случае\")\n    }\n\nПроверки в одну строку:\n\n    require(amount > 0) { \"сумма должна быть больше нуля\" }       // IllegalArgumentException\n    check(amount <= balance) { \"недостаточно средств\" }            // IllegalStateException\n\n• require — «мне передали неверный аргумент», check — «операция невозможна в текущем состоянии».\n• В Kotlin нет проверяемых исключений: throws писать не нужно.\n• Если ошибка ожидаема, обходятся без исключений: \"80a\".toIntOrNull() ?: 8080.\n• runCatching { … } превращает исключение в результат: runCatching { s.toInt() }.getOrDefault(0).\n• Своё исключение — класс-наследник:\n\n    class StockException(val have: Int) : RuntimeException(\"на складе только $have\")\n\n• throw — тоже выражение: val n = s.toIntOrNull() ?: throw IllegalArgumentException(\"не число\")."
+  }
+ ],
+ "tasks": [
+  {
+   "task_id": "kt-basics-01",
+   "topic_id": "kt-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Итог корзины на Kotlin",
+   "story": "Гена: «Бэкенд магазина переезжает на Kotlin. Начнём с простого: стоимость позиции.»",
+   "content": {
+    "question": "Допиши функцию cartTotal(price: Int, qty: Int): Int — стоимость позиции: цена × количество.",
+    "entry": "cartTotal",
+    "code": "// стоимость позиции: цена × количество\nfun cartTotal(price: Int, qty: Int): Int {\n    return 0\n}\n\nfun main() {\n    println(cartTotal(1990, 2))\n}",
+    "correct_answer": "// стоимость позиции: цена × количество\nfun cartTotal(price: Int, qty: Int): Int {\n    return price * qty\n}\n\nfun main() {\n    println(cartTotal(1990, 2))\n}",
+    "tests_code": "fun tests() {\n    Check.eq(\"1990 × 2\", 3980) { cartTotal(1990, 2) }\n    Check.eq(\"250 × 0\", 0) { cartTotal(250, 0) }\n    Check.eq(\"99 × 3\", 297) { cartTotal(99, 3) }\n}",
+    "requirements": [
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "Функция объявляется словом fun, тип пишется после имени через двоеточие: price: Int. Результат возвращают через return — или короткой формой fun cartTotal(price: Int, qty: Int) = price * qty.",
+   "hints": [
+    "Верни произведение через return.",
+    "return price * qty"
+   ]
+  },
+  {
+   "task_id": "kt-basics-02",
+   "topic_id": "kt-basics",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Шаблоны, деление и переполнение",
+   "story": "Ира: «В отчёте то 73 вместо 10, то отрицательная выручка. Что напечатает этот код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "fun main() {\n    val price = 7\n    println(price / 2)\n    println(price / 2.0)\n    println(price % 4)\n    println(\"Итого: \" + price + 3)\n    println(\"Итого: ${price + 3}\")\n    val title = \"Лампа\"\n    println(title.length)\n    println(\"$title стоит $price ₽\")\n    val big = 2_000_000_000\n    println(big + big)\n    println(big.toLong() + big)\n}",
+    "language": "kotlin",
+    "output": "3\n3.5\n3\nИтого: 73\nИтого: 10\n5\nЛампа стоит 7 ₽\n-294967296\n4000000000"
+   },
+   "explanation": "Целые делятся нацело: 7 / 2 == 3, а с 2.0 получается 3.5. \"Итого: \" + 7 + 3 выполняется слева направо — к строке приклеивается 7, потом 3. В ${…} сначала считается выражение. У «Лампа» 5 символов. 2 000 000 000 + 2 000 000 000 не помещается в Int и молча переполняется, а в Long считается правильно.",
+   "hints": [
+    "Сложение строки с числом склеивает, слева направо.",
+    "Int хранит числа примерно до 2,1 млрд."
+   ]
+  },
+  {
+   "task_id": "kt-basics-03",
+   "topic_id": "kt-basics",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Товар и итог",
+   "story": "Гена: «Допиши пропуски — без них строка про товар не соберётся.»",
+   "content": {
+    "question": "Заполни пропуски: неизменяемая переменная, изменяемая переменная и подстановка имени в строку.",
+    "code": "fun main() {\n    [[1]] title = \"Лампа\"\n    [[2]] total = 0\n    total += 1990\n    total += 500\n    println(\"Товар: [[3]]title, итого $total ₽\")\n}",
+    "blanks": [
+     {
+      "answer": [
+       "val",
+       "var"
+      ]
+     },
+     {
+      "answer": [
+       "var"
+      ]
+     },
+     {
+      "answer": [
+       "$"
+      ]
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "title не меняется — для неё val (var тоже сработает, но по умолчанию пишут val). total переприсваивается через +=, поэтому только var: с val будет ошибка «val cannot be reassigned». Переменная подставляется в строку через $имя.",
+   "hints": [
+    "Что меняется в программе, а что нет?",
+    "Подстановка в строку — знак доллара."
+   ]
+  },
+  {
+   "task_id": "kt-basics-04",
+   "topic_id": "kt-basics",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Средняя оценка без дробей",
+   "story": "Ира: «Средняя оценка из 9 баллов за 2 отзыва — 4.0, а должно быть 4.5. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "fun average(sum: Int, count: Int): Double {\n    return (sum / count).toDouble()\n}\n\nfun main() {\n    println(average(9, 2))\n}",
+    "bug_line": 2,
+    "options": [
+     "Целые делятся нацело ещё до преобразования: 9 / 2 == 4; нужно sum.toDouble() / count",
+     "toDouble() округляет вниз",
+     "Функция с типом Double не может принимать Int",
+     "println печатает Double без дробной части"
+    ],
+    "correct_answer": 0,
+    "language": "kotlin"
+   },
+   "explanation": "Сначала выполняется то, что в скобках: 9 / 2 — деление целых, дробная часть отброшена, получилось 4. toDouble() превращает уже готовую четвёрку в 4.0. Преобразовать нужно до деления: sum.toDouble() / count.",
+   "hints": [
+    "Что считается раньше — деление или toDouble()?",
+    "Сделай дробным одно из чисел до деления."
+   ]
+  },
+  {
+   "task_id": "kt-basics-05",
+   "topic_id": "kt-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Просмотры за год",
+   "story": "Стас: «Отчёт по просмотрам за год показывает отрицательное число. Посчитай так, чтобы влезло.»",
+   "content": {
+    "question": "Исправь totalViews(daily: Int, days: Int): Long — просмотров в день × дней. Результат бывает больше 2 млрд.",
+    "entry": "totalViews",
+    "code": "// просмотров за период: в день × дней\nfun totalViews(daily: Int, days: Int): Long {\n    return (daily * days).toLong()\n}\n\nfun main() {\n    println(totalViews(2_000_000_000, 365))\n}",
+    "correct_answer": "// просмотров за период: в день × дней\nfun totalViews(daily: Int, days: Int): Long {\n    return daily.toLong() * days\n}\n\nfun main() {\n    println(totalViews(2_000_000_000, 365))\n}",
+    "tests_code": "fun tests() {\n    Check.eq(\"1000 × 30\", 30000L) { totalViews(1000, 30) }\n    Check.eq(\"0 дней\", 0L) { totalViews(5000, 0) }\n    Check.eq(\"миллиард × 3\", 3_000_000_000L) { totalViews(1_000_000_000, 3) }\n    Check.eq(\"2 млрд × 365\", 730_000_000_000L) { totalViews(2_000_000_000, 365) }\n}",
+    "requirements": [
+     {
+      "input": "переводит в Long до умножения",
+      "expected": {
+       "regex": "\\.toLong\\(\\)\\s*\\*|\\*\\s*\\w+\\.toLong\\(\\)"
+      }
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "daily * days — это умножение двух Int, и результат переполняется ещё до toLong(). Kotlin не расширяет типы сам, поэтому в Long переводят один из множителей до умножения: daily.toLong() * days — тогда всё выражение считается в Long.",
+   "hints": [
+    "Переполнение случается в момент умножения.",
+    "daily.toLong() * days"
+   ]
+  },
+  {
+   "task_id": "kt-control-01",
+   "topic_id": "kt-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Оценка за код-ревью",
+   "story": "Гена: «Бот код-ревью ставит оценку по баллам. Перенеси правило на Kotlin — when тут как раз к месту.»",
+   "content": {
+    "question": "Напиши reviewGrade(score: Int): String: от 90 — «отлично», от 75 — «хорошо», от 50 — «зачёт», иначе «на доработку».",
+    "entry": "reviewGrade",
+    "code": "// оценка за код-ревью по баллам\nfun reviewGrade(score: Int): String {\n    return \"\"\n}\n\nfun main() {\n    println(reviewGrade(80))\n}",
+    "correct_answer": "// оценка за код-ревью по баллам\nfun reviewGrade(score: Int): String {\n    return when {\n        score >= 90 -> \"отлично\"\n        score >= 75 -> \"хорошо\"\n        score >= 50 -> \"зачёт\"\n        else -> \"на доработку\"\n    }\n}\n\nfun main() {\n    println(reviewGrade(80))\n}",
+    "tests_code": "fun tests() {\n    Check.eq(\"95\", \"отлично\") { reviewGrade(95) }\n    Check.eq(\"ровно 90\", \"отлично\") { reviewGrade(90) }\n    Check.eq(\"80\", \"хорошо\") { reviewGrade(80) }\n    Check.eq(\"ровно 75\", \"хорошо\") { reviewGrade(75) }\n    Check.eq(\"50\", \"зачёт\") { reviewGrade(50) }\n    Check.eq(\"12\", \"на доработку\") { reviewGrade(12) }\n}",
+    "requirements": [
+     {
+      "input": "сравнивает с 90",
+      "expected": {
+       "regex": ">=?\\s*(90|89)\\b|\\b(90|89)\\s*<=?|in\\s+90\\.\\."
+      }
+     },
+     {
+      "input": "сравнивает с 75",
+      "expected": {
+       "regex": ">=?\\s*(75|74)\\b|\\b(75|74)\\s*<=?|in\\s+75\\.\\."
+      }
+     },
+     {
+      "input": "сравнивает с 50",
+      "expected": {
+       "regex": ">=?\\s*(50|49)\\b|\\b(50|49)\\s*<=?|in\\s+50\\.\\."
+      }
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "when без аргумента проверяет условия сверху вниз и берёт первое истинное — порог 90 должен идти первым, иначе 95 получит «зачёт». else ловит всё остальное и обязателен, когда when возвращает значение. Цепочка if/else if тоже подходит.",
+   "hints": [
+    "return when { score >= 90 -> \"отлично\" … }",
+    "Последняя ветка — else."
+   ]
+  },
+  {
+   "task_id": "kt-control-02",
+   "topic_id": "kt-control",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Диапазоны и when",
+   "story": "Ира: «Где граница диапазона включена, а где нет? Что напечатает программа?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "fun main() {\n    println((1..5).joinToString(\" \"))\n    println((1 until 5).joinToString(\" \"))\n    println((10 downTo 1 step 3).joinToString(\" \"))\n    var total = 0\n    for (i in 1..10) {\n        if (i % 2 == 0) continue\n        if (i > 7) break\n        total += i\n    }\n    println(\"total = $total\")\n    val level = 5\n    val title = when (level) {\n        1 -> \"junior\"\n        2, 3 -> \"middle\"\n        in 4..10 -> \"senior\"\n        else -> \"?\"\n    }\n    println(title)\n    val kind = if (total > 10) \"много\" else \"мало\"\n    println(kind)\n}",
+    "language": "kotlin",
+    "output": "1 2 3 4 5\n1 2 3 4\n10 7 4 1\ntotal = 16\nsenior\nмного"
+   },
+   "explanation": "1..5 включает обе границы, until — без правой. downTo идёт вниз, step 3 — через три: 10, 7, 4, 1. В сумму попадают нечётные 1, 3, 5, 7 — это 16. Уровень 5 попадает в in 4..10. if — выражение, его результат можно положить в переменную.",
+   "hints": [
+    "until не включает правую границу.",
+    "continue пропускает шаг, break выходит из цикла."
+   ]
+  },
+  {
+   "task_id": "kt-control-03",
+   "topic_id": "kt-control",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "FizzBuzz на when",
+   "story": "Гена: «Классика собеседований, по-котлиновски. Собери функцию.»",
+   "content": {
+    "question": "Собери label(n: Int): String: кратно 15 — FizzBuzz, кратно 3 — Fizz, кратно 5 — Buzz, иначе само число строкой.",
+    "lines": [
+     "fun label(n: Int): String {",
+     "    return when {",
+     "        n % 15 == 0 -> \"FizzBuzz\"",
+     "        n % 3 == 0 -> \"Fizz\"",
+     "        n % 5 == 0 -> \"Buzz\"",
+     "        else -> n.toString()",
+     "    }",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "fun label(n: Int): String {",
+      "    return when {",
+      "        n % 15 == 0 -> \"FizzBuzz\"",
+      "        n % 5 == 0 -> \"Buzz\"",
+      "        n % 3 == 0 -> \"Fizz\"",
+      "        else -> n.toString()",
+      "    }",
+      "}"
+     ]
+    ],
+    "distractors": [
+     "        default -> n.toString()",
+     "    switch (n) {"
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "when берёт первую подходящую ветку, поэтому кратность 15 — первой. Fizz и Buzz можно поменять местами. «Всё остальное» в when — else; default и switch — это из Java. n.toString() превращает число в строку, как требует тип результата.",
+   "hints": [
+    "Самый частный случай — первым.",
+    "«Всё остальное» — else."
+   ]
+  },
+  {
+   "task_id": "kt-control-04",
+   "topic_id": "kt-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма кратных",
+   "story": "Гена: «Для акции нужна сумма всех номеров заказов меньше n, кратных 3 или 5. Номеров бывает миллион.»",
+   "content": {
+    "question": "Напиши sumMultiples(n: Int): Long — сумму всех чисел от 1 до n - 1, которые делятся на 3 или на 5.",
+    "entry": "sumMultiples",
+    "code": "// сумма чисел меньше n, кратных 3 или 5\nfun sumMultiples(n: Int): Long {\n    return 0\n}\n\nfun main() {\n    println(sumMultiples(10))\n}",
+    "correct_answer": "// сумма чисел меньше n, кратных 3 или 5\nfun sumMultiples(n: Int): Long {\n    var sum = 0L\n    for (i in 1 until n) {\n        if (i % 3 == 0 || i % 5 == 0) {\n            sum += i\n        }\n    }\n    return sum\n}\n\nfun main() {\n    println(sumMultiples(10))\n}",
+    "tests_code": "fun tests() {\n    Check.eq(\"n = 10: 3 + 5 + 6 + 9\", 23) { sumMultiples(10) }\n    Check.eq(\"n = 1\", 0) { sumMultiples(1) }\n    Check.eq(\"n = 16: 15 не входит\", 60) { sumMultiples(16) }\n    Check.eq(\"n = 1000\", 233168) { sumMultiples(1000) }\n    Check.eq(\"n = 1 000 000 — больше Int\", 233333166668L) { sumMultiples(1_000_000) }\n}",
+    "requirements": [
+     {
+      "input": "обходит числа циклом",
+      "expected": {
+       "regex": "\\b(for|while)\\s*\\(|\\.filter|\\.sumOf"
+      }
+     },
+     {
+      "input": "проверяет кратность 3",
+      "expected": {
+       "regex": "%\\s*3\\b"
+      }
+     },
+     {
+      "input": "проверяет кратность 5",
+      "expected": {
+       "regex": "%\\s*5\\b"
+      }
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "1 until n — числа от 1 до n - 1. Сумму держат в Long (var sum = 0L), иначе для миллиона она переполнит Int. Числа, кратные 15, учитываются один раз: условие через || — одно условие. Короче: (1 until n).filter { it % 3 == 0 || it % 5 == 0 }.sumOf { it.toLong() }.",
+   "hints": [
+    "for (i in 1 until n)",
+    "var sum = 0L — сумма в Long."
+   ]
+  },
+  {
+   "task_id": "kt-control-05",
+   "topic_id": "kt-control",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Корзина падает на подсчёте",
+   "story": "Ира: «Подсчёт суммы корзины падает с IndexOutOfBoundsException. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "fun main() {\n    val prices = listOf(100, 200, 300)\n    var total = 0\n    for (i in 0..prices.size) {\n        total += prices[i]\n    }\n    println(total)\n}",
+    "bug_line": 4,
+    "options": [
+     "0..prices.size включает size — индекса 3 в списке из трёх элементов нет; нужно 0 until prices.size или prices.indices",
+     "Список listOf нельзя обходить по индексам",
+     "total нужно объявить через val",
+     "+= не работает с Int"
+    ],
+    "correct_answer": 0,
+    "language": "kotlin"
+   },
+   "explanation": "Диапазон .. включает обе границы: 0, 1, 2, 3. Индексы списка из трёх элементов — 0, 1, 2. Для индексов пишут 0 until prices.size, prices.indices, а проще всего — for (p in prices) или prices.sum().",
+   "hints": [
+    "Какие числа входят в 0..3?",
+    "until не включает правую границу."
+   ]
+  },
+  {
+   "task_id": "kt-collections-01",
+   "topic_id": "kt-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Частота тегов",
+   "story": "Стас: «Хочу видеть, какие теги у товаров встречаются чаще. Посчитай их.»",
+   "content": {
+    "question": "Напиши tagCounts(tags: List<String>): Map<String, Int> — словарь «тег → сколько раз встретился».",
+    "entry": "tagCounts",
+    "code": "// сколько раз встретился каждый тег\nfun tagCounts(tags: List<String>): Map<String, Int> {\n    val counts = mutableMapOf<String, Int>()\n    return counts\n}\n\nfun main() {\n    println(tagCounts(listOf(\"sale\", \"new\", \"sale\")))\n}",
+    "correct_answer": "// сколько раз встретился каждый тег\nfun tagCounts(tags: List<String>): Map<String, Int> {\n    val counts = mutableMapOf<String, Int>()\n    for (tag in tags) {\n        counts[tag] = (counts[tag] ?: 0) + 1\n    }\n    return counts\n}\n\nfun main() {\n    println(tagCounts(listOf(\"sale\", \"new\", \"sale\")))\n}",
+    "tests_code": "fun tests() {\n    Check.eq(\"sale, new, sale\", mapOf(\"sale\" to 2, \"new\" to 1)) { tagCounts(listOf(\"sale\", \"new\", \"sale\")) }\n    Check.eq(\"один тег\", mapOf(\"hit\" to 1)) { tagCounts(listOf(\"hit\")) }\n    Check.eq(\"пустой список\", emptyMap<String, Int>()) { tagCounts(emptyList()) }\n    Check.eq(\"регистр важен\", mapOf(\"New\" to 1, \"new\" to 2)) { tagCounts(listOf(\"New\", \"new\", \"new\")) }\n}",
+    "requirements": [
+     {
+      "input": "обходит теги",
+      "expected": {
+       "regex": "for\\s*\\(|forEach|groupingBy"
+      }
+     },
+     {
+      "input": "учитывает, что ключа ещё нет",
+      "expected": {
+       "regex": "\\?:|getOrDefault|getOrPut|groupingBy|merge"
+      }
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "counts[tag] + 1 не скомпилируется: counts[tag] имеет тип Int? — для нового тега там null. ?: 0 подставляет ноль. Встроенный способ в одну строку — tags.groupingBy { it }.eachCount().",
+   "hints": [
+    "for (tag in tags)",
+    "counts[tag] = (counts[tag] ?: 0) + 1"
+   ]
+  },
+  {
+   "task_id": "kt-collections-02",
+   "topic_id": "kt-collections",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Списки и словари",
+   "story": "Гена: «Прежде чем писать склад, проверь, как ведут себя коллекции Kotlin.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "fun main() {\n    val cart = mutableListOf(\"лампа\", \"стол\")\n    cart.add(\"стул\")\n    cart.add(0, \"полка\")\n    println(\"${cart.size} ${cart[1]} ${cart.last()}\")\n    println(cart.getOrNull(10) ?: \"нет\")\n    val stock = mutableMapOf(\"лампа\" to 3)\n    stock[\"лампа\"] = 5\n    println(\"${stock[\"лампа\"]} ${stock[\"шкаф\"]} ${stock[\"шкаф\"] ?: 0}\")\n    println(\"шкаф\" in stock)\n    val prices = listOf(500, 1500, 999)\n    println(\"${prices.sum()} ${prices.max()}\")\n    println(prices.filter { it < 1000 })\n    println(prices.map { it * 2 })\n}",
+    "language": "kotlin",
+    "output": "4 лампа стул\nнет\n5 null 0\nfalse\n2999 1500\n[500, 999]\n[1000, 3000, 1998]"
+   },
+   "explanation": "add(0, …) вставляет в начало: полка, лампа, стол, стул — 4 элемента, под индексом 1 «лампа». getOrNull за границей даёт null, и ?: подставляет «нет». Запись по тому же ключу заменяет значение, отсутствующий ключ даёт null. in у словаря проверяет ключи. filter оставляет подходящие, map превращает каждый элемент.",
+   "hints": [
+    "add(0, x) вставляет в начало.",
+    "map[ключ] без ключа — null."
+   ]
+  },
+  {
+   "task_id": "kt-collections-03",
+   "topic_id": "kt-collections",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Цены из справочника",
+   "story": "Гена: «Справочник цен почти готов. Заполни пропуски.»",
+   "content": {
+    "question": "Заполни пропуски: создание словаря, обход пар и значение по умолчанию.",
+    "code": "fun main() {\n    val prices = [[1]](\"лампа\" to 1990, \"стол\" to 7500)\n    for ((name, price) [[2]] prices) {\n        println(\"$name: $price\")\n    }\n    println(prices[\"шкаф\"] [[3]] \"нет в продаже\")\n    println(prices.values.sum())\n}",
+    "blanks": [
+     {
+      "answer": [
+       "mapOf",
+       "mutableMapOf",
+       "linkedMapOf"
+      ]
+     },
+     {
+      "answer": [
+       "in"
+      ]
+     },
+     {
+      "answer": [
+       "?:"
+      ]
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "mapOf(ключ to значение) создаёт словарь только для чтения. for ((ключ, значение) in словарь) обходит пары, раскладывая их на две переменные. prices[\"шкаф\"] — null, и ?: возвращает правую часть. values.sum() складывает цены: 9490.",
+   "hints": [
+    "Пары в словаре создаёт to.",
+    "Значение вместо null — оператор «элвис»."
+   ]
+  },
+  {
+   "task_id": "kt-collections-04",
+   "topic_id": "kt-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товары по бюджету",
+   "story": "Стас: «Покупатель ввёл бюджет. Оставь цены, которые в него укладываются, в том же порядке.»",
+   "content": {
+    "question": "Напиши affordable(prices: List<Int>, budget: Int): List<Int> — цены не дороже бюджета, в исходном порядке.",
+    "entry": "affordable",
+    "code": "// цены, которые укладываются в бюджет\nfun affordable(prices: List<Int>, budget: Int): List<Int> {\n    return emptyList()\n}\n\nfun main() {\n    println(affordable(listOf(500, 1500, 999, 2000), 1000))\n}",
+    "correct_answer": "// цены, которые укладываются в бюджет\nfun affordable(prices: List<Int>, budget: Int): List<Int> {\n    return prices.filter { it <= budget }\n}\n\nfun main() {\n    println(affordable(listOf(500, 1500, 999, 2000), 1000))\n}",
+    "tests_code": "fun tests() {\n    Check.eq(\"бюджет 1000\", listOf(500, 999)) { affordable(listOf(500, 1500, 999, 2000), 1000) }\n    Check.eq(\"ровно бюджет\", listOf(1000)) { affordable(listOf(1000, 1001), 1000) }\n    Check.eq(\"всё дорого\", emptyList<Int>()) { affordable(listOf(3000, 4000), 100) }\n    Check.eq(\"пустой список\", emptyList<Int>()) { affordable(emptyList(), 500) }\n}",
+    "requirements": [
+     {
+      "input": "сравнивает цену с бюджетом",
+      "expected": {
+       "regex": "<=\\s*budget|budget\\s*>="
+      }
+     },
+     {
+      "input": "отбирает подходящие цены",
+      "expected": {
+       "regex": "\\.filter|\\.add\\(|\\+="
+      }
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "filter { it <= budget } возвращает новый список из подходящих элементов в исходном порядке; it — текущая цена. То же можно написать циклом с mutableListOf и add. Граница «не дороже» — это <=.",
+   "hints": [
+    "prices.filter { … }",
+    "it <= budget"
+   ]
+  },
+  {
+   "task_id": "kt-collections-05",
+   "topic_id": "kt-collections",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Шкаф роняет сервис",
+   "story": "Ира: «Проверка наличия падает с NullPointerException, когда спрашивают товар, которого нет в справочнике. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "fun inStock(stock: Map<String, Int>, item: String): Boolean {\n    val qty = stock[item]!!\n    return qty > 0\n}\n\nfun main() {\n    val stock = mapOf(\"лампа\" to 3, \"стол\" to 0)\n    println(inStock(stock, \"лампа\"))\n    println(inStock(stock, \"шкаф\"))\n}",
+    "bug_line": 2,
+    "options": [
+     "Для товара не из справочника stock[item] — null, а !! превращает null в NullPointerException; нужно stock[item] ?: 0",
+     "Словарь mapOf нельзя читать по ключу",
+     "qty > 0 не работает с Int",
+     "Функция должна возвращать Int"
+    ],
+    "correct_answer": 0,
+    "language": "kotlin"
+   },
+   "explanation": "stock[item] возвращает Int? — для «шкафа» это null. !! означает «я уверен, что тут не null» и бросает NullPointerException, если это не так. Отсутствующий товар — обычная ситуация, её обрабатывают: val qty = stock[item] ?: 0.",
+   "hints": [
+    "Что вернёт stock[\"шкаф\"]?",
+    "Вместо !! — ?: 0."
+   ]
+  },
+  {
+   "task_id": "kt-functions-01",
+   "topic_id": "kt-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Инициалы в карточке",
+   "story": "Гена: «В карточке сотрудника нужны инициалы: из „Гена Петров“ — „Г. П.“. Сделай это функцией-расширением строки — имена приходят как попало.»",
+   "content": {
+    "question": "Допиши расширение String.initials(): String — первые буквы имени и фамилии заглавными, через точку и пробел: «Г. П.». Лишние пробелы бывают.",
+    "entry": "initials",
+    "code": "// \"Гена Петров\" -> \"Г. П.\"\nfun String.initials(): String {\n    return \"\"\n}\n\nfun main() {\n    println(\"Гена Петров\".initials())\n}",
+    "correct_answer": "// \"Гена Петров\" -> \"Г. П.\"\nfun String.initials(): String {\n    val parts = trim().split(\" \").filter { it.isNotEmpty() }\n    val first = parts[0].first().uppercaseChar()\n    val last = parts[1].first().uppercaseChar()\n    return \"$first. $last.\"\n}\n\nfun main() {\n    println(\"Гена Петров\".initials())\n}",
+    "tests_code": "fun tests() {\n    Check.eq(\"Гена Петров\", \"Г. П.\") { \"Гена Петров\".initials() }\n    Check.eq(\"строчные буквы\", \"И. С.\") { \"ира смирнова\".initials() }\n    Check.eq(\"лишние пробелы\", \"С. В.\") { \"  Стас   Волков \".initials() }\n}",
+    "requirements": [
+     {
+      "input": "делает букву заглавной",
+      "expected": {
+       "regex": "uppercase|titlecase"
+      }
+     },
+     {
+      "input": "справляется с лишними пробелами",
+      "expected": {
+       "regex": "trim|isNotEmpty|isNotBlank|Regex|isBlank"
+      }
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "Внутри расширения this — сама строка, поэтому trim() и split(\" \") вызываются без имени. split по одному пробелу оставляет пустые кусочки между двойными пробелами — их убирает filter { it.isNotEmpty() }. first() — первый символ, uppercaseChar() делает его заглавным, кириллицу Kotlin понимает.",
+   "hints": [
+    "trim().split(\" \").filter { it.isNotEmpty() }",
+    "parts[0].first().uppercaseChar()"
+   ]
+  },
+  {
+   "task_id": "kt-functions-02",
+   "topic_id": "kt-functions",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Аргументы, null и лямбды",
+   "story": "Гена: «Проверь себя: именованные аргументы, ?. и let. Что напечатает код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "fun price(rub: Int, currency: String = \"₽\") = \"$rub $currency\"\nfun String?.orDash() = this ?: \"—\"\n\nfun main() {\n    println(price(500))\n    println(price(currency = \"$\", rub = 7))\n    val nick: String? = null\n    println(nick?.length)\n    println(nick?.length ?: 0)\n    println(nick.orDash())\n    nick?.let { println(\"ник: $it\") }\n    val name: String? = \"Гена\"\n    name?.let { println(\"имя: $it, ${it.length} буквы\") }\n    val double = { n: Int -> n * 2 }\n    println(listOf(1, 2, 3).map(double))\n    println(\"4x\".toIntOrNull() ?: -1)\n}",
+    "language": "kotlin",
+    "output": "500 ₽\n7 $\nnull\n0\n—\nимя: Гена, 4 буквы\n[2, 4, 6]\n-1"
+   },
+   "explanation": "Параметр currency по умолчанию «₽»; именованные аргументы можно передавать в любом порядке. nick?.length при null даёт null, а ?: подставляет 0. Расширение на String? можно вызывать и у null — внутри this == null. let выполняется только для не-null, поэтому «ник» не печатается. Лямбду можно положить в переменную и передать в map. \"4x\".toIntOrNull() — null.",
+   "hints": [
+    "?. при null возвращает null, а не падает.",
+    "?.let { } пропускается, если слева null."
+   ]
+  },
+  {
+   "task_id": "kt-functions-03",
+   "topic_id": "kt-functions",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма дорогих позиций",
+   "story": "Гена: «Собери функцию-расширение списка — пригодится в отчёте по дорогим товарам.»",
+   "content": {
+    "question": "Собери расширение List<Int>.totalAbove(limit: Int): Int — сумму цен дороже limit.",
+    "lines": [
+     "fun List<Int>.totalAbove(limit: Int): Int {",
+     "    var sum = 0",
+     "    for (p in this) {",
+     "        if (p > limit) sum += p",
+     "    }",
+     "    return sum",
+     "}"
+    ],
+    "distractors": [
+     "    val sum = 0",
+     "    for (p in it) {"
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "В расширении сам список — это this, поэтому for (p in this). Сумма меняется в цикле, значит var: с val будет ошибка «val cannot be reassigned». it существует только внутри лямбды с одним параметром, а здесь обычная функция.",
+   "hints": [
+    "Список внутри расширения — this.",
+    "Сумма меняется — нужен var."
+   ]
+  },
+  {
+   "task_id": "kt-functions-04",
+   "topic_id": "kt-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Сумма цифр артикула",
+   "story": "Стас: «Контрольная цифра артикула — сумма его цифр. Артикулы длинные, а минус в начале бывает у возвратов — его не считаем.»",
+   "content": {
+    "question": "Напиши digitSum(n: Long): Int — сумму цифр числа. Знак не учитывается: digitSum(-1990) == 19. Можно рекурсией.",
+    "entry": "digitSum",
+    "code": "import kotlin.math.abs\n\n// сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\nfun digitSum(n: Long): Int {\n    return 0\n}\n\nfun main() {\n    println(digitSum(1990))\n}",
+    "correct_answer": "import kotlin.math.abs\n\n// сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\nfun digitSum(n: Long): Int {\n    val m = abs(n)\n    if (m < 10) return m.toInt()\n    return (m % 10).toInt() + digitSum(m / 10)\n}\n\nfun main() {\n    println(digitSum(1990))\n}",
+    "tests_code": "fun tests() {\n    Check.eq(\"0\", 0) { digitSum(0) }\n    Check.eq(\"7\", 7) { digitSum(7) }\n    Check.eq(\"1990\", 19) { digitSum(1990) }\n    Check.eq(\"123456789\", 45) { digitSum(123456789) }\n    Check.eq(\"возврат -1990\", 19) { digitSum(-1990) }\n    Check.eq(\"длинный 9999999999\", 90) { digitSum(9_999_999_999) }\n}",
+    "requirements": [
+     {
+      "input": "берёт последнюю цифру остатком от деления на 10",
+      "expected": {
+       "regex": "%\\s*10"
+      }
+     },
+     {
+      "input": "отбрасывает последнюю цифру делением на 10",
+      "expected": {
+       "regex": "/\\s*10\\b"
+      }
+     },
+     {
+      "input": "убирает знак",
+      "expected": {
+       "regex": "abs\\s*\\(|absoluteValue|<\\s*0|-\\s*n\\b"
+      }
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "Последняя цифра — m % 10, остальное число — m / 10: у Long, как и у Int, деление целое. Результат операций с Long — тоже Long, поэтому в Int его переводят явно: toInt(). abs() убирает знак. Рекурсия заканчивается, когда осталась одна цифра.",
+   "hints": [
+    "m % 10 — последняя цифра, m / 10 — всё остальное.",
+    "(m % 10).toInt() — Long в Int только явно."
+   ]
+  },
+  {
+   "task_id": "kt-functions-05",
+   "topic_id": "kt-functions",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Не та дорогая цена",
+   "story": "Ира: «Функция должна вернуть первую цену дороже 1000 — это 2000, а возвращает 3000. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "fun firstExpensive(prices: List<Int>, limit: Int): Int? {\n    var found: Int? = null\n    prices.forEach {\n        if (it > limit) {\n            found = it\n            return@forEach\n        }\n    }\n    return found\n}\n\nfun main() {\n    println(firstExpensive(listOf(500, 2000, 3000), 1000))\n}",
+    "bug_line": 6,
+    "options": [
+     "return@forEach завершает только текущий шаг лямбды, как continue, — перебор идёт дальше и found перезаписывается; нужно return it или обычный for",
+     "forEach обходит список с конца",
+     "Переменную found нельзя менять внутри лямбды",
+     "Функция с типом Int? не может вернуть число"
+    ],
+    "correct_answer": 0,
+    "language": "kotlin"
+   },
+   "explanation": "return@forEach — возврат из лямбды, то есть переход к следующему элементу. Перебор продолжается, и found становится 3000. Чтобы остановиться, пишут return it (возврат из всей функции) или обычный цикл for с return. А проще всего — prices.firstOrNull { it > limit }.",
+   "hints": [
+    "Откуда именно возвращает return@forEach?",
+    "prices.firstOrNull { it > limit }"
+   ]
+  },
+  {
+   "task_id": "kt-classes-01",
+   "topic_id": "kt-classes",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Корзина-объект",
+   "story": "Гена: «Хватит считать корзину отдельными функциями — пусть объект Cart сам копит сумму, а снаружи её можно только читать.»",
+   "content": {
+    "question": "Допиши метод add(price: Int, qty: Int) класса Cart — он добавляет к total стоимость позиции.",
+    "entry": "Cart",
+    "code": "class Cart {\n    var total = 0\n        private set\n\n    // добавить позицию: цена × количество\n    fun add(price: Int, qty: Int) {\n    }\n}\n\nfun main() {\n    val cart = Cart()\n    cart.add(1990, 2)\n    cart.add(500, 1)\n    println(cart.total)\n}",
+    "correct_answer": "class Cart {\n    var total = 0\n        private set\n\n    // добавить позицию: цена × количество\n    fun add(price: Int, qty: Int) {\n        total += price * qty\n    }\n}\n\nfun main() {\n    val cart = Cart()\n    cart.add(1990, 2)\n    cart.add(500, 1)\n    println(cart.total)\n}",
+    "tests_code": "fun tests() {\n    Check.eq(\"пустая корзина\", 0) { Cart().total }\n    Check.eq(\"1990 × 2 + 500\", 4480) {\n        val c = Cart()\n        c.add(1990, 2)\n        c.add(500, 1)\n        c.total\n    }\n    Check.eq(\"позиция с количеством 0\", 300) {\n        val c = Cart()\n        c.add(700, 0)\n        c.add(100, 3)\n        c.total\n    }\n    Check.eq(\"у каждой корзины своя сумма\", \"100/10\") {\n        val a = Cart()\n        val b = Cart()\n        a.add(100, 1)\n        b.add(5, 2)\n        \"${a.total}/${b.total}\"\n    }\n}",
+    "requirements": [
+     {
+      "input": "накапливает сумму в свойстве",
+      "expected": {
+       "regex": "total\\s*\\+=|total\\s*=\\s*total\\s*\\+"
+      }
+     },
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "Внутри класса к свойству обращаются просто по имени (this.total — то же самое). private set разрешает менять total только методам класса: снаружи cart.total = 0 не скомпилируется, а читать можно. Каждый Cart() — отдельный объект со своей суммой.",
+   "hints": [
+    "total += price * qty",
+    "Метод меняет свойство своего объекта."
+   ]
+  },
+  {
+   "task_id": "kt-classes-02",
+   "topic_id": "kt-classes",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "data class и object",
+   "story": "Гена: «Почему одни объекты равны, а другие нет, и что печатает data class? Что выведет код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "data class Point(val x: Int, val y: Int)\nclass Box(val w: Int)\n\nobject Counter {\n    var created = 0\n    fun next(): Int {\n        created++\n        return created\n    }\n}\n\nfun main() {\n    val p = Point(1, 2)\n    val p2 = p.copy(x = 10)\n    println(p)\n    println(p2)\n    println(p == Point(1, 2))\n    println(Box(3) == Box(3))\n    val (x, y) = p2\n    println(x + y)\n    Counter.next()\n    Counter.next()\n    println(Counter.created)\n    val a = Box(5)\n    val b = a\n    println(a === b)\n}",
+    "language": "kotlin",
+    "output": "Point(x=1, y=2)\nPoint(x=10, y=2)\ntrue\nfalse\n12\n2\ntrue"
+   },
+   "explanation": "data class сам пишет toString в виде Point(x=1, y=2), сравнение == по значениям и copy — копию с изменёнными полями. У обычного класса == сравнивает ссылки — два разных Box не равны. val (x, y) раскладывает data class на поля: 10 + 2. object — единственный экземпляр, счётчик общий. === — «тот же объект».",
+   "hints": [
+    "data class сравнивается по значениям, обычный класс — по ссылке.",
+    "copy меняет только указанные поля."
+   ]
+  },
+  {
+   "task_id": "kt-classes-03",
+   "topic_id": "kt-classes",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Фигуры для конструктора витрины",
+   "story": "Гена: «Прямоугольник должен выполнять договор Shape и красиво печататься.»",
+   "content": {
+    "question": "Заполни пропуски: реализация интерфейса, переопределение метода и метод превращения в строку.",
+    "code": "interface Shape {\n    fun area(): Double\n}\n\nclass Rect(val w: Double, val h: Double) [[1]] Shape {\n    [[2]] fun area() = w * h\n    override fun [[3]]() = \"Прямоугольник ${w}×${h}\"\n}\n\nfun main() {\n    val r = Rect(2.0, 3.0)\n    println(\"$r: ${r.area()}\")\n}",
+    "blanks": [
+     {
+      "answer": [
+       ":"
+      ]
+     },
+     {
+      "answer": [
+       "override"
+      ]
+     },
+     {
+      "answer": [
+       "toString"
+      ]
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "И наследование, и реализация интерфейса в Kotlin пишутся через двоеточие. Метод из интерфейса реализуют с обязательным словом override. toString — метод, который вызывается при подстановке объекта в строку.",
+   "hints": [
+    "Интерфейс указывают после двоеточия.",
+    "Реализация метода интерфейса — override."
+   ]
+  },
+  {
+   "task_id": "kt-classes-04",
+   "topic_id": "kt-classes",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товар печатает себя сам",
+   "story": "Стас: «В логах вместо товара какое-то Product@1b6d3586. Пусть товар печатается по-человечески.»",
+   "content": {
+    "question": "Переопредели в Product метод toString(): «Лампа — 1990 ₽» (название, пробел, длинное тире, пробел, цена, пробел, ₽).",
+    "entry": "Product",
+    "code": "class Product(val name: String, val price: Int)\n\nfun main() {\n    println(Product(\"Лампа\", 1990))\n}",
+    "correct_answer": "class Product(val name: String, val price: Int) {\n    override fun toString() = \"$name — $price ₽\"\n}\n\nfun main() {\n    println(Product(\"Лампа\", 1990))\n}",
+    "tests_code": "fun tests() {\n    Check.eq(\"Лампа\", \"Лампа — 1990 ₽\") { Product(\"Лампа\", 1990).toString() }\n    Check.eq(\"бесплатный товар\", \"xСтол — 0 ₽\") { \"x\" + Product(\"Стол\", 0) }\n    Check.eq(\"подстановка в строку\", \"Хит: Кресло — 12500 ₽\") {\n        val p = Product(\"Кресло\", 12500)\n        \"Хит: $p\"\n    }\n}",
+    "requirements": [
+     {
+      "input": "переопределяет toString()",
+      "expected": {
+       "regex": "override\\s+fun\\s+toString\\s*\\(\\s*\\)"
+      }
+     },
+     {
+      "input": "добавляет знак ₽",
+      "expected": {
+       "regex": "₽"
+      }
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "println, склейка строк и подстановка $p превращают объект в строку через toString(). По умолчанию это имя класса и хеш — Product@1b6d3586. Метод есть у любого объекта, поэтому свой пишут с override. У data class toString готов сразу, но в другом виде: Product(name=Лампа, price=1990).",
+   "hints": [
+    "override fun toString() = …",
+    "\"$name — $price ₽\""
+   ]
+  },
+  {
+   "task_id": "kt-classes-05",
+   "topic_id": "kt-classes",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Счёт уходит в бесконечность",
+   "story": "Ира: «При пополнении счёта сервис падает со StackOverflowError. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "class Account {\n    var balance = 0\n        set(value) {\n            require(value >= 0) { \"баланс не может быть отрицательным\" }\n            balance = value\n        }\n}\n\nfun main() {\n    val acc = Account()\n    acc.balance = 500\n    println(acc.balance)\n}",
+    "bug_line": 5,
+    "options": [
+     "balance = value внутри сеттера снова вызывает этот же сеттер — бесконечная рекурсия; записывать нужно в field = value",
+     "require нельзя писать в сеттере",
+     "Свойство с сеттером должно быть val",
+     "В сеттер нужно передавать тип: set(value: Int)"
+    ],
+    "correct_answer": 0,
+    "language": "kotlin"
+   },
+   "explanation": "Присваивание свойству всегда идёт через его сеттер — даже внутри самого сеттера. balance = value вызывает set снова и снова, пока не кончится стек. Настоящее хранилище свойства внутри get и set называется field: field = value.",
+   "hints": [
+    "Что вызывает присваивание balance = …?",
+    "Внутри сеттера пишут в field."
+   ]
+  },
+  {
+   "task_id": "kt-errors-01",
+   "topic_id": "kt-errors",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Списание со счёта",
+   "story": "Гена: «Списание должно явно отказывать, а не уводить счёт в минус. В Kotlin для этого есть require и check.»",
+   "content": {
+    "question": "Напиши withdraw(balance: Int, amount: Int): Int — сумма ≤ 0: IllegalArgumentException; сумма больше баланса: IllegalStateException; иначе верни новый баланс.",
+    "entry": "withdraw",
+    "code": "// списание со счёта: новый баланс или исключение\nfun withdraw(balance: Int, amount: Int): Int {\n    return balance - amount\n}\n\nfun main() {\n    println(withdraw(1000, 300))\n}",
+    "correct_answer": "// списание со счёта: новый баланс или исключение\nfun withdraw(balance: Int, amount: Int): Int {\n    require(amount > 0) { \"сумма должна быть больше нуля\" }\n    check(amount <= balance) { \"недостаточно средств: $balance < $amount\" }\n    return balance - amount\n}\n\nfun main() {\n    println(withdraw(1000, 300))\n}",
+    "tests_code": "fun tests() {\n    Check.eq(\"1000 - 300\", 700) { withdraw(1000, 300) }\n    Check.eq(\"списать всё\", 0) { withdraw(500, 500) }\n    Check.throws<IllegalStateException>(\"не хватает денег\") { withdraw(100, 500) }\n    Check.throws<IllegalArgumentException>(\"сумма 0\") { withdraw(100, 0) }\n    Check.throws<IllegalArgumentException>(\"сумма -5\") { withdraw(100, -5) }\n}",
+    "requirements": [
+     {
+      "input": "бросает IllegalArgumentException",
+      "expected": {
+       "regex": "require\\s*\\(|throw\\s+IllegalArgumentException"
+      }
+     },
+     {
+      "input": "бросает IllegalStateException",
+      "expected": {
+       "regex": "check\\s*\\(|throw\\s+IllegalStateException|error\\s*\\("
+      }
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "require(условие) { сообщение } бросает IllegalArgumentException — «мне передали неверный аргумент». check — IllegalStateException — «операция невозможна сейчас». Оба — короткая запись if (…) throw …. Проверки ставят в начало функции.",
+   "hints": [
+    "require(amount > 0) { \"…\" }",
+    "check(amount <= balance) { \"…\" }"
+   ]
+  },
+  {
+   "task_id": "kt-errors-02",
+   "topic_id": "kt-errors",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "finally и toIntOrNull",
+   "story": "Гена: «В разборе порта срабатывает finally, а try почему-то возвращает значение. Что напечатается?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "fun parsePort(s: String): Int {\n    try {\n        println(\"разбираю $s\")\n        return s.toInt()\n    } catch (e: NumberFormatException) {\n        println(\"не число: $s\")\n        return -1\n    } finally {\n        println(\"готово\")\n    }\n}\n\nfun main() {\n    println(parsePort(\"8080\"))\n    println(parsePort(\"80a\"))\n    println(\"80a\".toIntOrNull())\n    val port = try { \"x\".toInt() } catch (e: NumberFormatException) { 8080 }\n    println(port)\n    println(runCatching { \"7\".toInt() * 2 }.getOrDefault(0))\n    println(runCatching { \"семь\".toInt() }.getOrDefault(0))\n}",
+    "language": "kotlin",
+    "output": "разбираю 8080\nготово\n8080\nразбираю 80a\nне число: 80a\nготово\n-1\nnull\n8080\n14\n0"
+   },
+   "explanation": "finally выполняется всегда — даже после return, и значение печатается уже после «готово». «80a» не число — toInt() бросает NumberFormatException, catch возвращает -1. toIntOrNull() вместо исключения даёт null. try — выражение: его значение — последняя строка сработавшего блока. runCatching превращает исключение в результат, getOrDefault даёт запасное значение.",
+   "hints": [
+    "finally срабатывает и после return.",
+    "try { } catch { } можно присвоить переменной."
+   ]
+  },
+  {
+   "task_id": "kt-errors-03",
+   "topic_id": "kt-errors",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Порт с понятной ошибкой",
+   "story": "Гена: «Если в конфиге порт „80a“ или 99999, сервис должен сказать, что именно не так.»",
+   "content": {
+    "question": "Заполни пропуски: чтение числа без исключения, запасная ветка и проверка аргумента.",
+    "code": "fun port(s: String): Int {\n    val n = s.[[1]]() [[2]] throw IllegalArgumentException(\"порт «$s» — не число\")\n    [[3]](n in 1..65535) { \"порт $n вне диапазона\" }\n    return n\n}\n\nfun main() {\n    println(port(\"8080\"))\n}",
+    "blanks": [
+     {
+      "answer": [
+       "toIntOrNull"
+      ]
+     },
+     {
+      "answer": [
+       "?:"
+      ]
+     },
+     {
+      "answer": [
+       "require"
+      ]
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "toIntOrNull() возвращает null вместо исключения. throw — тоже выражение, поэтому его можно поставить справа от ?:. require проверяет аргумент и бросает IllegalArgumentException с сообщением из лямбды.",
+   "hints": [
+    "Чтение числа, которое не бросает исключение, заканчивается на OrNull.",
+    "Проверка аргумента — require."
+   ]
+  },
+  {
+   "task_id": "kt-errors-04",
+   "topic_id": "kt-errors",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Своё исключение для склада",
+   "story": "Гена: «Фронту нужно знать, сколько товара не хватает. Собери класс исключения с данными.»",
+   "content": {
+    "question": "Собери класс StockException: наследник RuntimeException со свойствами want и have, понятным сообщением и вычисляемым свойством missing.",
+    "lines": [
+     "class StockException(",
+     "    val want: Int,",
+     "    val have: Int,",
+     ") : RuntimeException(\"не хватает товара: нужно $want, есть $have\") {",
+     "    val missing: Int",
+     "        get() = want - have",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "class StockException(",
+      "    val have: Int,",
+      "    val want: Int,",
+      ") : RuntimeException(\"не хватает товара: нужно $want, есть $have\") {",
+      "    val missing: Int",
+      "        get() = want - have",
+      "}"
+     ]
+    ],
+    "distractors": [
+     ") extends RuntimeException(\"не хватает товара\") {",
+     "        get() = field - have"
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "Родительский класс указывают после двоеточия и сразу вызывают его конструктор с сообщением — extends в Kotlin нет. val в главном конструкторе объявляют свойства. missing не хранится, а считается при каждом чтении через get(); field тут не нужен — у вычисляемого свойства нет хранилища.",
+   "hints": [
+    "Наследование — через двоеточие.",
+    "Вычисляемое свойство: get() = …"
+   ]
+  },
+  {
+   "task_id": "kt-errors-05",
+   "topic_id": "kt-errors",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Резерв на складе",
+   "story": "Стас: «Если товара не хватает, фронт должен показать, сколько есть. Исключение с данными уже готово — осталось им воспользоваться.»",
+   "content": {
+    "question": "Допиши reserve(have: Int, want: Int): Int — want ≤ 0: IllegalArgumentException; want > have: брось StockException(want, have); иначе верни остаток.",
+    "entry": "reserve",
+    "code": "class StockException(val want: Int, val have: Int) :\n    RuntimeException(\"не хватает товара: нужно $want, есть $have\")\n\n// резерв товара: остаток или исключение\nfun reserve(have: Int, want: Int): Int {\n    return have - want\n}\n\nfun main() {\n    println(reserve(10, 3))\n}",
+    "correct_answer": "class StockException(val want: Int, val have: Int) :\n    RuntimeException(\"не хватает товара: нужно $want, есть $have\")\n\n// резерв товара: остаток или исключение\nfun reserve(have: Int, want: Int): Int {\n    require(want > 0) { \"количество должно быть больше нуля\" }\n    if (want > have) throw StockException(want, have)\n    return have - want\n}\n\nfun main() {\n    println(reserve(10, 3))\n}",
+    "tests_code": "// ловим StockException, чтобы тест увидел его данные\nfun call(have: Int, want: Int): String =\n    try {\n        reserve(have, want).toString()\n    } catch (e: StockException) {\n        \"StockException(want=${e.want}, have=${e.have})\"\n    }\n\nfun tests() {\n    Check.eq(\"резерв 3 из 10\", \"7\") { call(10, 3) }\n    Check.eq(\"забрать всё\", \"0\") { call(4, 4) }\n    Check.eq(\"не хватает: нужно 5, есть 2\", \"StockException(want=5, have=2)\") { call(2, 5) }\n    Check.throws<IllegalArgumentException>(\"количество 0\") { call(10, 0) }\n}",
+    "requirements": [
+     {
+      "input": "проверяет количество ≤ 0",
+      "expected": {
+       "regex": "want\\s*<=\\s*0|want\\s*>\\s*0|want\\s*<\\s*1|want\\s*>=\\s*1"
+      }
+     },
+     {
+      "input": "бросает StockException с данными",
+      "expected": {
+       "regex": "throw\\s+StockException\\s*\\("
+      }
+     }
+    ],
+    "language": "kotlin"
+   },
+   "explanation": "Своё исключение несёт данные: фронт ловит StockException и показывает «есть только 2» из e.have. new в Kotlin не пишут: throw StockException(want, have). Неверное количество — ошибка вызывающего кода, для неё хватает require.",
+   "hints": [
+    "throw StockException(want, have)",
+    "Проверку want > 0 поставь первой."
+   ]
+  }
+ ]
+}

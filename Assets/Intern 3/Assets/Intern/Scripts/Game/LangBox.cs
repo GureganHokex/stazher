@@ -22,6 +22,8 @@ namespace Intern.Game
         public string testShow, runShow; // что показать игроку в терминале вместо полной команды
         public string testMarker;        // без этого в файле тестов задача считается сломанной (selftest)
         public string dockerfile;        // образ не скачивается, а собирается игрой из этого Dockerfile (docker build)
+        public int slowSec;              // добавка к времени на запуск и тесты: у компиляторов на JVM долгий старт
+        public int RunSec { get { return LangBox.RunTimeoutSec + slowSec; } }
         public string[] env = new string[0];
         public Dictionary<string, string> extraFiles = new Dictionary<string, string>();
     }
@@ -143,8 +145,118 @@ namespace Intern.Game
             extraFiles = new Dictionary<string, string> { { "check.php", CheckPhp }, { "stazher-tests.php", PhpTestsRunner }, { "stazher-php.sh", PhpScript } },
         };
 
-        public static LangSpec For(string lang) { return lang == "go" ? Go : lang == "java" ? Java : lang == "csharp" ? CSharp : lang == "cpp" ? Cpp : lang == "rust" ? Rust : lang == "php" ? Php : null; }
-        public static IEnumerable<LangSpec> All { get { yield return Go; yield return Java; yield return CSharp; yield return Cpp; yield return Rust; yield return Php; } }
+        // Спринт 17: Kotlin. Образа с kotlinc нет — игра собирает свой поверх eclipse-temurin:21-jdk-alpine (он уже скачан для Java)
+        // и готовит архив классов компилятора (CDS): сборка около 3 с вместо 8
+        public static readonly LangSpec Kotlin = new LangSpec
+        {
+            id = "kotlin", name = "Kotlin", image = "stazher/kotlin:1", container = "stazher-kotlin", dockerfile = KtDockerfile,
+            src = "Main.kt", test = "Tests.kt", parser = "check", size = "около 850 МБ", slowSec = 15,
+            runCmd = "sh stazher-kt.sh run", testCmd = "sh stazher-kt.sh test",
+            testShow = "kotlinc Main.kt Tests.kt -d out && kotlin -cp out StazherTests", runShow = "kotlinc Main.kt -d out && kotlin -cp out MainKt", testMarker = "Check.",
+            env = new[] { "LANG=C.UTF-8" },
+            extraFiles = new Dictionary<string, string> { { "Check.kt", CheckKt }, { "stazher-kt.sh", KtScript } },
+        };
+
+        public static LangSpec For(string lang) { return lang == "go" ? Go : lang == "java" ? Java : lang == "csharp" ? CSharp : lang == "cpp" ? Cpp : lang == "rust" ? Rust : lang == "php" ? Php : lang == "kotlin" ? Kotlin : null; }
+        public static IEnumerable<LangSpec> All { get { yield return Go; yield return Java; yield return CSharp; yield return Cpp; yield return Rust; yield return Php; yield return Kotlin; } }
+
+        // Tools/s17/Check.kt — набор проверок для Tests.kt и точка входа тестов
+        public const string CheckKt =
+            "// Проверки «Стажёра» для задач на Kotlin: каждая проверка печатает строку ##TEST|имя|PASS или ##TEST|имя|FAIL|почему.\n" +
+            "// Исключение в проверяемом коде ловится внутри проверки — остальные тесты всё равно выполнятся.\n" +
+            "object Check {\n" +
+            "    // Check.eq(\"имя\", ожидаемое) { код }\n" +
+            "    fun eq(name: String, want: Any?, got: () -> Any?) {\n" +
+            "        val g = try { got() } catch (e: Throwable) { fail(name, \"исключение \" + describe(e)); return }\n" +
+            "        if (same(g, want)) pass(name) else fail(name, \"получено ${show(g)}, ожидалось ${show(want)}\")\n" +
+            "    }\n" +
+            "\n" +
+            "    // Check.near(\"имя\", 2.25) { f(1.5) } — дробные сравниваются с допуском\n" +
+            "    fun near(name: String, want: Double, got: () -> Double) {\n" +
+            "        val g = try { got() } catch (e: Throwable) { fail(name, \"исключение \" + describe(e)); return }\n" +
+            "        if (Math.abs(g - want) < 1e-9) pass(name) else fail(name, \"получено $g, ожидалось $want\")\n" +
+            "    }\n" +
+            "\n" +
+            "    // Check.throws<IllegalArgumentException>(\"имя\") { f(-1) }\n" +
+            "    inline fun <reified T : Throwable> throws(name: String, noinline f: () -> Any?) = throwsOf(name, T::class.java, f)\n" +
+            "\n" +
+            "    fun throwsOf(name: String, type: Class<out Throwable>, f: () -> Any?) {\n" +
+            "        try { f(); fail(name, \"исключения не было, ожидалось ${type.simpleName}\") }\n" +
+            "        catch (e: Throwable) {\n" +
+            "            if (type.isInstance(e)) pass(name) else fail(name, \"исключение ${describe(e)}, ожидалось ${type.simpleName}\")\n" +
+            "        }\n" +
+            "    }\n" +
+            "\n" +
+            "    private fun same(a: Any?, b: Any?): Boolean {\n" +
+            "        if (a == null || b == null) return a == b\n" +
+            "        if (a is Number && b is Number) {\n" +
+            "            val real = a is Double || a is Float || b is Double || b is Float\n" +
+            "            return if (real) Math.abs(a.toDouble() - b.toDouble()) < 1e-9 else a.toLong() == b.toLong()\n" +
+            "        }\n" +
+            "        if (a is Array<*> && b is Array<*>) return a.contentDeepEquals(b)\n" +
+            "        if (a is IntArray && b is IntArray) return a.contentEquals(b)\n" +
+            "        return a == b\n" +
+            "    }\n" +
+            "\n" +
+            "    private fun show(v: Any?): String = when (v) {\n" +
+            "        null -> \"null\"\n" +
+            "        is String -> \"\\\"$v\\\"\"\n" +
+            "        is Char -> \"'$v'\"\n" +
+            "        is Array<*> -> v.contentDeepToString()\n" +
+            "        is IntArray -> v.contentToString()\n" +
+            "        else -> v.toString()\n" +
+            "    }\n" +
+            "\n" +
+            "    private fun describe(e: Throwable): String {\n" +
+            "        val at = e.stackTrace.firstOrNull { it.fileName == \"Main.kt\" }\n" +
+            "        return \"${e.javaClass.simpleName}: ${e.message}\" + (if (at != null) \" (Main.kt:${at.lineNumber})\" else \"\")\n" +
+            "    }\n" +
+            "\n" +
+            "    private fun clean(s: String) = s.replace(\"|\", \"/\").replace(\"\\r\", \"\").replace(\"\\n\", \" ⏎ \")\n" +
+            "    fun pass(n: String) = println(\"##TEST|${clean(n)}|PASS\")\n" +
+            "    fun fail(n: String, m: String) = println(\"##TEST|${clean(n)}|FAIL|${clean(m)}\")\n" +
+            "}\n" +
+            "\n" +
+            "// Точка входа тестов: запускает tests() из Tests.kt\n" +
+            "object StazherTests {\n" +
+            "    @JvmStatic\n" +
+            "    fun main(args: Array<String>) { tests() }\n" +
+            "}\n";
+
+        // Tools/s17/stazher-kt.sh — kotlinc через java с архивом классов
+        public const string KtScript =
+            "#!/bin/sh\n" +
+            "# «Стажёр»: сборка и запуск Kotlin. kotlinc запускается прямо через java с архивом классов (CDS) — быстрее обычного старта.\n" +
+            "# sh stazher-kt.sh run — Main.kt;  sh stazher-kt.sh test — Main.kt + Tests.kt + Check.kt\n" +
+            "K=${KOTLIN_HOME:-/opt/kotlinc}\n" +
+            "JSA=; [ -f \"$K/kotlinc.jsa\" ] && JSA=\"-XX:SharedArchiveFile=$K/kotlinc.jsa -Xshare:auto -Xlog:cds=off -Xlog:cds+dynamic=off\"\n" +
+            "ENC=\"-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8\"\n" +
+            "rm -rf out && mkdir out || exit 2\n" +
+            "if [ \"$1\" = test ]; then SRC=\"Main.kt Tests.kt Check.kt\"; MAIN=StazherTests; else SRC=\"Main.kt\"; MAIN=MainKt; fi\n" +
+            "java -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xmx512m -Xss4m $JSA $ENC -cp \"$K/lib/kotlin-compiler.jar\" \\\n" +
+            "     org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -kotlin-home \"$K\" -no-reflect -nowarn $SRC -d out 2>out/kotlinc.txt\n" +
+            "if [ $? -ne 0 ]; then cat out/kotlinc.txt >&2; exit 1; fi\n" +
+            "exec java -Xmx256m -Xss8m $ENC -cp \"out:$K/lib/kotlin-stdlib.jar\" $MAIN\n";
+
+        // Tools/s17/Dockerfile — образ JDK 21 + kotlinc, игра собирает его сама
+        public const string KtDockerfile =
+            "# Компилятор Kotlin для «Стажёра»: JDK 21 (тот же, что для Java) + kotlinc. Образ собирает сама игра, один раз.\n" +
+            "FROM eclipse-temurin:21-jdk-alpine\n" +
+            "ARG KOTLIN=2.4.20\n" +
+            "# kotlinc с GitHub JetBrains, запасной путь — официальный пакет JetBrains в npm\n" +
+            "RUN set -e; ok=; \\\n" +
+            "    for i in 1 2 3; do wget -q -O /tmp/k.zip \"https://github.com/JetBrains/kotlin/releases/download/v$KOTLIN/kotlin-compiler-$KOTLIN.zip\" && ok=1 && break; sleep 5; done; \\\n" +
+            "    if [ -n \"$ok\" ]; then unzip -q /tmp/k.zip -d /opt; \\\n" +
+            "    else wget -q -O /tmp/k.tgz \"https://registry.npmjs.org/kotlin-compiler/-/kotlin-compiler-$KOTLIN.tgz\" && tar xzf /tmp/k.tgz -C /tmp && mv /tmp/package /opt/kotlinc; fi; \\\n" +
+            "    rm -f /tmp/k.zip /tmp/k.tgz; test -f /opt/kotlinc/lib/kotlin-compiler.jar\n" +
+            "# архив классов компилятора (CDS): kotlinc стартует примерно втрое быстрее\n" +
+            "RUN mkdir /tmp/w && cd /tmp/w && printf 'fun main() { println(listOf(1, 2).sum()) }\\n' > A.kt \\\n" +
+            " && java -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xmx512m -Xss4m -XX:ArchiveClassesAtExit=/opt/kotlinc/kotlinc.jsa \\\n" +
+            "         -cp /opt/kotlinc/lib/kotlin-compiler.jar org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -kotlin-home /opt/kotlinc -no-reflect A.kt -d out \\\n" +
+            " && cd / && rm -rf /tmp/w\n" +
+            "ENV LANG=C.UTF-8 KOTLIN_HOME=/opt/kotlinc\n" +
+            "WORKDIR /work\n" +
+            "LABEL stazher=1\n";
 
         // Tools/s16/check.php — набор проверок для tests.php
         public const string CheckPhp =
@@ -745,13 +857,13 @@ namespace Intern.Game
             if (rep.setupError != null) return rep;
             WriteFiles(s, id, new Dictionary<string, string> { { s.src, code }, { s.test, testCode } });
             if (note != null) note(s.testShow + "   # в контейнере " + s.image);
-            var r = Exec(s, id, s.testCmd, RunTimeoutSec + 10);
+            var r = Exec(s, id, s.testCmd, s.RunSec + 10);
             rep = s.parser == "check" ? ParseCheck(r.Out, r.Err, s.src, r.TimedOut ? 0 : r.Code) : ParseGoTest(r.Out + "\n" + r.Err, s.src);
             rep.pulled = pulled; rep.ms = r.Ms;
             if (r.TimedOut && !rep.buildFailed)
             {
                 rep.timedOut = true;
-                rep.results.Add(new CheckResult { Passed = false, InputsText = "время", Note = "Тесты не уложились в " + (RunTimeoutSec + 10) + " с — похоже на бесконечный цикл (или программе не хватило памяти)." });
+                rep.results.Add(new CheckResult { Passed = false, InputsText = "время", Note = "Тесты не уложились в " + (s.RunSec + 10) + " с — похоже на бесконечный цикл (или программе не хватило памяти)." });
             }
             if (rep.results.Count == 0 && rep.setupError == null)
                 rep.results.Add(new CheckResult { Passed = false, InputsText = "тесты", Note = "Тесты не запустились: " + FirstLine(r.Text) });
@@ -765,7 +877,7 @@ namespace Intern.Game
             res.setupError = Prepare(s, note, out pulled); res.pulled = pulled;
             if (res.setupError != null) return res;
             WriteFiles(s, id, new Dictionary<string, string> { { s.src, code } });
-            var r = Exec(s, id, s.runCmd, RunTimeoutSec);
+            var r = Exec(s, id, s.runCmd, s.RunSec);
             res.code = r.Code; res.timedOut = r.TimedOut; res.ms = r.Ms;
             string outp = r.Out + (r.Err.Length > 0 ? (r.Out.Length > 0 && !r.Out.EndsWith("\n") ? "\n" : "") + r.Err : "");
             if (outp.Length > MaxOutput) outp = outp.Substring(0, MaxOutput) + "\n… вывод обрезан …";
@@ -875,10 +987,11 @@ namespace Intern.Game
         // ---------- разбор ##TEST (Java, C# и дальше) ----------
         static readonly Regex JavacErr = new Regex(@"^(\w+\.java):(\d+): error: (.*)$");
         static readonly Regex CscErr = new Regex(@"^(\w+\.cs)\((\d+),(\d+)\): error (CS\d+): (.*)$");
-        static readonly Regex SrcAt = new Regex(@"\((\w+\.(?:java|cs|rs|php)):(\d+)\)");   // (Main.java:4), (Program.cs:5) — из Check и трассировок Java
+        static readonly Regex SrcAt = new Regex(@"\((\w+\.(?:java|cs|rs|php|kt)):(\d+)\)");   // (Main.java:4), (Program.cs:5) — из Check и трассировок Java
         static readonly Regex CsAt = new Regex(@"(\w+\.cs):line (\d+)");            // трассировка .NET: in /work/…/Program.cs:line 5
         static readonly Regex GppErr = new Regex(@"^(\w+\.(?:cpp|hpp|h)):(\d+):(\d+): (?:fatal )?error: (.*?)(?: \[-(?:Werror=[\w-]+|fpermissive)\])?$");
         static readonly Regex CppAt = new Regex(@"(?:^|[/\s])(\w+\.cpp):(\d+)");          // кадр трассировки санитайзера: …/main.cpp:6
+        static readonly Regex KtErr = new Regex(@"^(\w+\.kt):(\d+):(\d+): error: (.*?)\.?$");
         static readonly Regex PhpParse = new Regex(@"^(?:PHP )?Parse error:\s+(.*) in (?:.*/)?(\w+\.php) on line (\d+)$");
         static readonly Regex PhpUncaught = new Regex(@"(?:PHP )?Fatal error:\s+Uncaught (\S+?): (.*?) in (?:.*/)?(\w+\.php):(\d+)");
         static readonly Regex PhpFatal = new Regex(@"(?:PHP )?Fatal error:\s+(.*) in (?:.*/)?(\w+\.php) on line (\d+)");
@@ -899,6 +1012,8 @@ namespace Intern.Game
             for (int i = 0; i < lines.Length; i++)
             {
                 string l = lines[i].Trim();
+                var km = KtErr.Match(l);
+                if (km.Success) { list.Add(new CompileError { file = km.Groups[1].Value, line = int.Parse(km.Groups[2].Value), text = Explain(km.Groups[4].Value) }); continue; }
                 var pm = PhpParse.Match(l);
                 if (pm.Success) { list.Add(new CompileError { file = pm.Groups[2].Value, line = int.Parse(pm.Groups[3].Value), text = Explain(pm.Groups[1].Value) }); continue; }
                 var rm = RustErr.Match(lines[i]);
@@ -1122,7 +1237,7 @@ namespace Intern.Game
         public static int ErrorLine(string stderr, string srcName, out string msg)
         {
             msg = null;
-            if (srcName.EndsWith(".java") || srcName.EndsWith(".cs") || srcName.EndsWith(".cpp") || srcName.EndsWith(".rs") || srcName.EndsWith(".php"))
+            if (srcName.EndsWith(".java") || srcName.EndsWith(".cs") || srcName.EndsWith(".cpp") || srcName.EndsWith(".rs") || srcName.EndsWith(".php") || srcName.EndsWith(".kt"))
             {
                 var ce = CompileErrors(stderr).FirstOrDefault(e => e.file == srcName);
                 if (ce != null) { msg = "Ошибка компиляции в строке " + ce.line + ": " + ce.text; return ce.line; }
@@ -1157,6 +1272,17 @@ namespace Intern.Game
             if ((m = Regex.Match(e, "^\"([^\"]+)\" imported and not used$")).Success) return "пакет " + m.Groups[1].Value + " импортирован, но не используется (" + e + ")";
             if ((m = Regex.Match(e, @"^undefined: (\S+)$")).Success) return m.Groups[1].Value + " не объявлено (" + e + ")";
             if (e == "missing return") return "функция должна вернуть значение: не хватает return (" + e + ")";
+            // kotlinc (Kotlin)
+            if ((m = Regex.Match(e, @"^unresolved reference '(\w+)'$")).Success) return "имя " + m.Groups[1].Value + " не найдено: опечатка или не объявлено (" + e + ")";
+            if ((m = Regex.Match(e, @"type mismatch: expected '(.+?)', actual '(.+?)'")).Success) return "не тот тип: ожидался " + m.Groups[1].Value + ", а получен " + m.Groups[2].Value + " (" + e + ")";
+            if ((m = Regex.Match(e, @"type mismatch: actual type is '(.+?)', but '(.+?)' was expected")).Success) return "не тот тип: ожидался " + m.Groups[2].Value + ", а получен " + m.Groups[1].Value + " (" + e + ")";
+            if (e == "'val' cannot be reassigned") return "val нельзя переприсвоить — объяви переменную через var (" + e + ")";
+            if ((m = Regex.Match(e, @"^only safe \(\?\.\) or non-null asserted \(!!\.\) calls are allowed on a nullable receiver of type '(.+?)'")).Success) return "значение типа " + m.Groups[1].Value + " может быть null — используй ?. или проверь на null (" + e + ")";
+            if (e.StartsWith("'when' expression must be exhaustive")) return "when должен разобрать все варианты — добавь ветку else (" + e + ")";
+            if ((m = Regex.Match(e, @"^no value passed for parameter '(\w+)'$")).Success) return "не передан аргумент " + m.Groups[1].Value + " (" + e + ")";
+            if (e.StartsWith("too many arguments for")) return "передано слишком много аргументов (" + e + ")";
+            if (e.StartsWith("none of the following candidates is applicable") || e.StartsWith("none of the following functions can be called")) return "нет подходящей функции для таких аргументов (" + e + ")";
+            if ((m = Regex.Match(e, @"^cannot access '(\w+)': it is private")).Success) return m.Groups[1].Value + " закрыт (private) (" + e + ")";
             // php -l (PHP)
             if ((m = Regex.Match(e, "^syntax error, unexpected (?:token )?\"(.+?)\", expecting \"(.+?)\"$")).Success) return "синтаксическая ошибка: перед «" + m.Groups[1].Value + "» не хватает «" + m.Groups[2].Value + "» (" + e + ")";
             if (e.StartsWith("syntax error, unexpected end of file")) return "файл закончился раньше времени — не закрыта скобка } или кавычка (" + e + ")";
