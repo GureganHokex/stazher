@@ -72,6 +72,8 @@ namespace Intern.Game
 
         // Только для инструментов редактора: построить город (если ещё нет) и включить его, не начиная обед, —
         // чтобы снимать улицы. Возвращает точку появления у бизнес-центра
+        public CityRefs DevCityRefs { get { return city; } }   // только для инструментов редактора
+
         public Vector3 DevCity()
         {
             if (city == null) city = CityBuilder.Build();

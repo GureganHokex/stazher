@@ -473,7 +473,7 @@ namespace Intern.Game
                     var n = h.collider.GetComponentInParent<CityNpc>();
                     if (n != null)
                     {
-                        if (!n.Alive) continue;
+                        if (!n.Alive) { n.Shove(h.point, dir * (10f + ars.Damage(def) * 0.5f)); continue; }   // лежащее тело толкает, пуля летит дальше
                         n.Hit(ars.Damage(def), player.Position, h.point, dir, def.id == "shotgun" ? 0.25f : 0f, 0f);
                         end = h.point;
                         if (--pierce > 0) continue;

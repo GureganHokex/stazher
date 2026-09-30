@@ -351,9 +351,12 @@ namespace Intern.EditorTools
                     case "city": City(); break;
                     case "texts": Texts(); break;
                     case "stats": Stats(); break;
+                    case "rig": RigDump(); break;
+                    case "ragtest": Intern.Game.RagTest.Launch(); break;
                     case "continue":
                         {
                             var gr = EditorApplication.isPlaying ? UnityEngine.Object.FindFirstObjectByType<Intern.Game.GameRoot>() : null;
+                            Intern.Game.Bench.NoSave = true;   // проверки не должны менять сохранение (время, монеты, штрафы Гены)
                             if (gr != null && gr.CurMode == Intern.Game.GameRoot.Mode.Menu) gr.UiContinue();
                             File.WriteAllText(Out, "continue: " + (gr != null ? gr.CurMode.ToString() : "нет игры") + "\n", new UTF8Encoding(false));
                         }
@@ -517,6 +520,30 @@ namespace Intern.EditorTools
                 var byTris = rs.OfType<MeshRenderer>().GroupBy(r => r.name).Select(g => new { g.Key, T = g.Sum(r => TrisOf(r)) }).OrderByDescending(x => x.T).Take(12);
                 sb.AppendLine("  треугольники: всего " + rs.OfType<MeshRenderer>().Sum(r => TrisOf(r)) + "; " + string.Join(", ", byTris.Select(x => x.Key + " " + x.T)));
             }
+            File.WriteAllText(Out, sb.ToString(), new UTF8Encoding(false));
+        }
+
+        // Скелет первого персонажа из модели: кости (без _bind и сеток) — позиции в осях персонажа
+        static void RigDump()
+        {
+            var sb = new StringBuilder("скелет " + DateTime.Now.ToString("HH:mm:ss") + "\n");
+            var anims = UnityEngine.Object.FindObjectsByType<Intern.Game.CharacterAnim>(FindObjectsSortMode.None);
+            var a = anims.FirstOrDefault(x => x.imported && x.rig != null);
+            if (a == null) { File.WriteAllText(Out, sb + "нет персонажа с моделью\n", new UTF8Encoding(false)); return; }
+            sb.AppendLine("модель " + a.model + " на " + PathOf(a.transform));
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            Action<Transform, int> walk = null;
+            walk = (t, d) =>
+            {
+                if (t.name.EndsWith("_bind") || t.GetComponent<Renderer>() != null) return;
+                var p = a.transform.InverseTransformPoint(t.position);
+                var f = Quaternion.Inverse(a.transform.rotation) * t.rotation;
+                sb.AppendLine(new string(' ', d * 2) + t.name + string.Format(ci, "  ({0:0.000}, {1:0.000}, {2:0.000})  rot {3}", p.x, p.y, p.z, f.eulerAngles.ToString("0")));
+                foreach (Transform c in t) walk(c, d + 1);
+            };
+            walk(a.rig, 0);
+            foreach (var smr in a.rig.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                sb.AppendLine("сетка " + smr.name + ": костей " + smr.bones.Length + ", вершин " + (smr.sharedMesh != null ? smr.sharedMesh.vertexCount : 0));
             File.WriteAllText(Out, sb.ToString(), new UTF8Encoding(false));
         }
 

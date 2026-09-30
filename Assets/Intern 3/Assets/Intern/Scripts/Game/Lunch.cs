@@ -313,7 +313,8 @@ namespace Intern.Game
 
         public void Track(GameObject go) { tracked.RemoveAll(g => g == null); tracked.Add(go); }
 
-        public void SetPaused(bool p) { Paused = p; }
+        // Пауза останавливает и физику: падающие тела и выпавшие портфели замирают вместе с игрой
+        public void SetPaused(bool p) { Paused = p; Physics.simulationMode = p ? SimulationMode.Script : SimulationMode.FixedUpdate; }
 
         // Средний FPS и FPS худшего 1% кадров
         public string PerfLine()
@@ -340,8 +341,16 @@ namespace Intern.Game
             if (best != null) best.DebugPlace(at, yaw);
         }
 
+        // Только для инструментов редактора: горожанин нужного вида в точке — стоит и ждёт (проверка падений)
+        public CityNpc DevSpawn(string id, Vector3 at, float yaw)
+        {
+            var def = Balance.Citizen(id); if (def == null) return null;
+            var n = Add(def, at); n.DebugPlace(at, yaw); return n;
+        }
+
         public void Cleanup()
         {
+            Physics.simulationMode = SimulationMode.FixedUpdate;
             foreach (var n in npcs.ToArray()) if (n != null) city.Recycle(n);
             npcs.Clear(); hiddenInArchive.Clear();
             foreach (var g in tracked) if (g != null) UnityEngine.Object.Destroy(g);

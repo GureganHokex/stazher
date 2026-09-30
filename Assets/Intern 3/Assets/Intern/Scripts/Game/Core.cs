@@ -291,8 +291,8 @@ namespace Intern.Game
             try { return JsonUtility.FromJson<SaveData>(PlayerPrefs.GetString(Key)) ?? new SaveData(); }
             catch { return new SaveData(); }
         }
-        public static void Save(SaveData d) { if (Bench.Running) return; PlayerPrefs.SetString(Key, JsonUtility.ToJson(d)); PlayerPrefs.Save(); }
-        public static void Wipe() { if (Bench.Running) return; PlayerPrefs.DeleteKey(Key); }
+        public static void Save(SaveData d) { if (Bench.Running || Bench.NoSave) return; PlayerPrefs.SetString(Key, JsonUtility.ToJson(d)); PlayerPrefs.Save(); }
+        public static void Wipe() { if (Bench.Running || Bench.NoSave) return; PlayerPrefs.DeleteKey(Key); }
 
         public static string Rank(int done, int total)
         {

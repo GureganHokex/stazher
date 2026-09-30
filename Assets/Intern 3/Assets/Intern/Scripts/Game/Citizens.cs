@@ -33,12 +33,14 @@ namespace Intern.Game
         public CharacterAnim Anim { get { return anim; } }
         public bool Recyclable;          // можно вернуть тело в пул (обед заберёт в своём кадре)
         NameTag tag;          // имя над головой — рисует интерфейс (спринт 4 версии 0.9)
+        Ragdoll rag;          // тело после смерти (спринт 5 версии 0.9)
         SpeechBubble bubble;
         St st = St.Walk;
         List<Vector3> path = new List<Vector3>();
         int pi;
         float speed, yaw, idleUntil, nextThink, nextAct, windupAt = -1f, bubbleUntil, curiousUntil, alertEnd, lane, calledAt = -1f, frozenUntil, staggerUntil;
-        Vector3 listenAt, knockVel, fleeDoor;
+        Vector3 listenAt, knockVel, fleeDoor, prevPos, velocity;
+        public Vector3 DevRunVel;        // только для проверки в редакторе: бежит с этой скоростью, ни на что не реагируя
         bool hitOnce, toArchive;
         int scatter;
 
@@ -78,6 +80,7 @@ namespace Intern.Game
             var tagGo = new GameObject("NameTag"); tagGo.transform.SetParent(a.transform, false);
             n.tag = tagGo.AddComponent<NameTag>(); n.tag.Set(label, Pal.Hex(def.humanitarian ? def.color : "89D185"), 2.2f, def.humanitarian);
             n.nextThink = Time.time + (float)rnd.NextDouble() * 0.3f;
+            n.prevPos = a.transform.position;
             n.NewWalk(rnd);
             return n;
         }
@@ -129,8 +132,12 @@ namespace Intern.Game
             {
                 case "lawyer": Look.RBox("Briefcase", hand, new Vector3(0, -0.32f, 0.02f), new Vector3(0.1f, 0.3f, 0.42f), Pal.Hex("6B4226"), 0.03f, false, 0.6f); break;
                 case "notary":
-                    Look.Prim("Stamp", hand, PrimitiveType.Cylinder, new Vector3(0, -0.32f, 0.06f), new Vector3(0.1f, 0.05f, 0.1f), Pal.Hex("C8453A"), false, 0.6f);
-                    Look.Prim("StampGrip", hand, PrimitiveType.Sphere, new Vector3(0, -0.26f, 0.06f), new Vector3(0.07f, 0.07f, 0.07f), Pal.Hex("2B2D42"), false, 0.6f); break;
+                {
+                    var stamp = Look.Prim("Stamp", hand, PrimitiveType.Cylinder, new Vector3(0, -0.32f, 0.06f), new Vector3(0.1f, 0.05f, 0.1f), Pal.Hex("C8453A"), false, 0.6f);
+                    var grip = Look.Prim("StampGrip", hand, PrimitiveType.Sphere, new Vector3(0, -0.26f, 0.06f), new Vector3(0.07f, 0.07f, 0.07f), Pal.Hex("2B2D42"), false, 0.6f);
+                    grip.transform.SetParent(stamp.transform, true);   // падает одним предметом
+                    break;
+                }
                 case "philologist": Look.RBox("Book", hand, new Vector3(0, -0.3f, 0.08f), new Vector3(0.05f, 0.22f, 0.16f), Pal.Hex("7A6FC4"), 0.01f, false, 0.6f); break;
                 case "journalist": Look.RBox("Phone", hand, new Vector3(0, -0.3f, 0.06f), new Vector3(0.02f, 0.14f, 0.075f), Pal.Hex("2B2D42"), 0.01f, false, 0.6f, 0.4f); onChest("Press", new Vector3(0.12f, 0.08f, 0.01f), Pal.Hex("F4F1EA")); break;
                 case "philosopher": Look.Prim("Scroll", hand, PrimitiveType.Cylinder, new Vector3(0, -0.3f, 0.05f), new Vector3(0.06f, 0.12f, 0.06f), Pal.Hex("F2E6C8"), false, 0.6f); break;
@@ -160,8 +167,13 @@ namespace Intern.Game
         void Update()
         {
             if (st == St.Dead || run == null) return;
-            if (run.Paused || Time.time < frozenUntil) { anim.moveSpeed = 0f; return; }
             float dt = Time.deltaTime;
+            if (DevRunVel.sqrMagnitude > 0.01f)
+            {
+                transform.position += DevRunVel * dt; anim.moveSpeed = DevRunVel.magnitude;
+                transform.rotation = Quaternion.LookRotation(new Vector3(DevRunVel.x, 0, DevRunVel.z)); return;
+            }
+            if (run.Paused || Time.time < frozenUntil) { anim.moveSpeed = 0f; return; }
             var me = transform.position; me.y = 0;
             var pl = run.PlayerPos; pl.y = 0;
             float dist = Vector3.Distance(me, pl);
@@ -209,6 +221,16 @@ namespace Intern.Game
                 case St.Preach: PreachTick(pl, dist, dt); break;
             }
             if (calledAt > 0f && Time.time >= calledAt) { calledAt = -1f; run.CallColleague(this); }
+        }
+
+        // Скорость тела за кадр — её унесёт с собой падение на бегу. Считаем после всех перемещений кадра
+        // (Update двигает горожанина с тем же deltaTime), сглаживая рывки
+        void LateUpdate()
+        {
+            if (st == St.Dead) return;
+            float dt = Time.deltaTime;
+            if (dt > 0f) velocity = Vector3.Lerp(velocity, (transform.position - prevPos) / dt, 0.5f);
+            prevPos = transform.position;
         }
 
         // Заметил ли стажёра с оружием
@@ -404,13 +426,13 @@ namespace Intern.Game
             if (run.training) stun = Mathf.Max(stun, 0.7f);   // обучение: после удара чуть замирает
             if (knock > 0f) { var k = dir; k.y = 0; knockVel = k.normalized * knock * 6f; }
             if (stun > 0f) staggerUntil = Time.time + stun;
-            if (hp <= 0) { Die(); return; }
+            if (hp <= 0) { Die(point, dir, damage, knock); return; }
             // раненый реагирует сразу: философ и декан дерутся, остальные по своей схеме
             if (def.id == "philosopher" && st == St.Preach) { st = St.Attack; return; }
             if (Calm || st == St.Alert) React();
         }
 
-        void Die()
+        void Die(Vector3 point, Vector3 dir, int damage, float knock)
         {
             st = St.Dead;
             anim.moveSpeed = 0f; anim.aimGun = false;
@@ -418,11 +440,27 @@ namespace Intern.Game
             if (tag != null) tag.gameObject.SetActive(false);
             if (bubble != null) bubble.Hide();
             run.OnKill(this);
-            StartCoroutine(Fall());
+            // толчок: чем сильнее оружие, тем дальше отбрасывает; бита — сильнее всего и чуть вверх
+            var d = dir.sqrMagnitude > 0.0001f ? dir.normalized : transform.forward * -1f;
+            d.y = Mathf.Max(d.y, knock > 1f ? 0.22f : 0.1f); d.Normalize();
+            float power = Mathf.Clamp(18f + damage * 0.9f, 25f, 100f) + knock * 55f;
+            StartCoroutine(Fall(point, d * power));
         }
 
-        IEnumerator Fall()
+        IEnumerator Fall(Vector3 point, Vector3 impulse)
         {
+            rag = Ragdoll.Make(anim, velocity, point, impulse);
+            if (rag != null)
+            {
+                DropProps(impulse);
+                float t0 = Time.time;
+                while (rag != null && !rag.Frozen && Time.time - t0 < 3f) yield return null;
+                if (rag != null) { var h = rag.HipsPosition; Gore.Pool(new Vector3(h.x, transform.position.y + 0.02f, h.z)); }
+                yield return new WaitForSeconds(18f);
+                if (run != null) Recyclable = true; else Destroy(gameObject);
+                yield break;
+            }
+            // модель без скелета — падает целиком, как раньше
             var start = transform.rotation;
             var end = start * Quaternion.Euler(-88f, 0, 0);   // падает на спину
             for (float t = 0; t < 1f; t += Time.deltaTime / 0.4f)
@@ -441,6 +479,7 @@ namespace Intern.Game
         public void Strip()
         {
             StopAllCoroutines();
+            if (rag != null) { rag.Restore(); DestroyImmediate(rag); rag = null; }
             foreach (var p in props) if (p != null) Destroy(p);
             props.Clear();
             if (tag != null) Destroy(tag.gameObject);
@@ -451,10 +490,44 @@ namespace Intern.Game
             run = null;
         }
 
+        // Предметы из рук (портфель, папка, ноутбук, печать) и шапки при падении летят отдельно
+        void DropProps(Vector3 impulse)
+        {
+            var hand = anim.elbowR;
+            var bodyCols = GetComponentsInChildren<Collider>();
+            foreach (var p in props)
+            {
+                if (p == null) continue;
+                bool inHand = hand != null && p.transform.IsChildOf(hand);
+                bool hat = p.name == "Beret" || p.name == "Helmet" || p.name == "Cap";
+                if (!inHand && !(hat && Random.value < 0.7f)) continue;
+                p.transform.SetParent(city.root, true);
+                Collider col;
+                if (p.GetComponent<MeshFilter>() != null) col = p.AddComponent<BoxCollider>(); else { var sc = p.AddComponent<SphereCollider>(); sc.radius = 0.08f; col = sc; }
+                foreach (var bc in bodyCols) if (bc != null && bc.enabled) Physics.IgnoreCollision(col, bc, true);   // не расталкивать руку, из которой выпал
+                var rb = p.AddComponent<Rigidbody>();
+                rb.mass = inHand ? 1.5f : 0.4f; rb.angularDamping = 0.5f;
+                rb.interpolation = RigidbodyInterpolation.Interpolate; rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                var push = impulse.sqrMagnitude > 0.0001f ? impulse.normalized : Vector3.zero;
+                rb.linearVelocity = velocity * 0.8f + push * (inHand ? 1.2f : 2.2f) + Vector3.up * (inHand ? 1.0f : 1.8f) + Random.insideUnitSphere * 0.5f;
+                rb.angularVelocity = Random.insideUnitSphere * 7f;
+            }
+        }
+
+        // Выстрел по лежащему телу — толкнуть его
+        public void Shove(Vector3 point, Vector3 impulse) { if (rag != null) rag.Shove(point, impulse); }
+
+        // Только для проверки в редакторе: смертельное попадание по направлению dir (knock — как у биты)
+        public void DebugKill(Vector3 dir, float knock)
+        {
+            if (!Alive) return;
+            Hit(hp + 1, transform.position - dir * 5f, transform.position + Vector3.up * 1.25f, dir, knock, 0f);
+        }
+
         // Только для проверки в редакторе: поставить перед игроком и заморозить
         public void DebugPlace(Vector3 at, float yaw)
         {
-            at.y = 0f; transform.position = at; transform.rotation = Quaternion.Euler(0, yaw, 0); this.yaw = yaw;
+            at.y = 0f; transform.position = at; transform.rotation = Quaternion.Euler(0, yaw, 0); this.yaw = yaw; prevPos = at; velocity = Vector3.zero;
             path.Clear(); st = St.Idle; idleUntil = Time.time + 15f; frozenUntil = Time.time + 15f;
         }
     }

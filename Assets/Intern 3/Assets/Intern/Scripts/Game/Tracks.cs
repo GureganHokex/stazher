@@ -146,7 +146,7 @@ namespace Intern.Game
 
         public static void Unmark(string track) { if (Set.Remove(track)) Store(); }
 
-        static void Store() { if (Bench.Running) return; PlayerPrefs.SetString(Key, string.Join(",", Set.ToArray())); PlayerPrefs.Save(); }
+        static void Store() { if (Bench.Running || Bench.NoSave) return; PlayerPrefs.SetString(Key, string.Join(",", Set.ToArray())); PlayerPrefs.Save(); }
     }
 
     // Путь игрока по выбранной профессии: темы в порядке прохождения и все задачи подряд

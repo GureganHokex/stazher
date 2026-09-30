@@ -91,12 +91,66 @@ namespace Intern.Game
             foreach (var line in es) { fail++; sb.AppendLine("FAIL окружение: " + line); }
             foreach (var line in envInfo) sb.AppendLine(line);
             sb.AppendLine("фильтр docker и сценарии: " + (es.Count == 0 ? "проверки прошли" : es.Count + " ошибок"));
+            var rdBad = new List<string>(); var rdInfo = new List<string>();
+            yield return RagdollSim(rdBad, rdInfo);
+            foreach (var line in rdBad) { fail++; sb.AppendLine("FAIL ragdoll: " + line); }
+            foreach (var line in rdInfo) sb.AppendLine(line);
             sb.AppendLine("режимы: " + string.Join(", ", counts.Select(kv => kv.Key + " " + kv.Value).ToArray()));
             sb.AppendLine("итог: " + ok + " ок, " + fail + " ошибок, " + (DateTime.Now - started).TotalSeconds.ToString("0") + " с");
             string file = Path.Combine(Application.persistentDataPath, "selftest.txt");
             File.WriteAllText(file, sb.ToString(), new UTF8Encoding(false));
             Debug.Log("[Стажёр] Самопроверка: " + ok + " ок, " + fail + " ошибок → " + file);
             Application.Quit(fail == 0 ? 0 : 1);
+        }
+
+        // Ragdoll (спринт 5 версии 0.9): горожанин падает с толчком на бегу и замирает; суставы в пределах, тело не под полом,
+        // после возврата в пул кости и сетки как были. Полное тело и упрощённое («Низкое»)
+        IEnumerator RagdollSim(List<string> bad, List<string> info)
+        {
+            if (!ModelLib.HasCharacter("Dev1")) { info.Add("ragdoll: модели Dev1 нет — пропущено"); yield break; }
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            floor.transform.position = new Vector3(1000f, -0.5f, 1000f); floor.transform.localScale = new Vector3(30f, 1f, 30f);   // верх пола — y = 0
+            int savedQ = GameConfig.S.quality;
+            foreach (int q in new[] { 2, 0 })
+            {
+                GameConfig.S.quality = q;
+                var a = CharacterAnim.Spawn("Dev1", null, new Vector3(1000f, 0f, 1000f), 0f, null);
+                a.moveSpeed = 4f;
+                for (int i = 0; i < 5; i++) yield return null;
+                var knee0 = a.kneeL.localRotation;
+                var rd = Ragdoll.Make(a, new Vector3(4f, 0f, 0f), a.torso.position + Vector3.up * 0.3f, new Vector3(0f, 6f, 70f));
+                string tag = q == 0 ? "упрощённое" : "полное";
+                if (rd == null) { bad.Add(tag + ": тело не собралось"); UnityEngine.Object.Destroy(a.gameObject); continue; }
+                float t0 = Time.realtimeSinceStartup;
+                while (!rd.Frozen && Time.realtimeSinceStartup - t0 < 8f) yield return null;
+                if (!rd.Frozen) bad.Add(tag + ": тело не замерло за 8 с");
+                float low = float.MaxValue; bool nan = false;
+                foreach (var c in a.GetComponentsInChildren<Collider>()) { if (!c.enabled) continue; low = Mathf.Min(low, c.bounds.min.y); if (float.IsNaN(c.bounds.center.x)) nan = true; }
+                if (nan) bad.Add(tag + ": NaN в положении частей");
+                if (low < -0.08f) bad.Add(tag + ": часть тела под полом на " + (-low).ToString("0.00") + " м");
+                var hp = a.hips.position; float moved = new Vector2(hp.x - 1000f, hp.z - 1000f).magnitude;
+                if (moved > 6f) bad.Add(tag + ": тело улетело на " + moved.ToString("0.0") + " м");
+                float kneeBend = Bend(a.kneeL), elbowBend = Bend(a.elbowL);
+                if (kneeBend < -4f || kneeBend > 140f) bad.Add(tag + ": колено согнуто на " + kneeBend.ToString("0") + "° (можно 0…135)");
+                if (elbowBend > 4f || elbowBend < -145f) bad.Add(tag + ": локоть согнут на " + elbowBend.ToString("0") + "° (можно −140…0)");
+                int parts = a.GetComponentsInChildren<Rigidbody>().Count(r => r.gameObject != a.gameObject);
+                info.Add("ragdoll " + tag + ": частей " + parts + ", отлетело на " + moved.ToString("0.0") + " м, колено " + kneeBend.ToString("0") + "°, низ " + low.ToString("0.00"));
+                rd.Restore(); UnityEngine.Object.DestroyImmediate(rd);
+                if (a.GetComponentsInChildren<Rigidbody>().Any(r => r.gameObject != a.gameObject) || a.GetComponentsInChildren<Joint>().Length > 0) bad.Add(tag + ": после возврата в пул остались физические части");
+                if (!a.enabled) bad.Add(tag + ": анимация не включилась после возврата");
+                if (Quaternion.Angle(a.kneeL.localRotation, knee0) > 1f) bad.Add(tag + ": поза не вернулась");
+                UnityEngine.Object.Destroy(a.gameObject);
+                yield return null;
+            }
+            GameConfig.S.quality = savedQ;
+            UnityEngine.Object.Destroy(floor);
+        }
+
+        // сгиб кости вокруг её оси X (колено: + назад, локоть: − вперёд)
+        static float Bend(Transform t)
+        {
+            var q = t.localRotation; if (q.w < 0f) { q.x = -q.x; q.w = -q.w; }
+            return Mathf.DeltaAngle(0f, 2f * Mathf.Atan2(q.x, q.w) * Mathf.Rad2Deg);
         }
 
         // Ускоренный рабочий день: часы, штрафы за простой, выговоры, самоволка, прогул, увольнение

@@ -76,7 +76,7 @@ namespace Intern.Game
             if (S.quality < 4) SetQuality(S.quality);   // пресеты могли поменяться с прошлой версии — берём актуальные
         }
 
-        public static void Save() { if (Bench.Running) return; PlayerPrefs.SetString(Key, JsonUtility.ToJson(S)); PlayerPrefs.Save(); }
+        public static void Save() { if (Bench.Running || Bench.NoSave) return; PlayerPrefs.SetString(Key, JsonUtility.ToJson(S)); PlayerPrefs.Save(); }
 
         // Изменили что-то в меню настроек: применить и запомнить
         public static void Commit() { ApplyAll(); Save(); }
