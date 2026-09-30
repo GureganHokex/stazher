@@ -1,5 +1,5 @@
 // Сборка для Windows: меню «Стажёр → Собрать релиз для Windows» (Builds/Stazher-<версия>-win64) и
-// «Стажёр → Сборка для проверки» (версия 0.8.0-dev, Builds/Stazher-0.8.0-dev-<дата>-win64 — не релиз, никуда не выкладывается).
+// «Стажёр → Сборка для проверки» (версия 0.9.0-dev, Builds/Stazher-0.9.0-dev-<дата>-win64 — не релиз, никуда не выкладывается).
 // Выставляет имя игры, студию, версию и иконку и пишет короткий отчёт в Temp/release_build.txt.
 using System;
 using System.IO;
@@ -14,14 +14,14 @@ namespace Intern.EditorTools
 {
     public static class ReleaseBuild
     {
-        public const string Version = "0.7.0";
-        public const string DevVersion = "0.8.0-dev";   // весь бэклог v0.8 — между спринтами только сборки для проверки
+        public const string Version = "0.8.0";
+        public const string DevVersion = "0.9.0-dev";   // следующий бэклог — между спринтами только сборки для проверки
         const string IconPath = "Assets/Intern 3/Assets/Intern/Branding/icon.png";
 
         [MenuItem("Стажёр/Собрать релиз для Windows", false, 1)]
         public static void BuildWindows() { Build(Version, "Stazher-" + Version + "-win64"); }
 
-        [MenuItem("Стажёр/Сборка для проверки (0.8-dev)", false, 3)]
+        [MenuItem("Стажёр/Сборка для проверки (dev)", false, 3)]
         public static void BuildDev() { Build(DevVersion, "Stazher-" + DevVersion + "-" + DateTime.Now.ToString("MMdd-HHmm") + "-win64"); }
 
         static void Build(string version, string folder)

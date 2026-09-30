@@ -1,6 +1,9 @@
 // Инструменты разработки в редакторе (меню «Стажёр»), чтобы работать с проектом без отдельной консоли:
 //  • «Git: коммит и пуш в GitLab» — берёт Temp/commit.txt: сначала пути файлов (по одному в строке), потом строка «---»,
-//    потом сообщение коммита. Добавляет только эти файлы, коммитит и пушит в origin (GitLab). На GitHub не пушит никогда.
+//    потом сообщение коммита. Добавляет только эти файлы, коммитит и пушит в origin (GitLab). На GitHub этот пункт не пушит.
+//  • «Релиз: проверить GitHub» — только чтение: теги на GitHub, есть ли gh и вошёл ли он в аккаунт.
+//  • «Релиз: выложить на GitHub» — по Temp/release.txt (тег, архив, заголовок, «---», текст релиза): тег, пуш main и тега
+//    в remote github и релиз с архивом через gh. Запускать только после решения владельца выпустить релиз.
 //  • «Проверить ветки языков в Docker» — эталоны задач с запуском (Go и дальше) проходят go test, заготовки — нет; итог в Temp/langcheck.txt.
 //  • «Selftest последней сборки» — запускает Builds/Stazher-*-win64/Stazher.exe -selftest в окне и, когда он закончит,
 //    копирует отчёт в Temp/selftest_build.txt.
@@ -223,6 +226,88 @@ namespace Intern.EditorTools
                 }
                 catch (Exception e) { log.AppendLine("ошибка: " + e); }
                 try { File.WriteAllText(outFile, log.ToString(), new UTF8Encoding(false)); } catch (Exception) { }
+            }) { IsBackground = true }.Start();
+        }
+
+        // Команда без окна и без вопросов: git и gh не должны ждать ввода пароля, иначе редактор повиснет
+        static int Cmd(string exe, string args, StringBuilder log, int timeoutMs = 300000)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo(exe, args)
+                {
+                    WorkingDirectory = Root, UseShellExecute = false, CreateNoWindow = true,
+                    RedirectStandardOutput = true, RedirectStandardError = true,
+                    StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8,
+                };
+                psi.EnvironmentVariables["GIT_TERMINAL_PROMPT"] = "0";
+                psi.EnvironmentVariables["GCM_INTERACTIVE"] = "never";
+                psi.EnvironmentVariables["GH_PROMPT_DISABLED"] = "1";
+                using (var p = Process.Start(psi))
+                {
+                    var o = p.StandardOutput.ReadToEndAsync(); var e = p.StandardError.ReadToEndAsync();
+                    if (!p.WaitForExit(timeoutMs)) { try { p.Kill(); } catch (Exception) { } log.AppendLine("$ " + exe + " " + args + "  → таймаут"); return -1; }
+                    log.AppendLine("$ " + exe + " " + args + "  → " + p.ExitCode);
+                    if (o.Result.Length > 0) log.AppendLine(o.Result.TrimEnd());
+                    if (e.Result.Length > 0) log.AppendLine(e.Result.TrimEnd());
+                    return p.ExitCode;
+                }
+            }
+            catch (Exception ex) { log.AppendLine("$ " + exe + " " + args + "  → не запустилось: " + ex.Message); return -2; }
+        }
+
+        const string GitHubRepo = "GureganHokex/stazher";
+
+        [MenuItem("Стажёр/Релиз: проверить GitHub", false, 40)]
+        public static void CheckGitHub()
+        {
+            var log = new StringBuilder("github " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\n");
+            new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    Cmd("git", "ls-remote --tags github", log, 60000);
+                    Cmd("git", "ls-remote github refs/heads/main", log, 60000);
+                    Cmd("git", "rev-parse --short HEAD", log, 10000);
+                    if (Cmd("gh", "--version", log, 20000) == 0)
+                    {
+                        Cmd("gh", "auth status", log, 30000);
+                        Cmd("gh", "release list --repo " + GitHubRepo + " --limit 5", log, 30000);
+                    }
+                }
+                catch (Exception e) { log.AppendLine("ошибка: " + e.Message); }
+                finally { File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false)); }
+            }) { IsBackground = true }.Start();
+        }
+
+        [MenuItem("Стажёр/Релиз: выложить на GitHub", false, 41)]
+        public static void PublishGitHub()
+        {
+            var log = new StringBuilder("release " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\n");
+            string file = Path.Combine(Root, "Temp", "release.txt");
+            if (!File.Exists(file)) { File.WriteAllText(Out, log + "нет Temp/release.txt\n", new UTF8Encoding(false)); return; }
+            var lines = File.ReadAllLines(file, Encoding.UTF8);
+            int sep = Array.IndexOf(lines, "---");
+            if (sep < 3) { File.WriteAllText(Out, log + "Temp/release.txt: тег, архив, заголовок, потом «---» и текст\n", new UTF8Encoding(false)); return; }
+            string tag = lines[0].Trim(), zip = lines[1].Trim(), title = lines[2].Trim();
+            string notes = Path.Combine(Root, "Temp", "release_notes.md");
+            File.WriteAllText(notes, string.Join("\n", lines.Skip(sep + 1).ToArray()).Trim() + "\n", new UTF8Encoding(false));
+            new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    string zipPath = Path.Combine(Root, zip);
+                    if (!File.Exists(zipPath)) { log.AppendLine("нет архива " + zipPath); return; }
+                    log.AppendLine("архив: " + zipPath + ", " + (new FileInfo(zipPath).Length / 1048576.0).ToString("0.0") + " МБ");
+                    if (Cmd("git", "rev-parse -q --verify refs/tags/" + tag, log, 10000) != 0 && Cmd("git", "tag -a " + tag + " -m " + Quote(title), log, 30000) != 0) return;
+                    if (Cmd("git", "push github main", log) != 0) return;
+                    if (Cmd("git", "push github " + tag, log) != 0) return;
+                    if (Cmd("gh", "--version", log, 20000) != 0) { log.AppendLine("gh нет — релиз с архивом нужно создать на сайте GitHub, тег уже там"); return; }
+                    if (Cmd("gh", "release create " + tag + " " + Quote(zipPath) + " --repo " + GitHubRepo + " --verify-tag --title " + Quote(title) + " --notes-file " + Quote(notes), log, 20 * 60000) != 0) return;
+                    Cmd("gh", "release view " + tag + " --repo " + GitHubRepo, log, 30000);
+                }
+                catch (Exception e) { log.AppendLine("ошибка: " + e.Message); }
+                finally { File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false)); }
             }) { IsBackground = true }.Start();
         }
 
