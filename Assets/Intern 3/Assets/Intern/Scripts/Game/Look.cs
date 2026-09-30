@@ -323,7 +323,7 @@ namespace Intern.Game
         // ---------- гладкие модели (настройка «Модели персонажей») ----------
         static readonly HashSet<CharacterAnim> live = new HashSet<CharacterAnim>();
         static int smoothLevel = -1;
-        public int maxSmooth = 2;                     // горожанам хватает «гладких»: их на экране десятки
+        public int maxSmooth = MeshSmooth.MaxLevel;   // горожанам хватает «гладких»: их на экране десятки
         readonly List<KeyValuePair<Component, Mesh>> lowMeshes = new List<KeyValuePair<Component, Mesh>>();
         int smoothShown;
 
@@ -338,7 +338,7 @@ namespace Intern.Game
 
         void ApplySmooth()
         {
-            int lv = Mathf.Min(smoothLevel < 0 ? GameConfig.S.models : smoothLevel, maxSmooth);
+            int lv = Mathf.Min(smoothLevel < 0 ? GameConfig.S.models : smoothLevel, maxSmooth);   // уровень MeshSmooth: 0 как есть, 1 нормали, 2 форма
             if (lv == smoothShown || lowMeshes.Count == 0) return;
             smoothShown = lv;
             foreach (var kv in lowMeshes)

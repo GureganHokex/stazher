@@ -22,7 +22,7 @@ namespace Intern.Game
         public int aa = 3;                  // см. GameConfig.AaNames
         public int shadows = 2;             // 0 выкл, 1 средние, 2 высокие, 3 очень высокие (карта теней 4096)
         public int ao = 2;                  // затенение углов (SSAO): 0 выкл, 1 среднее, 2 высокое
-        public int models = 1;              // модели персонажей: 0 угловатые (low-poly), 1 гладкие, 2 очень гладкие (MeshSmooth)
+        public int models = 1;              // модели персонажей: 0 угловатые (low-poly), 1 гладкие (нормали), 2 очень гладкие (ещё и форма, MeshSmooth)
         public bool post = true;
         public bool screenAnim = true;      // прокрутка кода на мониторах коллег
         // звук

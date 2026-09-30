@@ -12,14 +12,16 @@ namespace Intern.Game
     public static class MeshSmooth
     {
         public const float CreaseAngle = 60f;
-        static readonly Dictionary<Mesh, Mesh>[] cache = { null, new Dictionary<Mesh, Mesh>(), new Dictionary<Mesh, Mesh>() };
+        public const int MaxLevel = 3;
+        static readonly Dictionary<Mesh, Mesh>[] cache = { null, new Dictionary<Mesh, Mesh>(), new Dictionary<Mesh, Mesh>(), new Dictionary<Mesh, Mesh>() };
         static readonly HashSet<Mesh> unreadable = new HashSet<Mesh>();
 
-        // level 0 — исходная сетка; 1 — каждый треугольник на 4; 2 — на 16
+        // level 0 — исходная сетка; 1 — только сглаженные нормали (форма та же, ничего не может вылезти);
+        // 2 — ещё и каждый треугольник на 4 по кривизне; 3 — на 16 (для проверки, в игре не используется)
         public static Mesh Get(Mesh src, int level)
         {
             if (src == null || level <= 0 || src.blendShapeCount > 0) return src;
-            level = Mathf.Min(level, 2);
+            level = Mathf.Min(level, MaxLevel);
             Mesh m;
             if (cache[level].TryGetValue(src, out m) && m != null) return m;
             if (!src.isReadable) { if (unreadable.Add(src)) Debug.LogWarning("[Стажёр] сетка " + src.name + " не читается (Read/Write в импорте FBX) — остаётся угловатой"); return src; }
@@ -44,9 +46,17 @@ namespace Intern.Game
         static Mesh Build(Mesh src, int level)
         {
             var wk = Weld(src);
-            for (int i = 0; i < level; i++) { SmoothNormals(wk); wk = Tessellate(wk); }
+            // уже гладкая сетка (глаза, зрачки): вершины не разрезаны по граням — оставляем как есть
+            if (src.vertexCount < wk.p.Count * 1.3f) return src;
+            // мелкие детали (брови, рты, пуговицы, шнурки): только сглаженные нормали, форму не трогаем —
+            // иначе они уходят под поверхность, на которой лежат
+            int tris = wk.sub.Count;
+            if (tris >= SmallTris)
+                for (int i = 1; i < level; i++) { SmoothNormals(wk); wk = Tessellate(wk); }
             return Output(src, wk, level);
         }
+
+        public const int SmallTris = 240;
 
         static Work Weld(Mesh src)
         {
@@ -114,7 +124,13 @@ namespace Intern.Game
                 int id;
                 if (mids.TryGetValue(key, out id)) return id;
                 Vector3 pa = wk.p[a], pb = wk.p[b], na = wk.n[a], nb = wk.n[b];
-                var m = (pa + pb) * 0.5f - (Vector3.Dot(pb - pa, na) * na + Vector3.Dot(pa - pb, nb) * nb) * 0.125f;
+                var mid = (pa + pb) * 0.5f;
+                // на острых рёбрах (нормали расходятся больше 60°) не выгибаем: там PN дал бы бугорки (большой палец, подошвы, края)
+                float c = Vector3.Dot(na, nb), k = Mathf.Clamp01((c - 0.5f) / 0.3f);
+                var d = -(Vector3.Dot(pb - pa, na) * na + Vector3.Dot(pa - pb, nb) * nb) * 0.125f * k;
+                float lim = (pb - pa).magnitude * 0.15f;
+                if (d.sqrMagnitude > lim * lim) d = d.normalized * lim;
+                var m = mid + d;
                 id = o.p.Count; mids[key] = id;
                 o.p.Add(m); o.uv.Add((wk.uv[a] + wk.uv[b]) * 0.5f); o.w.Add(o.skinned ? Blend(wk.w[a], wk.w[b]) : new BoneWeight());
                 return id;

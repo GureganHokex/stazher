@@ -8,7 +8,7 @@
 //  • «Selftest последней сборки» — запускает Builds/Stazher-*-win64/Stazher.exe -selftest в окне и, когда он закончит,
 //    копирует отчёт в Temp/selftest_build.txt.
 //  • «Графика: замер FPS последней сборки» — Stazher.exe -bench: FPS на каждом пресете и снимки, итог в Temp/bench_build.txt.
-//  • Команды без меню: слово в Temp/devcmd.txt — shots, pose, dump, resume, play, stop, refresh, builddev, selftest, bench, commit.
+//  • Команды без меню: слово в Temp/devcmd.txt — shots, pose, dump, resume, play, stop, refresh, builddev, selftest, bench, commit, gallery.
 // Итог каждой команды — в Temp/devtools.txt.
 using System;
 using System.Collections.Generic;
@@ -343,6 +343,7 @@ namespace Intern.EditorTools
                     case "selftest": SelftestBuild(); break;
                     case "bench": BenchBuild(); break;
                     case "commit": CommitPush(); break;
+                    case "gallery": ModelGallery.Run(); break;
                     default: File.WriteAllText(Out, "devcmd: неизвестная команда «" + cmd + "»\n", new UTF8Encoding(false)); break;
                 }
             };
