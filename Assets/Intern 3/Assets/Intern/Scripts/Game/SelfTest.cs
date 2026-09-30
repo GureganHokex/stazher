@@ -589,6 +589,17 @@ namespace Intern.Game
                 string km; T(LangBox.ErrorLine("Exception in thread \"main\" java.lang.ArrayIndexOutOfBoundsException: Index 5 out of bounds for length 2\n\tat java.base/java.util.Arrays$ArrayList.get(Arrays.java:4266)\n\tat MainKt.main(Main.kt:3)\n\tat MainKt.main(Main.kt)\n", "Main.kt", out km) == 3, "kotlin: исключение при запуске " + km);
                 var kotlin = LangBox.For("kotlin");
                 T(kotlin != null && kotlin.extraFiles["Check.kt"].Contains("##TEST|") && kotlin.extraFiles["stazher-kt.sh"].Contains("K2JVMCompiler") && kotlin.src == "Main.kt" && kotlin.RunSec > LangBox.RunTimeoutSec, "kotlin: раннер и Check.kt");
+                // Swift (спринт 18): swiftc, падения из отчёта swift-backtrace со строкой main.swift
+                var sc1 = LangBox.ParseCheck("", "main.swift:3:12: error: cannot find 'prce' in scope\n    return prce * qty\n           ^~~~\n", "main.swift", 1);
+                T(sc1.buildFailed && sc1.errLine == 3 && sc1.errText.Contains("prce") && sc1.errText.Contains("не найдено"), "swift: имя не найдено " + sc1.errLine + " " + sc1.errText);
+                var sc2 = LangBox.ParseCheck("", "out/main.swift:6:1: error: cannot assign to value: 'x' is a 'let' constant\n", "main.swift", 1);
+                T(sc2.buildFailed && sc2.errLine == 6 && sc2.errText.Contains("var"), "swift: let в тестах " + sc2.errText);
+                var sc3 = LangBox.ParseCheck("3980\n##TEST|1990 × 2|PASS\n", "Swift/ContiguousArrayBuffer.swift:691: Fatal error: Index out of range\n\n*** Program crashed: Illegal instruction at 0x00007de77a6bfd76 ***\n\nThread 0 \"prog\" crashed:\n\n  0      0x00007de77a6bfd76 _assertionFailure(_:_:file:line:flags:) + 438 in libswiftCore.so\n  2 [ra] 0x0000583b711c5e74 at(_:) + 99 in prog at out/main.swift:19:13\n  3 [ra] 0x0000583b711c661a closure #12 in tests() + 25 in prog at /work/.stazher/run/x/tests.swift:13:37\n", "main.swift", 132);
+                T(sc3.results.Count == 2 && sc3.results[0].Passed && !sc3.results[1].Passed && sc3.results[1].Note.Contains("границ") && sc3.errLine == 19, "swift: падение в тестах " + sc3.errLine);
+                string sm; T(LangBox.ErrorLine("\n*** Signal 4: Backtracing from 0x5580b3987dd8... done ***\n\n*** Swift runtime failure: arithmetic overflow ***\n\n  0 [inlined] [system] 0x00005580b3987dd8 Swift runtime failure: arithmetic overflow in prog at //<compiler-generated>\n  1                    0x00005580b3987dd8 add(_:_:) + 88 in prog at /work/.stazher/run/x/main.swift:2:14\n  2 [ra]               0x00005580b3987e9e main + 45 in prog at /work/.stazher/run/x/main.swift:5:7\n", "main.swift", out sm) == 2 && sm.Contains("переполнение"), "swift: переполнение " + sm);
+                T(LangBox.ErrorLine("Stazher/main.swift:4: Fatal error: Unexpectedly found nil while unwrapping an Optional value\n\n*** Program crashed: Illegal instruction at 0x0000702b9969bd76 ***\n", "main.swift", out sm) == 4 && sm.Contains("nil"), "swift: nil в ! " + sm);
+                var swift = LangBox.For("swift");
+                T(swift != null && swift.extraFiles["check.swift"].Contains("##TEST|") && swift.extraFiles["stazher-swift.sh"].Contains("swiftc") && swift.src == "main.swift", "swift: раннер и check.swift");
                 var java = LangBox.For("java");
                 T(java != null && java.extraFiles.ContainsKey("Check.java") && java.extraFiles["Check.java"].Contains("##TEST|") && java.testMarker == "Check.", "java: раннер и Check.java");
             }

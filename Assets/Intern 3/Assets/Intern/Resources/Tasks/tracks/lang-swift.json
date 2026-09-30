@@ -1,0 +1,1157 @@
+{
+ "track": "lang-swift",
+ "roadmap": [
+  {
+   "topic_id": "sw-basics",
+   "lang": "swift",
+   "replaces": [
+    "be-py-basics"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Swift: переменные и типы",
+   "grade": "junior",
+   "requires": [
+    "c-terminal"
+   ],
+   "description": "let и var, Int/Double/String/Bool, интерполяция \\(…), целое деление, явные преобразования Double(x) и Int(x), print.",
+   "theory": "Swift — язык Apple: на нём пишут приложения для iPhone и Mac, а на сервере — бэкенды на Vapor. Программа — это файл main.swift, код в нём выполняется сверху вниз:\n\n    print(\"Привет, Кодзилла!\")\n    let price = 1990\n    print(\"Цена: \\(price) ₽\")              // интерполяция: \\(выражение)\n    print(\"С доставкой: \\(price + 300)\")\n\n• Точка с запятой не нужна.\n• let — константа (переприсвоить нельзя), var — переменная. По умолчанию пишут let.\n• Тип выводится сам, но его можно указать: let qty: Int = 2.\n\nТипы: Int, Double, Bool, Character, String.\n• Swift не смешивает типы сам: Int и Double не складываются, Double(price) / 2 — явно.\n• 7 / 2 == 3 — деление целых; Double(7) / 2 == 3.5.\n• Int(4.9) == 4 — дробная часть отбрасывается.\n• Строку с числом «+» не склеит: \"Итого: \" + String(price) или \"Итого: \\(price)\".\n• count у строки — число символов: у «Лампа» 5.\n• Переполнение Int в Swift — не тихая ошибка, а остановка программы («arithmetic overflow»).\n\nФункции:\n\n    func cartTotal(_ price: Int, _ qty: Int) -> Int {\n        return price * qty\n    }\n    cartTotal(1990, 2)\n\n_ перед именем параметра разрешает вызывать без метки. В настоящем проекте код собирает SwiftPM; игра для скорости вызывает компилятор swiftc напрямую."
+  },
+  {
+   "topic_id": "sw-control",
+   "lang": "swift",
+   "replaces": [
+    "be-py-control"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Swift: условия, switch и циклы",
+   "grade": "junior",
+   "requires": [
+    "sw-basics"
+   ],
+   "description": "if и тернарный оператор, switch с диапазонами и кортежами, диапазоны ... и ..<, stride, циклы for-in и while.",
+   "theory": "Условия:\n\n    if total > 10 {\n        print(\"много\")\n    } else {\n        print(\"мало\")\n    }\n    let kind = total > 10 ? \"много\" : \"мало\"\n\nСкобки вокруг условия не нужны, фигурные — обязательны.\n\nswitch — мощнее, чем в C и Java:\n\n    switch score {\n    case 90...:\n        return \"отлично\"\n    case 75..<90:\n        return \"хорошо\"\n    default:\n        return \"на доработку\"\n    }\n\n• Выполняется первая подходящая ветка, break писать не нужно — в следующую ветку switch сам не проваливается.\n• switch должен разобрать все варианты: для чисел и строк нужен default.\n• В case можно перечислять значения (case 2, 3:), диапазоны и кортежи: switch (n % 3, n % 5) { case (0, 0): … case (0, _): … }.\n\nДиапазоны и циклы:\n\n    for i in 1...10 { … }          // 1, 2, …, 10 — обе границы\n    for i in 0..<10 { … }          // 0, …, 9\n    for i in stride(from: 10, to: 0, by: -2) { … }   // 10, 8, 6, 4, 2\n    for item in list { … }\n    for i in list.indices { … }    // все индексы\n    while total < 100 { … }\n\n• 0...list.count — ловушка: такого индекса нет, программа остановится с «Index out of range».\n• break выходит из цикла, continue переходит к следующему шагу."
+  },
+  {
+   "topic_id": "sw-collections",
+   "lang": "swift",
+   "replaces": [
+    "be-py-collections"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Swift: массивы и словари",
+   "grade": "junior",
+   "requires": [
+    "sw-control"
+   ],
+   "description": "Массивы и словари, let против var, словарь возвращает опционал, default: и ??, filter/map/reduce/sorted.",
+   "theory": "Массив и словарь, объявленные через let, менять нельзя; через var — можно:\n\n    var cart = [\"лампа\", \"стол\"]\n    cart.append(\"стул\")\n    cart.insert(\"полка\", at: 0)\n    cart.count; cart[1]; cart.first; cart.last\n\n    var stock = [\"лампа\": 3]\n    stock[\"лампа\"] = 5\n    stock[\"шкаф\"]                     // nil — такого ключа нет\n    stock[\"шкаф\"] ?? 0                // ?? — значение, если слева nil\n    stock[\"шкаф\", default: 0] += 1    // счётчик: нет ключа — начать с 0\n\n• Словарь по ключу возвращает опционал Int? — «число или nil». print(stock[\"лампа\"]) напечатает Optional(5).\n• ! достаёт значение из опционала, а если там nil — программа падает. Обычно лучше ??.\n• Порядок ключей в словаре не определён: для вывода сортируют — stock.keys.sorted().\n\nОперации над коллекциями ($0 — текущий элемент):\n\n    prices.filter { $0 < 1000 }\n    prices.map { $0 * 2 }\n    prices.reduce(0, +)              // сумма\n    prices.max()                     // опционал: у пустого массива максимума нет\n    prices.sorted()\n    for (name, qty) in stock { … }\n\nМассивы и словари в Swift — значения: var copy = cart создаёт копию, изменения копии не видны в cart."
+  },
+  {
+   "topic_id": "sw-functions",
+   "lang": "swift",
+   "replaces": [
+    "be-py-functions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Swift: функции и опционалы",
+   "grade": "junior",
+   "requires": [
+    "sw-collections"
+   ],
+   "description": "Метки аргументов и значения по умолчанию, замыкания, опционалы: if let, guard let, ?., ??, и почему ! опасен.",
+   "theory": "Функции:\n\n    func price(_ rub: Int, currency: String = \"₽\") -> String {\n        return \"\\(rub) \\(currency)\"\n    }\n    price(500)                    // \"500 ₽\"\n    price(7, currency: \"$\")       // метка currency: пишется при вызове\n\n• Метка по умолчанию совпадает с именем параметра; _ убирает её.\n• Параметры внутри функции — константы, менять их нельзя.\n\nЗамыкание — функция в фигурных скобках: { (n: Int) in n * 2 }. Если оно последний аргумент, его пишут после скобок: list.filter { $0 > 0 }.\n\nОпционалы — главная защита Swift от «пустых» значений:\n\n    let nick: String? = nil          // ? — может быть nil\n    nick.count                        // ошибка компиляции\n    nick?.count                       // nil, если nick — nil\n    nick?.count ?? 0                  // 0, если nil\n    if let nick { print(nick) }       // выполнить, только если не nil\n    guard let n = Int(text) else { return 0 }   // выйти, если nil\n\n• Int(\"42\") возвращает Int? — строка может оказаться не числом.\n• return внутри замыкания forEach выходит только из замыкания, а не из функции (работает как continue)."
+  },
+  {
+   "topic_id": "sw-types",
+   "lang": "swift",
+   "replaces": [
+    "be-py-oop"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Swift: struct, class и протоколы",
+   "grade": "junior",
+   "requires": [
+    "sw-functions"
+   ],
+   "description": "struct — значение, class — ссылка, mutating, private(set), протоколы и CustomStringConvertible, вычисляемые свойства.",
+   "theory": "Два способа описать тип:\n\n    struct Point {              // значение: при присваивании копируется\n        var x: Int\n        var y: Int\n    }\n    class Box {                 // ссылка: две переменные — один объект\n        var w: Int\n        init(w: Int) { self.w = w }\n    }\n\n    var p2 = p1       // копия, p2.x = 10 не трогает p1\n    let b2 = b1       // тот же объект, b2.w = 30 видно и в b1\n    b1 === b2         // true — тот же объект\n\n• У struct конструктор со всеми свойствами появляется сам: Point(x: 1, y: 2).\n• Метод struct, который меняет свойства, помечают mutating; вызвать его можно только у var.\n• private(set) var total = 0 — читать можно всем, менять только внутри типа.\n• В Swift почти всё — struct: Int, String, Array, Dictionary. Классы берут, когда нужен общий изменяемый объект.\n\nПротокол — договор: какие методы и свойства есть у типа.\n\n    protocol Shape { func area() -> Double }\n    struct Rect: Shape, CustomStringConvertible {\n        let w: Double, h: Double\n        func area() -> Double { w * h }\n        var description: String { \"Прямоугольник \\(w)×\\(h)\" }\n    }\n\nCustomStringConvertible со свойством description решает, как тип выглядит в print и в \"\\(…)\"."
+  },
+  {
+   "topic_id": "sw-errors",
+   "lang": "swift",
+   "replaces": [
+    "be-py-exceptions"
+   ],
+   "professions": [
+    "backend"
+   ],
+   "title": "Swift: ошибки",
+   "grade": "junior",
+   "requires": [
+    "sw-functions"
+   ],
+   "description": "Ошибки как enum, throws и throw, do/try/catch, try? и ??, guard … else { throw }, defer, ошибки с данными.",
+   "theory": "Ошибка в Swift — обычный тип, чаще всего enum:\n\n    enum BankError: Error {\n        case badAmount\n        case notEnough(want: Int, have: Int)   // ошибка с данными\n    }\n\nФункция, которая может бросить ошибку, помечается throws, а вызов — try:\n\n    func withdraw(_ balance: Int, _ amount: Int) throws -> Int {\n        guard amount > 0 else { throw BankError.badAmount }\n        return balance - amount\n    }\n\n    do {\n        let left = try withdraw(100, 30)\n    } catch BankError.notEnough(let want, let have) {\n        print(\"нужно \\(want), есть \\(have)\")\n    } catch {\n        print(\"ошибка: \\(error)\")          // error — пойманная ошибка\n    }\n\n• try? превращает ошибку в nil: let port = (try? parse(text)) ?? 8080.\n• guard условие else { throw … } — проверка в начале функции.\n• defer { … } выполняется при выходе из функции — и при return, и при ошибке.\n• Ошибки ≠ падения: выход за границы массива, nil в ! и переполнение не ловятся catch — программа просто останавливается. Поэтому проверки пишут заранее."
+  }
+ ],
+ "tasks": [
+  {
+   "task_id": "sw-basics-01",
+   "topic_id": "sw-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Итог корзины на Swift",
+   "story": "Гена: «Бэкенд магазина пробуем на Swift и Vapor. Начнём с простого: стоимость позиции.»",
+   "content": {
+    "question": "Допиши функцию cartTotal(_ price: Int, _ qty: Int) -> Int — стоимость позиции: цена × количество.",
+    "entry": "cartTotal",
+    "code": "// стоимость позиции: цена × количество\nfunc cartTotal(_ price: Int, _ qty: Int) -> Int {\n    return 0\n}\n\nprint(cartTotal(1990, 2))",
+    "correct_answer": "// стоимость позиции: цена × количество\nfunc cartTotal(_ price: Int, _ qty: Int) -> Int {\n    return price * qty\n}\n\nprint(cartTotal(1990, 2))",
+    "tests_code": "func tests() {\n    Check.eq(\"1990 × 2\", 3980) { cartTotal(1990, 2) }\n    Check.eq(\"250 × 0\", 0) { cartTotal(250, 0) }\n    Check.eq(\"99 × 3\", 297) { cartTotal(99, 3) }\n}",
+    "requirements": [
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "Функция объявляется словом func, тип результата — после стрелки ->. Результат возвращают через return. _ перед именем параметра позволяет вызывать cartTotal(1990, 2) без меток.",
+   "hints": [
+    "Верни произведение через return.",
+    "return price * qty"
+   ]
+  },
+  {
+   "task_id": "sw-basics-02",
+   "topic_id": "sw-basics",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Интерполяция и деление",
+   "story": "Ира: «В отчёте то 73 вместо 10, то рейтинг без дробной части. Что напечатает этот код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "let price = 7\nprint(price / 2)\nprint(Double(price) / 2)\nprint(price % 4)\nprint(\"Итого: \\(price + 3)\")\nprint(\"Итого: \" + String(price) + \"3\")\nlet title = \"Лампа\"\nprint(title.count)\nprint(\"\\(title) стоит \\(price) ₽\")\nlet rating = 4.5\nprint(Int(rating))\nprint(rating * 2)",
+    "language": "swift",
+    "output": "3\n3.5\n3\nИтого: 10\nИтого: 73\n5\nЛампа стоит 7 ₽\n4\n9.0"
+   },
+   "explanation": "Целые делятся нацело: 7 / 2 == 3, а Double(7) / 2 — 3.5. В \\(…) сначала считается выражение — 10. String(price) + \"3\" склеивает строки — 73. У «Лампа» 5 символов. Int(4.5) отбрасывает дробную часть — 4. Double печатается с точкой: 9.0.",
+   "hints": [
+    "Int / Int — целое деление.",
+    "Int(4.5) не округляет, а отбрасывает дробь."
+   ]
+  },
+  {
+   "task_id": "sw-basics-03",
+   "topic_id": "sw-basics",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Товар и итог",
+   "story": "Гена: «Допиши пропуски — без них строка про товар не соберётся.»",
+   "content": {
+    "question": "Заполни пропуски: константа, переменная и интерполяция имени в строку.",
+    "code": "[[1]] title = \"Лампа\"\n[[2]] total = 0\ntotal += 1990\ntotal += 500\nprint(\"Товар: [[3]](title), итого \\(total) ₽\")",
+    "blanks": [
+     {
+      "answer": [
+       "let",
+       "var"
+      ]
+     },
+     {
+      "answer": [
+       "var"
+      ]
+     },
+     {
+      "answer": [
+       "\\"
+      ]
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "title не меняется — для неё let (var тоже сработает, но компилятор посоветует let). total переприсваивается через +=, поэтому только var: с let будет ошибка «cannot assign to value: 'total' is a 'let' constant». Значение подставляется в строку через \\(имя).",
+   "hints": [
+    "Что меняется в программе, а что нет?",
+    "Интерполяция — обратная косая черта и скобки."
+   ]
+  },
+  {
+   "task_id": "sw-basics-04",
+   "topic_id": "sw-basics",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Средняя оценка без дробей",
+   "story": "Ира: «Средняя оценка из 9 баллов за 2 отзыва — 4.0, а должно быть 4.5. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "func average(_ sum: Int, _ count: Int) -> Double {\n    return Double(sum / count)\n}\n\nprint(average(9, 2))",
+    "bug_line": 2,
+    "options": [
+     "Целые делятся нацело ещё до преобразования: 9 / 2 == 4; нужно Double(sum) / Double(count)",
+     "Double() округляет вниз",
+     "Функция с типом Double не может принимать Int",
+     "print печатает Double без дробной части"
+    ],
+    "correct_answer": 0,
+    "language": "swift"
+   },
+   "explanation": "Сначала выполняется то, что в скобках: 9 / 2 — деление целых, получилось 4. Double(4) — это 4.0. Преобразовать нужно до деления, и оба числа: Double(sum) / Double(count) — Swift не делит Double на Int.",
+   "hints": [
+    "Что считается раньше — деление или Double()?",
+    "Double(sum) / Double(count)"
+   ]
+  },
+  {
+   "task_id": "sw-basics-05",
+   "topic_id": "sw-basics",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Цена с НДС",
+   "story": "Стас: «На витрине цены с НДС 20 %. Посчитай — и никаких копеечных хвостов.»",
+   "content": {
+    "question": "Напиши withVat(_ price: Double) -> Double — цена × 1.2, округлённая до копеек (2 знака после точки).",
+    "entry": "withVat",
+    "code": "// цена с НДС 20 %, до копеек\nfunc withVat(_ price: Double) -> Double {\n    return price\n}\n\nprint(withVat(1990.99))",
+    "correct_answer": "// цена с НДС 20 %, до копеек\nfunc withVat(_ price: Double) -> Double {\n    return (price * 1.2 * 100).rounded() / 100\n}\n\nprint(withVat(1990.99))",
+    "tests_code": "func tests() {\n    Check.near(\"100 ₽\", 120) { withVat(100) }\n    Check.near(\"1990.99 ₽\", 2389.19) { withVat(1990.99) }\n    Check.near(\"1 копейка\", 0.01) { withVat(0.01) }\n    Check.near(\"бесплатно\", 0) { withVat(0) }\n}",
+    "requirements": [
+     {
+      "input": "умножает на 1.2",
+      "expected": {
+       "regex": "1\\.2\\b|\\*\\s*120\\s*/|/\\s*100"
+      }
+     },
+     {
+      "input": "округляет",
+      "expected": {
+       "regex": "rounded\\s*\\(|round\\s*\\("
+      }
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "1990.99 × 1.2 = 2389.188 — лишняя доля копейки. rounded() округляет до целого, поэтому сначала переводят в копейки (× 100), округляют и делят обратно. Для настоящих денег хранят копейки в Int или берут Decimal.",
+   "hints": [
+    "(значение * 100).rounded() / 100",
+    "Сначала × 1.2, потом округление."
+   ]
+  },
+  {
+   "task_id": "sw-control-01",
+   "topic_id": "sw-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Оценка за код-ревью",
+   "story": "Гена: «Бот код-ревью ставит оценку по баллам. Перенеси правило на Swift — switch с диапазонами тут как раз к месту.»",
+   "content": {
+    "question": "Напиши reviewGrade(_ score: Int) -> String: от 90 — «отлично», от 75 — «хорошо», от 50 — «зачёт», иначе «на доработку».",
+    "entry": "reviewGrade",
+    "code": "// оценка за код-ревью по баллам\nfunc reviewGrade(_ score: Int) -> String {\n    return \"\"\n}\n\nprint(reviewGrade(80))",
+    "correct_answer": "// оценка за код-ревью по баллам\nfunc reviewGrade(_ score: Int) -> String {\n    switch score {\n    case 90...:\n        return \"отлично\"\n    case 75..<90:\n        return \"хорошо\"\n    case 50..<75:\n        return \"зачёт\"\n    default:\n        return \"на доработку\"\n    }\n}\n\nprint(reviewGrade(80))",
+    "tests_code": "func tests() {\n    Check.eq(\"95\", \"отлично\") { reviewGrade(95) }\n    Check.eq(\"ровно 90\", \"отлично\") { reviewGrade(90) }\n    Check.eq(\"80\", \"хорошо\") { reviewGrade(80) }\n    Check.eq(\"ровно 75\", \"хорошо\") { reviewGrade(75) }\n    Check.eq(\"50\", \"зачёт\") { reviewGrade(50) }\n    Check.eq(\"12\", \"на доработку\") { reviewGrade(12) }\n}",
+    "requirements": [
+     {
+      "input": "сравнивает с 90",
+      "expected": {
+       "regex": "\\b(90|89)\\b"
+      }
+     },
+     {
+      "input": "сравнивает с 75",
+      "expected": {
+       "regex": "\\b(75|74)\\b"
+      }
+     },
+     {
+      "input": "сравнивает с 50",
+      "expected": {
+       "regex": "\\b(50|49)\\b"
+      }
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "case 90... — «90 и больше», 75..<90 — «от 75 до 89». Ветки проверяются сверху вниз, break не нужен. default обязателен: switch по Int должен разобрать все числа. Цепочка if / else if тоже подходит — тогда порог 90 проверяют первым.",
+   "hints": [
+    "switch score { case 90...: return \"отлично\" … }",
+    "Последняя ветка — default."
+   ]
+  },
+  {
+   "task_id": "sw-control-02",
+   "topic_id": "sw-control",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Диапазоны и switch",
+   "story": "Ира: «Где граница диапазона включена, а где нет? Что напечатает программа?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "print(Array(1...5))\nprint(Array(1..<5))\nprint(Array(stride(from: 10, to: 0, by: -3)))\nvar total = 0\nfor i in 1...10 {\n    if i % 2 == 0 { continue }\n    if i > 7 { break }\n    total += i\n}\nprint(\"total = \\(total)\")\nlet level = 5\nswitch level {\ncase 1:\n    print(\"junior\")\ncase 2, 3:\n    print(\"middle\")\ncase 4...10:\n    print(\"senior\")\ndefault:\n    print(\"?\")\n}\nlet kind = total > 10 ? \"много\" : \"мало\"\nprint(kind)",
+    "language": "swift",
+    "output": "[1, 2, 3, 4, 5]\n[1, 2, 3, 4]\n[10, 7, 4, 1]\ntotal = 16\nsenior\nмного"
+   },
+   "explanation": "1...5 включает обе границы, ..< — без правой. stride(from: 10, to: 0, by: -3) идёт вниз и не доходит до 0: 10, 7, 4, 1. В сумму попадают нечётные 1, 3, 5, 7 — это 16. Уровень 5 попадает в 4...10. Тернарный оператор ?: выбирает одно из двух значений.",
+   "hints": [
+    "..< не включает правую границу.",
+    "continue пропускает шаг, break выходит из цикла."
+   ]
+  },
+  {
+   "task_id": "sw-control-03",
+   "topic_id": "sw-control",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "FizzBuzz на switch",
+   "story": "Гена: «Классика собеседований, по-свифтовски — switch по кортежу. Собери функцию.»",
+   "content": {
+    "question": "Собери label(_ n: Int) -> String: кратно 15 — FizzBuzz, кратно 3 — Fizz, кратно 5 — Buzz, иначе само число строкой.",
+    "lines": [
+     "func label(_ n: Int) -> String {",
+     "    switch (n % 3, n % 5) {",
+     "    case (0, 0): return \"FizzBuzz\"",
+     "    case (0, _): return \"Fizz\"",
+     "    case (_, 0): return \"Buzz\"",
+     "    default: return String(n)",
+     "    }",
+     "}"
+    ],
+    "alternatives": [
+     [
+      "func label(_ n: Int) -> String {",
+      "    switch (n % 3, n % 5) {",
+      "    case (0, 0): return \"FizzBuzz\"",
+      "    case (_, 0): return \"Buzz\"",
+      "    case (0, _): return \"Fizz\"",
+      "    default: return String(n)",
+      "    }",
+      "}"
+     ]
+    ],
+    "distractors": [
+     "    else: return String(n)",
+     "    switch n % 3, n % 5 {"
+    ],
+    "language": "swift"
+   },
+   "explanation": "switch по кортежу (остаток от 3, остаток от 5) проверяет оба сразу, _ — «что угодно». Ветки идут сверху вниз, поэтому (0, 0) — первой. Fizz и Buzz можно поменять местами. «Всё остальное» — default, а кортеж пишут в скобках.",
+   "hints": [
+    "Самый частный случай — первым.",
+    "«Всё остальное» — default."
+   ]
+  },
+  {
+   "task_id": "sw-control-04",
+   "topic_id": "sw-control",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма кратных",
+   "story": "Гена: «Для акции нужна сумма всех номеров заказов меньше n, кратных 3 или 5. Номеров бывает миллион.»",
+   "content": {
+    "question": "Напиши sumMultiples(_ n: Int) -> Int — сумму всех чисел от 1 до n - 1, которые делятся на 3 или на 5 (n ≥ 1).",
+    "entry": "sumMultiples",
+    "code": "// сумма чисел меньше n, кратных 3 или 5\nfunc sumMultiples(_ n: Int) -> Int {\n    return 0\n}\n\nprint(sumMultiples(10))",
+    "correct_answer": "// сумма чисел меньше n, кратных 3 или 5\nfunc sumMultiples(_ n: Int) -> Int {\n    var sum = 0\n    for i in 1..<n {\n        if i % 3 == 0 || i % 5 == 0 {\n            sum += i\n        }\n    }\n    return sum\n}\n\nprint(sumMultiples(10))",
+    "tests_code": "func tests() {\n    Check.eq(\"n = 10: 3 + 5 + 6 + 9\", 23) { sumMultiples(10) }\n    Check.eq(\"n = 1\", 0) { sumMultiples(1) }\n    Check.eq(\"n = 16: 15 не входит\", 60) { sumMultiples(16) }\n    Check.eq(\"n = 1000\", 233168) { sumMultiples(1000) }\n    Check.eq(\"n = 1 000 000\", 233333166668) { sumMultiples(1_000_000) }\n}",
+    "requirements": [
+     {
+      "input": "обходит числа циклом",
+      "expected": {
+       "regex": "\\bfor\\b|\\bwhile\\b|\\.filter|\\.reduce"
+      }
+     },
+     {
+      "input": "проверяет кратность 3",
+      "expected": {
+       "regex": "%\\s*3\\b"
+      }
+     },
+     {
+      "input": "проверяет кратность 5",
+      "expected": {
+       "regex": "%\\s*5\\b"
+      }
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "1..<n — числа от 1 до n - 1. Int в Swift 64-битный, миллион его не переполнит. Числа, кратные 15, учитываются один раз: условие через || — одно условие. Короче: (1..<n).filter { $0 % 3 == 0 || $0 % 5 == 0 }.reduce(0, +).",
+   "hints": [
+    "for i in 1..<n",
+    "if i % 3 == 0 || i % 5 == 0"
+   ]
+  },
+  {
+   "task_id": "sw-control-05",
+   "topic_id": "sw-control",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Корзина падает на подсчёте",
+   "story": "Ира: «Подсчёт суммы корзины падает с „Fatal error: Index out of range“. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "let prices = [100, 200, 300]\nvar total = 0\nfor i in 0...prices.count {\n    total += prices[i]\n}\nprint(total)",
+    "bug_line": 3,
+    "options": [
+     "0...prices.count включает count — индекса 3 в массиве из трёх элементов нет; нужно 0..<prices.count или prices.indices",
+     "Массив, объявленный через let, нельзя читать по индексу",
+     "total нужно объявить через let",
+     "+= не работает с Int"
+    ],
+    "correct_answer": 0,
+    "language": "swift"
+   },
+   "explanation": "Диапазон ... включает обе границы: 0, 1, 2, 3. Индексы массива из трёх элементов — 0, 1, 2. Swift не читает чужую память, а останавливает программу. Для индексов пишут 0..<prices.count или prices.indices, а проще всего — for p in prices или prices.reduce(0, +).",
+   "hints": [
+    "Какие числа входят в 0...3?",
+    "..< не включает правую границу."
+   ]
+  },
+  {
+   "task_id": "sw-collections-01",
+   "topic_id": "sw-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Частота тегов",
+   "story": "Стас: «Хочу видеть, какие теги у товаров встречаются чаще. Посчитай их.»",
+   "content": {
+    "question": "Напиши tagCounts(_ tags: [String]) -> [String: Int] — словарь «тег → сколько раз встретился».",
+    "entry": "tagCounts",
+    "code": "// сколько раз встретился каждый тег\nfunc tagCounts(_ tags: [String]) -> [String: Int] {\n    var counts: [String: Int] = [:]\n    return counts\n}\n\nprint(tagCounts([\"sale\", \"new\", \"sale\"]))",
+    "correct_answer": "// сколько раз встретился каждый тег\nfunc tagCounts(_ tags: [String]) -> [String: Int] {\n    var counts: [String: Int] = [:]\n    for tag in tags {\n        counts[tag, default: 0] += 1\n    }\n    return counts\n}\n\nprint(tagCounts([\"sale\", \"new\", \"sale\"]))",
+    "tests_code": "func tests() {\n    Check.eq(\"sale, new, sale\", [\"sale\": 2, \"new\": 1]) { tagCounts([\"sale\", \"new\", \"sale\"]) }\n    Check.eq(\"один тег\", [\"hit\": 1]) { tagCounts([\"hit\"]) }\n    Check.eq(\"пустой список\", [:]) { tagCounts([]) }\n    Check.eq(\"регистр важен\", [\"New\": 1, \"new\": 2]) { tagCounts([\"New\", \"new\", \"new\"]) }\n}",
+    "requirements": [
+     {
+      "input": "обходит теги",
+      "expected": {
+       "regex": "\\bfor\\s+\\w+\\s+in\\b|forEach|reduce"
+      }
+     },
+     {
+      "input": "учитывает, что ключа ещё нет",
+      "expected": {
+       "regex": "default:|\\?\\?"
+      }
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "counts[tag] += 1 не скомпилируется: counts[tag] — опционал Int?, для нового тега там nil. counts[tag, default: 0] берёт 0, если ключа нет, и сразу записывает результат. Можно и так: counts[tag] = (counts[tag] ?? 0) + 1.",
+   "hints": [
+    "for tag in tags",
+    "counts[tag, default: 0] += 1"
+   ]
+  },
+  {
+   "task_id": "sw-collections-02",
+   "topic_id": "sw-collections",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 1,
+   "xp_reward": 20,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Массивы и словари",
+   "story": "Гена: «Прежде чем писать склад, проверь, как ведут себя коллекции Swift.»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "var cart = [\"лампа\", \"стол\"]\ncart.append(\"стул\")\ncart.insert(\"полка\", at: 0)\nprint(cart.count, cart[1], cart.last!)\nprint(cart.first ?? \"пусто\")\nvar stock = [\"лампа\": 3]\nstock[\"лампа\"] = 5\nprint(stock[\"лампа\"] ?? 0, stock[\"шкаф\"] ?? 0)\nprint(stock[\"лампа\"])\nprint(stock[\"шкаф\"] == nil)\nlet prices = [500, 1500, 999]\nprint(prices.reduce(0, +), prices.max()!)\nprint(prices.filter { $0 < 1000 })\nprint(prices.map { $0 * 2 })\nprint(prices.sorted())",
+    "language": "swift",
+    "output": "4 лампа стул\nполка\n5 0\nOptional(5)\ntrue\n2999 1500\n[500, 999]\n[1000, 3000, 1998]\n[500, 999, 1500]"
+   },
+   "explanation": "insert(at: 0) вставляет в начало: полка, лампа, стол, стул — 4 элемента, под индексом 1 «лампа». Запись по тому же ключу заменяет значение, отсутствующий ключ даёт nil, и ?? подставляет 0. Без ?? словарь отдаёт опционал — print показывает Optional(5). reduce(0, +) складывает, filter оставляет подходящие, map превращает каждый элемент, sorted сортирует.",
+   "hints": [
+    "insert(…, at: 0) — в начало.",
+    "Словарь по ключу отдаёт опционал."
+   ]
+  },
+  {
+   "task_id": "sw-collections-03",
+   "topic_id": "sw-collections",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Цены из справочника",
+   "story": "Гена: «Справочник цен почти готов. Заполни пропуски.»",
+   "content": {
+    "question": "Заполни пропуски: обход ключей, значение вместо nil и сумма всех цен.",
+    "code": "let prices: [String: Int] = [\"лампа\": 1990, \"стол\": 7500]\nfor name [[1]] prices.keys.sorted() {\n    print(\"\\(name): \\(prices[name]!)\")\n}\nprint(prices[\"шкаф\"] [[2]] 0)\nprint(prices.values.[[3]](0, +))",
+    "blanks": [
+     {
+      "answer": [
+       "in"
+      ]
+     },
+     {
+      "answer": [
+       "??"
+      ]
+     },
+     {
+      "answer": [
+       "reduce"
+      ]
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "for … in перебирает ключи; sorted() нужен, потому что порядок ключей в словаре не определён. prices[\"шкаф\"] — nil, и ?? подставляет 0. reduce(0, +) складывает все значения: 9490.",
+   "hints": [
+    "Цикл: for имя in коллекция.",
+    "Значение вместо nil — ??."
+   ]
+  },
+  {
+   "task_id": "sw-collections-04",
+   "topic_id": "sw-collections",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товары по бюджету",
+   "story": "Стас: «Покупатель ввёл бюджет. Оставь цены, которые в него укладываются, в том же порядке.»",
+   "content": {
+    "question": "Напиши affordable(_ prices: [Int], budget: Int) -> [Int] — цены не дороже бюджета, в исходном порядке. Вызов: affordable(prices, budget: 1000).",
+    "entry": "affordable",
+    "code": "// цены, которые укладываются в бюджет\nfunc affordable(_ prices: [Int], budget: Int) -> [Int] {\n    return []\n}\n\nprint(affordable([500, 1500, 999, 2000], budget: 1000))",
+    "correct_answer": "// цены, которые укладываются в бюджет\nfunc affordable(_ prices: [Int], budget: Int) -> [Int] {\n    return prices.filter { $0 <= budget }\n}\n\nprint(affordable([500, 1500, 999, 2000], budget: 1000))",
+    "tests_code": "func tests() {\n    Check.eq(\"бюджет 1000\", [500, 999]) { affordable([500, 1500, 999, 2000], budget: 1000) }\n    Check.eq(\"ровно бюджет\", [1000]) { affordable([1000, 1001], budget: 1000) }\n    Check.eq(\"всё дорого\", []) { affordable([3000, 4000], budget: 100) }\n    Check.eq(\"пустой список\", []) { affordable([], budget: 500) }\n}",
+    "requirements": [
+     {
+      "input": "сравнивает цену с бюджетом",
+      "expected": {
+       "regex": "<=\\s*budget|budget\\s*>="
+      }
+     },
+     {
+      "input": "отбирает подходящие цены",
+      "expected": {
+       "regex": "\\.filter|\\.append\\(|\\+="
+      }
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "filter { $0 <= budget } возвращает новый массив из подходящих элементов в исходном порядке; $0 — текущая цена. Второй параметр с меткой budget: — поэтому при вызове пишут budget: 1000. Граница «не дороже» — это <=.",
+   "hints": [
+    "prices.filter { … }",
+    "$0 <= budget"
+   ]
+  },
+  {
+   "task_id": "sw-collections-05",
+   "topic_id": "sw-collections",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Шкаф роняет сервис",
+   "story": "Ира: «Проверка наличия падает, когда спрашивают товар, которого нет в справочнике. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "func inStock(_ stock: [String: Int], _ item: String) -> Bool {\n    let qty = stock[item]!\n    return qty > 0\n}\n\nlet stock = [\"лампа\": 3, \"стол\": 0]\nprint(inStock(stock, \"лампа\"))\nprint(inStock(stock, \"шкаф\"))",
+    "bug_line": 2,
+    "options": [
+     "Для товара не из справочника stock[item] — nil, а ! на nil останавливает программу; нужно stock[item] ?? 0",
+     "Словарь, объявленный через let, нельзя читать по ключу",
+     "qty > 0 не работает с Int",
+     "Функция должна возвращать Int"
+    ],
+    "correct_answer": 0,
+    "language": "swift"
+   },
+   "explanation": "stock[item] возвращает Int? — для «шкафа» это nil. ! означает «я уверен, что тут не nil», и Swift останавливает программу с «Unexpectedly found nil». Отсутствующий товар — обычная ситуация, её обрабатывают: let qty = stock[item] ?? 0.",
+   "hints": [
+    "Что вернёт stock[\"шкаф\"]?",
+    "Вместо ! — ?? 0."
+   ]
+  },
+  {
+   "task_id": "sw-functions-01",
+   "topic_id": "sw-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Инициалы в карточке",
+   "story": "Гена: «В карточке сотрудника нужны инициалы: из „Гена Петров“ — „Г. П.“. Имена приходят как попало.»",
+   "content": {
+    "question": "Напиши initials(_ fullName: String) -> String — первые буквы имени и фамилии заглавными, через точку и пробел: «Г. П.». Лишние пробелы бывают.",
+    "entry": "initials",
+    "code": "// \"Гена Петров\" -> \"Г. П.\"\nfunc initials(_ fullName: String) -> String {\n    return \"\"\n}\n\nprint(initials(\"Гена Петров\"))",
+    "correct_answer": "// \"Гена Петров\" -> \"Г. П.\"\nfunc initials(_ fullName: String) -> String {\n    let parts = fullName.split(separator: \" \")\n    let first = parts[0].prefix(1).uppercased()\n    let last = parts[1].prefix(1).uppercased()\n    return \"\\(first). \\(last).\"\n}\n\nprint(initials(\"Гена Петров\"))",
+    "tests_code": "func tests() {\n    Check.eq(\"Гена Петров\", \"Г. П.\") { initials(\"Гена Петров\") }\n    Check.eq(\"строчные буквы\", \"И. С.\") { initials(\"ира смирнова\") }\n    Check.eq(\"лишние пробелы\", \"С. В.\") { initials(\"  Стас   Волков \") }\n}",
+    "requirements": [
+     {
+      "input": "делает букву заглавной",
+      "expected": {
+       "regex": "uppercased\\(\\)|capitalized"
+      }
+     },
+     {
+      "input": "делит имя на части",
+      "expected": {
+       "regex": "split|components"
+      }
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "split(separator: \" \") делит строку по пробелам и сам выбрасывает пустые кусочки — лишние пробелы не мешают. prefix(1) — первый символ (строки в Swift нельзя индексировать числом), uppercased() делает его заглавным, кириллицу Swift понимает.",
+   "hints": [
+    "fullName.split(separator: \" \")",
+    "parts[0].prefix(1).uppercased()"
+   ]
+  },
+  {
+   "task_id": "sw-functions-02",
+   "topic_id": "sw-functions",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Метки, значения по умолчанию и опционалы",
+   "story": "Гена: «Проверь себя: метки аргументов, if let и ??. Что напечатает код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "func price(_ rub: Int, currency: String = \"₽\") -> String {\n    return \"\\(rub) \\(currency)\"\n}\n\nprint(price(500))\nprint(price(7, currency: \"$\"))\nlet nick: String? = nil\nprint(nick?.count as Any)\nprint(nick?.count ?? 0)\nif let n = nick {\n    print(\"ник: \\(n)\")\n} else {\n    print(\"ника нет\")\n}\nlet name: String? = \"Гена\"\nif let name {\n    print(\"имя: \\(name), \\(name.count) буквы\")\n}\nlet double = { (n: Int) in n * 2 }\nprint([1, 2, 3].map(double))\nprint(Int(\"4x\") ?? -1)\nprint(Int(\"42\") as Any)",
+    "language": "swift",
+    "output": "500 ₽\n7 $\nnil\n0\nника нет\nимя: Гена, 4 буквы\n[2, 4, 6]\n-1\nOptional(42)"
+   },
+   "explanation": "Параметр currency по умолчанию «₽», при вызове его пишут с меткой. nick?.count при nil даёт nil, а ?? подставляет 0. if let выполняет ветку, только если значение есть, — иначе else. if let name — короткая запись if let name = name. Замыкание можно положить в константу и передать в map. Int(\"4x\") — nil, а Int(\"42\") — опционал Optional(42).",
+   "hints": [
+    "?. при nil возвращает nil, а не падает.",
+    "Int(\"…\") всегда возвращает опционал."
+   ]
+  },
+  {
+   "task_id": "sw-functions-03",
+   "topic_id": "sw-functions",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Сумма дорогих позиций",
+   "story": "Гена: «Собери функцию для отчёта по дорогим товарам — со свифтовым for … where.»",
+   "content": {
+    "question": "Собери totalAbove(_ prices: [Int], limit: Int) -> Int — сумму цен дороже limit.",
+    "lines": [
+     "func totalAbove(_ prices: [Int], limit: Int) -> Int {",
+     "    var sum = 0",
+     "    for p in prices where p > limit {",
+     "        sum += p",
+     "    }",
+     "    return sum",
+     "}"
+    ],
+    "distractors": [
+     "    let sum = 0",
+     "    for p in prices if p > limit {"
+    ],
+    "language": "swift"
+   },
+   "explanation": "for … where перебирает только подходящие элементы — отдельный if не нужен. Сумма меняется в цикле, значит var: с let будет ошибка «left side of mutating operator isn't mutable». Слова if в заголовке цикла Swift не понимает.",
+   "hints": [
+    "Фильтр прямо в цикле — where.",
+    "Сумма меняется — нужен var."
+   ]
+  },
+  {
+   "task_id": "sw-functions-04",
+   "topic_id": "sw-functions",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Сумма цифр артикула",
+   "story": "Стас: «Контрольная цифра артикула — сумма его цифр. Минус в начале бывает у возвратов — его не считаем.»",
+   "content": {
+    "question": "Напиши digitSum(_ n: Int) -> Int — сумму цифр числа. Знак не учитывается: digitSum(-1990) == 19. Можно рекурсией.",
+    "entry": "digitSum",
+    "code": "// сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\nfunc digitSum(_ n: Int) -> Int {\n    return 0\n}\n\nprint(digitSum(1990))",
+    "correct_answer": "// сумма цифр: 1990 -> 1 + 9 + 9 + 0 = 19\nfunc digitSum(_ n: Int) -> Int {\n    let m = abs(n)\n    if m < 10 {\n        return m\n    }\n    return m % 10 + digitSum(m / 10)\n}\n\nprint(digitSum(1990))",
+    "tests_code": "func tests() {\n    Check.eq(\"0\", 0) { digitSum(0) }\n    Check.eq(\"7\", 7) { digitSum(7) }\n    Check.eq(\"1990\", 19) { digitSum(1990) }\n    Check.eq(\"123456789\", 45) { digitSum(123456789) }\n    Check.eq(\"возврат -1990\", 19) { digitSum(-1990) }\n    Check.eq(\"длинный 9999999999\", 90) { digitSum(9_999_999_999) }\n}",
+    "requirements": [
+     {
+      "input": "берёт последнюю цифру остатком от деления на 10",
+      "expected": {
+       "regex": "%\\s*10"
+      }
+     },
+     {
+      "input": "отбрасывает последнюю цифру делением на 10",
+      "expected": {
+       "regex": "/\\s*10\\b"
+      }
+     },
+     {
+      "input": "убирает знак",
+      "expected": {
+       "regex": "abs\\s*\\(|magnitude|<\\s*0|-\\s*n\\b"
+      }
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "Последняя цифра — m % 10, остальное число — m / 10: деление Int целое. abs() убирает знак; без него -1990 % 10 == 0, а -199 % 10 == -9 — остаток в Swift отрицательный у отрицательных чисел. Рекурсия заканчивается, когда осталась одна цифра.",
+   "hints": [
+    "m % 10 — последняя цифра, m / 10 — всё остальное.",
+    "let m = abs(n)"
+   ]
+  },
+  {
+   "task_id": "sw-functions-05",
+   "topic_id": "sw-functions",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Не та дорогая цена",
+   "story": "Ира: «Функция должна вернуть первую цену дороже 1000 — это 2000, а возвращает 3000. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "func firstExpensive(_ prices: [Int], limit: Int) -> Int? {\n    var found: Int? = nil\n    prices.forEach { p in\n        if p > limit {\n            found = p\n            return\n        }\n    }\n    return found\n}\n\nprint(firstExpensive([500, 2000, 3000], limit: 1000) ?? 0)",
+    "bug_line": 6,
+    "options": [
+     "return внутри замыкания forEach выходит только из замыкания, как continue, — перебор идёт дальше и found перезаписывается; нужен обычный for с return или first(where:)",
+     "forEach обходит массив с конца",
+     "Переменную found нельзя менять внутри замыкания",
+     "Функция с типом Int? не может вернуть число"
+    ],
+    "correct_answer": 0,
+    "language": "swift"
+   },
+   "explanation": "Замыкание в forEach — отдельная маленькая функция, и return выходит только из неё. Перебор продолжается, и found становится 3000. Чтобы остановиться на первой, пишут обычный цикл for p in prices where p > limit { return p } — а проще всего prices.first { $0 > limit }.",
+   "hints": [
+    "Откуда именно выходит return в замыкании?",
+    "prices.first { $0 > limit }"
+   ]
+  },
+  {
+   "task_id": "sw-types-01",
+   "topic_id": "sw-types",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Корзина-структура",
+   "story": "Гена: «Хватит считать корзину отдельными функциями — пусть Cart сам копит сумму, а снаружи её можно только читать.»",
+   "content": {
+    "question": "Допиши mutating-метод add(_ price: Int, _ qty: Int) структуры Cart — он добавляет к total стоимость позиции.",
+    "entry": "Cart",
+    "code": "struct Cart {\n    private(set) var total = 0\n\n    // добавить позицию: цена × количество\n    mutating func add(_ price: Int, _ qty: Int) {\n    }\n}\n\nvar cart = Cart()\ncart.add(1990, 2)\ncart.add(500, 1)\nprint(cart.total)",
+    "correct_answer": "struct Cart {\n    private(set) var total = 0\n\n    // добавить позицию: цена × количество\n    mutating func add(_ price: Int, _ qty: Int) {\n        total += price * qty\n    }\n}\n\nvar cart = Cart()\ncart.add(1990, 2)\ncart.add(500, 1)\nprint(cart.total)",
+    "tests_code": "func tests() {\n    Check.eq(\"пустая корзина\", 0) { Cart().total }\n    Check.eq(\"1990 × 2 + 500\", 4480) {\n        var c = Cart()\n        c.add(1990, 2)\n        c.add(500, 1)\n        return c.total\n    }\n    Check.eq(\"позиция с количеством 0\", 300) {\n        var c = Cart()\n        c.add(700, 0)\n        c.add(100, 3)\n        return c.total\n    }\n    Check.eq(\"копия корзины — отдельная корзина\", \"100/110\") {\n        var a = Cart()\n        a.add(100, 1)\n        var b = a\n        b.add(5, 2)\n        return \"\\(a.total)/\\(b.total)\"\n    }\n}",
+    "requirements": [
+     {
+      "input": "накапливает сумму в свойстве",
+      "expected": {
+       "regex": "total\\s*\\+=|total\\s*=\\s*total\\s*\\+"
+      }
+     },
+     {
+      "input": "умножает цену на количество",
+      "expected": {
+       "regex": "price\\s*\\*\\s*qty|qty\\s*\\*\\s*price"
+      }
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "Метод struct, который меняет свойства, помечен mutating — поэтому корзину объявляют через var. private(set) разрешает менять total только внутри Cart: снаружи cart.total = 0 не скомпилируется. struct — значение: var b = a создаёт отдельную копию корзины.",
+   "hints": [
+    "total += price * qty",
+    "Внутри метода к свойству обращаются просто по имени."
+   ]
+  },
+  {
+   "task_id": "sw-types-02",
+   "topic_id": "sw-types",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "struct против class",
+   "story": "Гена: «Одни объекты копируются, другие нет. Что напечатает код?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "struct Point {\n    var x: Int\n    var y: Int\n}\n\nclass Box {\n    var w: Int\n    init(w: Int) { self.w = w }\n}\n\nvar p1 = Point(x: 1, y: 2)\nvar p2 = p1\np2.x = 10\nprint(p1.x, p2.x)\n\nlet b1 = Box(w: 3)\nlet b2 = b1\nb2.w = 30\nprint(b1.w, b2.w)\nprint(b1 === b2)\n\nvar names = [\"лампа\"]\nvar copy = names\ncopy.append(\"стол\")\nprint(names.count, copy.count)\nprint(p1)",
+    "language": "swift",
+    "output": "1 10\n30 30\ntrue\n1 2\nPoint(x: 1, y: 2)"
+   },
+   "explanation": "struct — значение: p2 = p1 копирует точку, и p1.x остаётся 1. class — ссылка: b1 и b2 указывают на один объект, поэтому у обоих 30, и === даёт true. Даже через let можно менять свойства объекта класса — неизменна только сама ссылка. Массивы тоже значения: копия получила «стол», а оригинал нет. print у struct показывает все свойства: Point(x: 1, y: 2).",
+   "hints": [
+    "struct копируется при присваивании, class — нет.",
+    "Массив в Swift — это struct."
+   ]
+  },
+  {
+   "task_id": "sw-types-03",
+   "topic_id": "sw-types",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Фигуры для конструктора витрины",
+   "story": "Гена: «Прямоугольник должен выполнять договор Shape и красиво печататься.»",
+   "content": {
+    "question": "Заполни пропуски: список протоколов, протокол «печатается как текст» и его свойство.",
+    "code": "protocol Shape {\n    func area() -> Double\n}\n\nstruct Rect[[1]] Shape, [[2]] {\n    let w: Double\n    let h: Double\n\n    func area() -> Double { w * h }\n    var [[3]]: String { \"Прямоугольник \\(w)×\\(h)\" }\n}\n\nlet r = Rect(w: 2, h: 3)\nprint(\"\\(r): \\(r.area())\")",
+    "blanks": [
+     {
+      "answer": [
+       ":"
+      ]
+     },
+     {
+      "answer": [
+       "CustomStringConvertible"
+      ]
+     },
+     {
+      "answer": [
+       "description"
+      ]
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "Протоколы перечисляют после двоеточия через запятую. CustomStringConvertible требует свойство description — его значение и попадает в print и \\(…). Функция из одного выражения может обойтись без return.",
+   "hints": [
+    "Протоколы — после двоеточия.",
+    "Протокол печати требует свойство description."
+   ]
+  },
+  {
+   "task_id": "sw-types-04",
+   "topic_id": "sw-types",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Товар печатает себя сам",
+   "story": "Стас: «В логах товар выглядит как Product(name: \"Лампа\", price: 1990). Пусть печатается по-человечески.»",
+   "content": {
+    "question": "Сделай, чтобы Product печатался как «Лампа — 1990 ₽» (название, пробел, длинное тире, пробел, цена, пробел, ₽): протокол CustomStringConvertible и свойство description.",
+    "entry": "Product",
+    "code": "struct Product {\n    let name: String\n    let price: Int\n}\n\nprint(Product(name: \"Лампа\", price: 1990))",
+    "correct_answer": "struct Product: CustomStringConvertible {\n    let name: String\n    let price: Int\n\n    var description: String {\n        return \"\\(name) — \\(price) ₽\"\n    }\n}\n\nprint(Product(name: \"Лампа\", price: 1990))",
+    "tests_code": "func tests() {\n    Check.eq(\"Лампа\", \"Лампа — 1990 ₽\") { String(describing: Product(name: \"Лампа\", price: 1990)) }\n    Check.eq(\"бесплатный товар\", \"xСтол — 0 ₽\") { \"x\" + \"\\(Product(name: \"Стол\", price: 0))\" }\n    Check.eq(\"подстановка в строку\", \"Хит: Кресло — 12500 ₽\") {\n        let p = Product(name: \"Кресло\", price: 12500)\n        return \"Хит: \\(p)\"\n    }\n}",
+    "requirements": [
+     {
+      "input": "выполняет CustomStringConvertible",
+      "expected": {
+       "regex": "CustomStringConvertible"
+      }
+     },
+     {
+      "input": "объявляет description",
+      "expected": {
+       "regex": "var\\s+description\\s*:\\s*String"
+      }
+     },
+     {
+      "input": "добавляет знак ₽",
+      "expected": {
+       "regex": "₽"
+      }
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "print и \\(…) превращают значение в строку. По умолчанию struct печатается со всеми свойствами. Протокол CustomStringConvertible со свойством description задаёт свой вид — вычисляемое свойство пересчитывается при каждом обращении.",
+   "hints": [
+    "struct Product: CustomStringConvertible",
+    "var description: String { \"\\(name) — \\(price) ₽\" }"
+   ]
+  },
+  {
+   "task_id": "sw-types-05",
+   "topic_id": "sw-types",
+   "grade": "junior",
+   "type": "clickbug",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "qa",
+   "title": "Бонус не дошёл",
+   "story": "Ира: «Всем счетам начислили бонус 500 ₽, а балансы по-прежнему 0. Найди строку.»",
+   "content": {
+    "question": "Кликни по строке с багом и выбери, что с ней не так.",
+    "code": "struct Account {\n    var balance = 0\n}\n\nvar accounts = [Account(), Account()]\nfor var acc in accounts {\n    acc.balance += 500\n}\nprint(accounts[0].balance, accounts[1].balance)",
+    "bug_line": 6,
+    "options": [
+     "Account — struct: for var acc получает копию каждого счёта, бонус попадает в копию; менять нужно accounts[i] через индексы",
+     "+= не работает со свойствами struct",
+     "Массив структур нельзя обходить циклом for",
+     "В struct свойство должно быть let"
+    ],
+    "correct_answer": 0,
+    "language": "swift"
+   },
+   "explanation": "struct — значение: на каждом шаге acc — копия элемента массива, и изменения пропадают вместе с ней. Меняют сам массив: for i in accounts.indices { accounts[i].balance += 500 }. Будь Account классом, копировалась бы только ссылка — но для денег обычно выбирают struct как раз ради предсказуемости.",
+   "hints": [
+    "Что получает acc — сам счёт или копию?",
+    "for i in accounts.indices { accounts[i]… }"
+   ]
+  },
+  {
+   "task_id": "sw-errors-01",
+   "topic_id": "sw-errors",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Списание со счёта",
+   "story": "Гена: «Списание должно явно отказывать, а не уводить счёт в минус. В Swift для этого throws и guard.»",
+   "content": {
+    "question": "Допиши withdraw(_ balance: Int, _ amount: Int) throws -> Int — сумма ≤ 0: брось BankError.badAmount; сумма больше баланса: BankError.notEnough; иначе верни новый баланс.",
+    "entry": "withdraw",
+    "code": "enum BankError: Error {\n    case badAmount\n    case notEnough\n}\n\n// списание со счёта: новый баланс или ошибка\nfunc withdraw(_ balance: Int, _ amount: Int) throws -> Int {\n    return balance - amount\n}\n\ndo {\n    print(try withdraw(1000, 300))\n} catch {\n    print(\"ошибка: \\(error)\")\n}",
+    "correct_answer": "enum BankError: Error {\n    case badAmount\n    case notEnough\n}\n\n// списание со счёта: новый баланс или ошибка\nfunc withdraw(_ balance: Int, _ amount: Int) throws -> Int {\n    guard amount > 0 else { throw BankError.badAmount }\n    guard amount <= balance else { throw BankError.notEnough }\n    return balance - amount\n}\n\ndo {\n    print(try withdraw(1000, 300))\n} catch {\n    print(\"ошибка: \\(error)\")\n}",
+    "tests_code": "func tests() {\n    Check.eq(\"1000 - 300\", 700) { try withdraw(1000, 300) }\n    Check.eq(\"списать всё\", 0) { try withdraw(500, 500) }\n    Check.fails(\"не хватает денег\", BankError.notEnough) { try withdraw(100, 500) }\n    Check.fails(\"сумма 0\", BankError.badAmount) { try withdraw(100, 0) }\n    Check.fails(\"сумма -5\", BankError.badAmount) { try withdraw(100, -5) }\n}",
+    "requirements": [
+     {
+      "input": "бросает BankError.badAmount",
+      "expected": {
+       "regex": "throw\\s+BankError\\.badAmount"
+      }
+     },
+     {
+      "input": "бросает BankError.notEnough",
+      "expected": {
+       "regex": "throw\\s+BankError\\.notEnough"
+      }
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "guard условие else { throw … } — «дальше только если условие верно». Проверки ставят в начало функции, и основной код остаётся без вложенных if. Порядок важен: сумму 0 надо отклонить как badAmount, даже если баланса хватает.",
+   "hints": [
+    "guard amount > 0 else { throw BankError.badAmount }",
+    "guard amount <= balance else { throw BankError.notEnough }"
+   ]
+  },
+  {
+   "task_id": "sw-errors-02",
+   "topic_id": "sw-errors",
+   "grade": "junior",
+   "type": "predict",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "defer и try?",
+   "story": "Гена: «В разборе порта срабатывает defer, а try? подменяет ошибку. Что напечатается?»",
+   "content": {
+    "question": "Что напечатает программа?",
+    "code": "enum ParseError: Error {\n    case notNumber(String)\n}\n\nfunc parsePort(_ s: String) throws -> Int {\n    print(\"разбираю \\(s)\")\n    defer { print(\"готово\") }\n    guard let n = Int(s) else { throw ParseError.notNumber(s) }\n    return n\n}\n\ndo {\n    print(try parsePort(\"8080\"))\n    print(try parsePort(\"80a\"))\n    print(\"сюда не дойдём\")\n} catch ParseError.notNumber(let s) {\n    print(\"не число: \\(s)\")\n} catch {\n    print(\"другая ошибка\")\n}\nlet port = (try? parsePort(\"x\")) ?? 8080\nprint(port)",
+    "language": "swift",
+    "output": "разбираю 8080\nготово\n8080\nразбираю 80a\nготово\nне число: 80a\nразбираю x\nготово\n8080"
+   },
+   "explanation": "defer выполняется при выходе из функции — и после return, и при ошибке, поэтому «готово» печатается раньше, чем результат. На «80a» Int(s) даёт nil, guard бросает ошибку, остаток do пропускается, а catch с шаблоном достаёт строку из ошибки. try? превращает ошибку в nil, и ?? подставляет 8080.",
+   "hints": [
+    "defer срабатывает при любом выходе из функции.",
+    "После ошибки остаток блока do не выполняется."
+   ]
+  },
+  {
+   "task_id": "sw-errors-03",
+   "topic_id": "sw-errors",
+   "grade": "junior",
+   "type": "cloze",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Порт с понятной ошибкой",
+   "story": "Гена: «Если в конфиге порт „80a“ или 99999, сервис должен сказать, что именно не так.»",
+   "content": {
+    "question": "Заполни пропуски: проверка с выходом, бросок ошибки и запасное значение.",
+    "code": "enum ConfigError: Error {\n    case badPort(String)\n}\n\nfunc port(_ s: String) throws -> Int {\n    [[1]] let n = Int(s), (1...65535).contains(n) else {\n        [[2]] ConfigError.badPort(s)\n    }\n    return n\n}\n\nprint((try? port(\"8080\")) [[3]] 80)",
+    "blanks": [
+     {
+      "answer": [
+       "guard"
+      ]
+     },
+     {
+      "answer": [
+       "throw"
+      ]
+     },
+     {
+      "answer": [
+       "??"
+      ]
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "guard let … else { … } — если число не получилось или вне диапазона, выходим из функции, и в else нужно выйти: return или throw. throw бросает ошибку. try? превращает ошибку в nil, а ?? подставляет значение по умолчанию.",
+   "hints": [
+    "Проверка «иначе выйти» — guard.",
+    "Бросают ошибку словом throw."
+   ]
+  },
+  {
+   "task_id": "sw-errors-04",
+   "topic_id": "sw-errors",
+   "grade": "junior",
+   "type": "parsons",
+   "difficulty": 2,
+   "xp_reward": 35,
+   "time_limit_minutes": null,
+   "character": "teamlead",
+   "title": "Ошибка склада с данными",
+   "story": "Гена: «Фронту нужно знать, сколько товара не хватает. Собери тип ошибки с данными и понятным текстом.»",
+   "content": {
+    "question": "Собери enum StockError: ошибка notEnough(want:have:) и свойство description с текстом «не хватает товара: нужно …, есть …».",
+    "lines": [
+     "enum StockError: Error, CustomStringConvertible {",
+     "    case notEnough(want: Int, have: Int)",
+     "    var description: String {",
+     "        switch self {",
+     "        case .notEnough(let want, let have):",
+     "            return \"не хватает товара: нужно \\(want), есть \\(have)\"",
+     "        }",
+     "    }",
+     "}"
+    ],
+    "distractors": [
+     "class StockError extends Error {",
+     "    case notEnough(want, have)"
+    ],
+    "language": "swift"
+   },
+   "explanation": "Ошибка в Swift — обычный enum с протоколом Error, а данные хранятся прямо в варианте: notEnough(want: Int, have: Int). Достают их шаблоном case .notEnough(let want, let have). extends в Swift нет, а у данных варианта обязательно указывают типы.",
+   "hints": [
+    "Ошибка — enum с протоколом Error.",
+    "Данные достают через case .notEnough(let want, let have)."
+   ]
+  },
+  {
+   "task_id": "sw-errors-05",
+   "topic_id": "sw-errors",
+   "grade": "junior",
+   "type": "write_code",
+   "difficulty": 3,
+   "xp_reward": 55,
+   "time_limit_minutes": null,
+   "character": "manager",
+   "title": "Резерв на складе",
+   "story": "Стас: «Если товара не хватает, фронт должен показать, сколько есть. Ошибка с данными уже готова — осталось ей воспользоваться.»",
+   "content": {
+    "question": "Допиши reserve(_ have: Int, _ want: Int) throws -> Int — want ≤ 0: брось StockError.badAmount; want > have: StockError.notEnough(want: want, have: have); иначе верни остаток.",
+    "entry": "reserve",
+    "code": "enum StockError: Error, Equatable {\n    case badAmount\n    case notEnough(want: Int, have: Int)\n}\n\n// резерв товара: остаток или ошибка\nfunc reserve(_ have: Int, _ want: Int) throws -> Int {\n    return have - want\n}\n\nprint((try? reserve(10, 3)) ?? -1)",
+    "correct_answer": "enum StockError: Error, Equatable {\n    case badAmount\n    case notEnough(want: Int, have: Int)\n}\n\n// резерв товара: остаток или ошибка\nfunc reserve(_ have: Int, _ want: Int) throws -> Int {\n    guard want > 0 else { throw StockError.badAmount }\n    guard want <= have else { throw StockError.notEnough(want: want, have: have) }\n    return have - want\n}\n\nprint((try? reserve(10, 3)) ?? -1)",
+    "tests_code": "func tests() {\n    Check.eq(\"резерв 3 из 10\", 7) { try reserve(10, 3) }\n    Check.eq(\"забрать всё\", 0) { try reserve(4, 4) }\n    Check.fails(\"не хватает: нужно 5, есть 2\", StockError.notEnough(want: 5, have: 2)) { try reserve(2, 5) }\n    Check.fails(\"количество 0\", StockError.badAmount) { try reserve(10, 0) }\n}",
+    "requirements": [
+     {
+      "input": "проверяет количество ≤ 0",
+      "expected": {
+       "regex": "want\\s*>\\s*0|want\\s*<=\\s*0|want\\s*<\\s*1|want\\s*>=\\s*1"
+      }
+     },
+     {
+      "input": "бросает notEnough с данными",
+      "expected": {
+       "regex": "throw\\s+StockError\\.notEnough\\s*\\("
+      }
+     }
+    ],
+    "language": "swift"
+   },
+   "explanation": "Ошибка несёт данные: фронт ловит catch StockError.notEnough(let want, let have) и показывает «есть только 2». Equatable нужен, чтобы ошибки можно было сравнивать — например, в тестах. Неверное количество проверяют первым.",
+   "hints": [
+    "guard want <= have else { throw StockError.notEnough(want: want, have: have) }",
+    "Проверку want > 0 поставь первой."
+   ]
+  }
+ ]
+}

@@ -29,6 +29,7 @@ namespace Intern.Game
             new LangInfo { id = "rust", name = "Rust", badge = "RS", runner = "docker", ready = true, professions = new[] { "backend" } },
             new LangInfo { id = "php", name = "PHP", badge = "PHP", runner = "docker", ready = true, professions = new[] { "backend" } },
             new LangInfo { id = "kotlin", name = "Kotlin", badge = "KT", runner = "docker", ready = true, professions = new[] { "backend" } },
+            new LangInfo { id = "swift", name = "Swift", badge = "SW", runner = "docker", ready = true, professions = new[] { "backend" } },
         };
 
         public static LangInfo Get(string id) { return All.FirstOrDefault(l => l.id == id); }
@@ -64,6 +65,7 @@ namespace Intern.Game
                 case "rust": return "Быстрый и безопасный язык: компилятор следит за памятью и не пропустит гонку данных. Код собирает rustc в песочнице Docker — образ Rust (около 1,4 ГБ на диске) скачается при первом запуске. Без Docker задачи проверяются по коду.";
                 case "php": return "Язык большинства сайтов: WordPress, Laravel, маркетплейсы. Код запускается в песочнице Docker — образ PHP (около 160 МБ на диске) скачается при первом запуске; в тестах предупреждения PHP считаются ошибками. Без Docker задачи проверяются по коду.";
                 case "kotlin": return "Современный язык для JVM: бэкенды на Spring и Ktor, Android. Код собирает kotlinc в песочнице Docker — образ с JDK и компилятором (около 850 МБ на диске, из них 550 МБ — тот же JDK, что для Java) игра соберёт при первом запуске. Без Docker задачи проверяются по коду.";
+                case "swift": return "Язык Apple: приложения для iPhone и Mac, а на сервере — бэкенды на Vapor. Код собирает swiftc в песочнице Docker — официальный образ swift:6.2 скачается при первом запуске — это самый большой образ в игре, около 5 ГБ на диске. Без Docker задачи проверяются по коду.";
                 default: return "Ветка языка появится в " + (Get(id) != null ? Get(id).soon : "следующих обновлениях") + ": задачи запускаются в песочнице Docker, без Docker — задачи без запуска.";
             }
         }

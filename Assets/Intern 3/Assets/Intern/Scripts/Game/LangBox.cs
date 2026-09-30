@@ -157,8 +157,83 @@ namespace Intern.Game
             extraFiles = new Dictionary<string, string> { { "Check.kt", CheckKt }, { "stazher-kt.sh", KtScript } },
         };
 
-        public static LangSpec For(string lang) { return lang == "go" ? Go : lang == "java" ? Java : lang == "csharp" ? CSharp : lang == "cpp" ? Cpp : lang == "rust" ? Rust : lang == "php" ? Php : lang == "kotlin" ? Kotlin : null; }
-        public static IEnumerable<LangSpec> All { get { yield return Go; yield return Java; yield return CSharp; yield return Cpp; yield return Rust; yield return Php; yield return Kotlin; } }
+        // Спринт 18: Swift. Официальный образ swift:6.2 (компилятор swiftc и Foundation для Linux). Сборка без SwiftPM — одним swiftc,
+        // отладочная (-Onone -g): выход за границы, переполнение и nil в ! — падение со строкой кода
+        public static readonly LangSpec Swift = new LangSpec
+        {
+            id = "swift", name = "Swift", image = "swift:6.2", container = "stazher-swift",
+            src = "main.swift", test = "tests.swift", parser = "check", size = "около 5 ГБ", slowSec = 10,
+            runCmd = "sh stazher-swift.sh run", testCmd = "sh stazher-swift.sh test",
+            testShow = "swiftc main.swift tests.swift check.swift -o tests && ./tests", runShow = "swiftc main.swift -o main && ./main", testMarker = "Check.",
+            env = new[] { "LANG=C.UTF-8" },
+            extraFiles = new Dictionary<string, string> { { "check.swift", CheckSwift }, { "stazher-swift.sh", SwiftScript } },
+        };
+
+        public static LangSpec For(string lang) { return lang == "go" ? Go : lang == "java" ? Java : lang == "csharp" ? CSharp : lang == "cpp" ? Cpp : lang == "rust" ? Rust : lang == "php" ? Php : lang == "kotlin" ? Kotlin : lang == "swift" ? Swift : null; }
+        public static IEnumerable<LangSpec> All { get { yield return Go; yield return Java; yield return CSharp; yield return Cpp; yield return Rust; yield return Php; yield return Kotlin; yield return Swift; } }
+
+        // <swift-embed> — генерирует Tools/s18/embed.py из check.swift и stazher-swift.sh
+        public const string CheckSwift =
+            "// Проверки «Стажёра» для задач на Swift: каждая проверка печатает строку ##TEST|имя|PASS или ##TEST|имя|FAIL|почему.\n" +
+            "// Ошибка (throw) в проверяемом коде ловится внутри проверки; падение программы (fatal error) останавливает все тесты.\n" +
+            "import Foundation\n" +
+            "\n" +
+            "enum Check {\n" +
+            "    // Check.eq(\"имя\", ожидаемое) { код }\n" +
+            "    static func eq<T: Equatable>(_ name: String, _ want: T, _ got: () throws -> T) {\n" +
+            "        do {\n" +
+            "            let g = try got()\n" +
+            "            if g == want { pass(name) } else { fail(name, \"получено \\(show(g)), ожидалось \\(show(want))\") }\n" +
+            "        } catch { fail(name, \"ошибка \\(show(error))\") }\n" +
+            "    }\n" +
+            "\n" +
+            "    // Check.near(\"имя\", 2.25) { f(1.5) } — дробные сравниваются с допуском\n" +
+            "    static func near(_ name: String, _ want: Double, _ got: () throws -> Double) {\n" +
+            "        do {\n" +
+            "            let g = try got()\n" +
+            "            if abs(g - want) < 1e-9 { pass(name) } else { fail(name, \"получено \\(g), ожидалось \\(want)\") }\n" +
+            "        } catch { fail(name, \"ошибка \\(show(error))\") }\n" +
+            "    }\n" +
+            "\n" +
+            "    // Check.fails(\"имя\", BankError.notEnough) { try withdraw(100, 500) } — ждём именно эту ошибку\n" +
+            "    static func fails<E: Error & Equatable, T>(_ name: String, _ want: E, _ f: () throws -> T) {\n" +
+            "        do {\n" +
+            "            let r = try f()\n" +
+            "            fail(name, \"ошибки не было (результат \\(show(r))), ожидалась \\(show(want))\")\n" +
+            "        } catch let e as E where e == want {\n" +
+            "            pass(name)\n" +
+            "        } catch {\n" +
+            "            fail(name, \"ошибка \\(show(error)), ожидалась \\(show(want))\")\n" +
+            "        }\n" +
+            "    }\n" +
+            "\n" +
+            "    static func show(_ v: Any) -> String { String(reflecting: v).replacingOccurrences(of: \"Swift.\", with: \"\").replacingOccurrences(of: \"Stazher.\", with: \"\") }\n" +
+            "    static func clean(_ s: String) -> String {\n" +
+            "        s.replacingOccurrences(of: \"|\", with: \"/\").replacingOccurrences(of: \"\\r\", with: \"\").replacingOccurrences(of: \"\\n\", with: \" ⏎ \")\n" +
+            "    }\n" +
+            "    static func pass(_ n: String) { print(\"##TEST|\\(clean(n))|PASS\"); fflush(stdout) }\n" +
+            "    static func fail(_ n: String, _ m: String) { print(\"##TEST|\\(clean(n))|FAIL|\\(clean(m))\"); fflush(stdout) }\n" +
+            "}\n" +
+            "";
+
+        public const string SwiftScript =
+            "#!/bin/sh\n" +
+            "# «Стажёр»: сборка и запуск Swift. sh stazher-swift.sh run — main.swift;  sh stazher-swift.sh test — main.swift + tests.swift + check.swift\n" +
+            "# В тестах к копии main.swift дописывается вызов tests(): сначала выполняется код игрока, потом проверки (номера строк не сдвигаются)\n" +
+            "rm -rf out && mkdir out || exit 2\n" +
+            "if [ \"$1\" = test ]; then\n" +
+            "    { cat main.swift; printf '\\ntests()\\n'; } > out/main.swift\n" +
+            "    SRC=\"out/main.swift tests.swift check.swift\"\n" +
+            "else\n" +
+            "    SRC=\"main.swift\"\n" +
+            "fi\n" +
+            "swiftc -swift-version 5 -Onone -g -suppress-warnings -diagnostic-style llvm -module-name Stazher $SRC -lm -o out/prog 2>out/swiftc.txt\n" +
+            "if [ $? -ne 0 ]; then grep -v \"emit-module command failed\" out/swiftc.txt >&2; exit 1; fi\n" +
+            "# при падении — короткий отчёт: только упавший поток, без регистров и списка библиотек\n" +
+            "export SWIFT_BACKTRACE=enable=yes,interactive=no,color=no,threads=crashed,registers=none,images=none,limit=12\n" +
+            "exec ./out/prog\n" +
+            "";
+        // </swift-embed>
 
         // Tools/s17/Check.kt — набор проверок для Tests.kt и точка входа тестов
         public const string CheckKt =
@@ -825,6 +900,9 @@ namespace Intern.Game
             return null;
         }
 
+        // Для инструментов редактора (пакетный прогон): образ и контейнер языка готовы — null, иначе текст ошибки
+        public static string PrepareBox(LangSpec s, Action<string> note) { bool pulled; return Prepare(s, note, out pulled); }
+
         // ---------- папка запуска ----------
         public static string SafeId(string id) { return Regex.Replace(string.IsNullOrEmpty(id) ? "task" : id, "[^A-Za-z0-9_-]", "_"); }
         public static string HostDir(string id) { return Path.Combine(Path.Combine(Path.Combine(DevEnv.WorkDir, ".stazher"), "run"), SafeId(id)); }
@@ -992,6 +1070,9 @@ namespace Intern.Game
         static readonly Regex GppErr = new Regex(@"^(\w+\.(?:cpp|hpp|h)):(\d+):(\d+): (?:fatal )?error: (.*?)(?: \[-(?:Werror=[\w-]+|fpermissive)\])?$");
         static readonly Regex CppAt = new Regex(@"(?:^|[/\s])(\w+\.cpp):(\d+)");          // кадр трассировки санитайзера: …/main.cpp:6
         static readonly Regex KtErr = new Regex(@"^(\w+\.kt):(\d+):(\d+): error: (.*?)\.?$");
+        static readonly Regex SwiftErr = new Regex(@"^(?:.*/)?(\w+\.swift):(\d+):(\d+): error: (.*)$");
+        static readonly Regex SwiftCrash = new Regex(@"(?:(?:Fatal error|Precondition failed|Assertion failed): ([^\n]*)|\*\*\* Swift runtime failure: ([^\n]*?) \*\*\*|\*\*\* Program crashed: ([^\n]*?) at 0x)");
+        static readonly Regex SwiftFrame = new Regex(@" at (?:\S*/)?(\w+\.swift):(\d+)");   // кадр отчёта swift-backtrace: … in prog at /work/…/main.swift:4:20
         static readonly Regex PhpParse = new Regex(@"^(?:PHP )?Parse error:\s+(.*) in (?:.*/)?(\w+\.php) on line (\d+)$");
         static readonly Regex PhpUncaught = new Regex(@"(?:PHP )?Fatal error:\s+Uncaught (\S+?): (.*?) in (?:.*/)?(\w+\.php):(\d+)");
         static readonly Regex PhpFatal = new Regex(@"(?:PHP )?Fatal error:\s+(.*) in (?:.*/)?(\w+\.php) on line (\d+)");
@@ -1012,6 +1093,8 @@ namespace Intern.Game
             for (int i = 0; i < lines.Length; i++)
             {
                 string l = lines[i].Trim();
+                var sm = SwiftErr.Match(l);
+                if (sm.Success) { list.Add(new CompileError { file = sm.Groups[1].Value, line = int.Parse(sm.Groups[2].Value), text = Explain(sm.Groups[4].Value) }); continue; }
                 var km = KtErr.Match(l);
                 if (km.Success) { list.Add(new CompileError { file = km.Groups[1].Value, line = int.Parse(km.Groups[2].Value), text = Explain(km.Groups[4].Value) }); continue; }
                 var pm = PhpParse.Match(l);
@@ -1132,6 +1215,18 @@ namespace Intern.Game
         {
             ex = null; err = err ?? "";
             Func<int, string> lineAt = i => { int end = err.IndexOf('\n', i); return (end > 0 ? err.Substring(i, end - i) : err.Substring(i)).Trim(); };
+            // Swift: fatal error, runtime failure или падение; строка — из первого кадра в файле игрока (отчёт swift-backtrace)
+            if (srcName.EndsWith(".swift"))
+            {
+                var sc = SwiftCrash.Match(err);
+                if (!sc.Success) return -1;
+                string what = sc.Groups[1].Success ? sc.Groups[1].Value : sc.Groups[2].Success ? sc.Groups[2].Value : sc.Groups[3].Value;
+                ex = ExplainRuntime("swift:" + what.Trim());
+                var fr = SwiftFrame.Matches(err).Cast<Match>().FirstOrDefault(x => x.Groups[1].Value == srcName);
+                if (fr != null) return int.Parse(fr.Groups[2].Value);
+                var fl = Regex.Match(err, @"(?:^|\n)(?:\w+/)*" + Regex.Escape(srcName) + @":(\d+): ");   // Stazher/main.swift:4: Fatal error: …
+                return fl.Success ? int.Parse(fl.Groups[1].Value) : -1;
+            }
             // PHP: необработанное исключение или фатальная ошибка
             var pu = PhpUncaught.Match(err);
             if (pu.Success)
@@ -1215,6 +1310,19 @@ namespace Intern.Game
                 if (core.StartsWith("Maximum execution time")) return "программа работает слишком долго (" + e + ")";
                 return e;
             }
+            if (e.StartsWith("swift:"))
+            {
+                e = e.Substring(6);
+                if (e == "Index out of range") return "выход за границы массива (Index out of range)";
+                if (e.StartsWith("Unexpectedly found nil while")) return "в опционале nil, а значение достали через ! (" + e + ")";
+                if (e == "Division by zero") return "деление на ноль (" + e + ")";
+                if (e.StartsWith("Division by zero in remainder")) return "остаток от деления на ноль (" + e + ")";
+                if (e == "arithmetic overflow") return "переполнение Int: результат не помещается в тип (arithmetic overflow)";
+                if (e.StartsWith("Range requires lowerBound <= upperBound") || e.StartsWith("Can't form Range")) return "диапазон задом наперёд: нижняя граница больше верхней (" + e + ")";
+                if (e.StartsWith("Bad pointer dereference")) return "переполнение стека — похоже на бесконечную рекурсию (" + e + ")";
+                if (e.StartsWith("Double value cannot be converted") || e.StartsWith("Not enough bits")) return "дробное число не помещается в Int (" + e + ")";
+                return "программа остановлена: " + e;
+            }
             if (e.StartsWith("rust:"))
             {
                 e = e.Substring(5);
@@ -1237,7 +1345,7 @@ namespace Intern.Game
         public static int ErrorLine(string stderr, string srcName, out string msg)
         {
             msg = null;
-            if (srcName.EndsWith(".java") || srcName.EndsWith(".cs") || srcName.EndsWith(".cpp") || srcName.EndsWith(".rs") || srcName.EndsWith(".php") || srcName.EndsWith(".kt"))
+            if (srcName.EndsWith(".java") || srcName.EndsWith(".cs") || srcName.EndsWith(".cpp") || srcName.EndsWith(".rs") || srcName.EndsWith(".php") || srcName.EndsWith(".kt") || srcName.EndsWith(".swift"))
             {
                 var ce = CompileErrors(stderr).FirstOrDefault(e => e.file == srcName);
                 if (ce != null) { msg = "Ошибка компиляции в строке " + ce.line + ": " + ce.text; return ce.line; }
@@ -1283,6 +1391,29 @@ namespace Intern.Game
             if (e.StartsWith("too many arguments for")) return "передано слишком много аргументов (" + e + ")";
             if (e.StartsWith("none of the following candidates is applicable") || e.StartsWith("none of the following functions can be called")) return "нет подходящей функции для таких аргументов (" + e + ")";
             if ((m = Regex.Match(e, @"^cannot access '(\w+)': it is private")).Success) return m.Groups[1].Value + " закрыт (private) (" + e + ")";
+            // swiftc (Swift)
+            if ((m = Regex.Match(e, @"^cannot find '(\w+)' in scope$")).Success) return "имя " + m.Groups[1].Value + " не найдено: опечатка или не объявлено (" + e + ")";
+            if ((m = Regex.Match(e, @"^cannot find type '(\w+)' in scope$")).Success) return "тип " + m.Groups[1].Value + " не найден: опечатка или не объявлен (" + e + ")";
+            if ((m = Regex.Match(e, @"^cannot assign to (?:value|property): '(\w+)' is a 'let' constant$")).Success) return m.Groups[1].Value + " объявлена через let — чтобы менять, объяви через var (" + e + ")";
+            if ((m = Regex.Match(e, @"^left side of mutating operator isn't mutable: '(\w+)' is a 'let' constant$")).Success) return m.Groups[1].Value + " объявлена через let — чтобы менять, объяви через var (" + e + ")";
+            if ((m = Regex.Match(e, @"^cannot use mutating member on immutable value: '(\w+)' is a 'let' constant$")).Success) return m.Groups[1].Value + " — let: mutating-метод можно вызвать только у var (" + e + ")";
+            if (e.StartsWith("cannot assign to value: '") && e.Contains("is immutable")) return "параметры функции — константы, их нельзя менять: заведи var-копию (" + e + ")";
+            if ((m = Regex.Match(e, @"^value of optional type '(.+?)' must be unwrapped")).Success) return "значение типа " + m.Groups[1].Value + " может быть nil — разверни его: ?., ?? или if let (" + e + ")";
+            if ((m = Regex.Match(e, @"^cannot convert (?:value|return expression) of type '(.+?)' to (?:specified|expected argument|return|expected element) type '(.+?)'")).Success) return "не тот тип: ожидался " + m.Groups[2].Value + ", а получен " + m.Groups[1].Value + " (" + e + ")";
+            if ((m = Regex.Match(e, @"^binary operator '(.+?)' cannot be applied to operands of type '(.+?)' and '(.+?)'$")).Success) return "оператор " + m.Groups[1].Value + " не работает с " + m.Groups[2].Value + " и " + m.Groups[3].Value + " — Swift не смешивает типы, преобразуй явно: Double(x), String(x) (" + e + ")";
+            if (e.StartsWith("missing return in")) return "функция должна вернуть значение: не хватает return (" + e + ")";
+            if ((m = Regex.Match(e, @"^missing argument label '(\w+):' in call$")).Success) return "при вызове нужна метка " + m.Groups[1].Value + ": (" + e + ")";
+            if ((m = Regex.Match(e, @"^extraneous argument label '(\w+):' in call$")).Success) return "лишняя метка " + m.Groups[1].Value + ": — у этого параметра метки нет (_) (" + e + ")";
+            if (e.StartsWith("missing argument for parameter")) return "не передан аргумент (" + e + ")";
+            if (e.StartsWith("extra argument")) return "передан лишний аргумент (" + e + ")";
+            if (e.StartsWith("call can throw but is not marked with 'try'")) return "функция может бросить ошибку — вызывай её через try (" + e + ")";
+            if (e.StartsWith("errors thrown from here are not handled")) return "ошибку отсюда никто не ловит — оберни в do/catch или используй try? (" + e + ")";
+            if (e.StartsWith("switch must be exhaustive")) return "switch должен разобрать все варианты — добавь default (" + e + ")";
+            if ((m = Regex.Match(e, @"^'(\w+)' is inaccessible due to 'private' protection level$")).Success) return m.Groups[1].Value + " закрыт (private) (" + e + ")";
+            if ((m = Regex.Match(e, @"^cannot assign to property: '(\w+)' setter is inaccessible")).Success) return m.Groups[1].Value + " снаружи можно только читать (private(set)) (" + e + ")";
+            if ((m = Regex.Match(e, @"^type '(\w+)' does not conform to protocol '(\w+)'$")).Success) return "тип " + m.Groups[1].Value + " не выполняет договор " + m.Groups[2].Value + ": не хватает метода или свойства (" + e + ")";
+            if ((m = Regex.Match(e, @"^expected '(.+?)'")).Success && !e.EndsWith(" expected")) return "не хватает «" + m.Groups[1].Value + "» (" + e + ")";
+            if (e.StartsWith("consecutive statements on a line must be separated by")) return "две команды в одной строке — пропущен перенос строки или оператор (" + e + ")";
             // php -l (PHP)
             if ((m = Regex.Match(e, "^syntax error, unexpected (?:token )?\"(.+?)\", expecting \"(.+?)\"$")).Success) return "синтаксическая ошибка: перед «" + m.Groups[1].Value + "» не хватает «" + m.Groups[2].Value + "» (" + e + ")";
             if (e.StartsWith("syntax error, unexpected end of file")) return "файл закончился раньше времени — не закрыта скобка } или кавычка (" + e + ")";

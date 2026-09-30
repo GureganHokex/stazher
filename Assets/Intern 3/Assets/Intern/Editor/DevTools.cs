@@ -148,6 +148,56 @@ namespace Intern.EditorTools
             }) { IsBackground = true }.Start();
         }
 
+        // Пакетный прогон в контейнерах языков: Temp/boxbatch.json {"jobs":[{"id","lang","mode":"run|test","cmd","files":[{"name","text"}]}]}
+        // → Temp/boxbatch.out.json с кодом выхода, stdout и stderr каждого запуска. Нужен генераторам веток (Tools/sNN), когда компилятора нет под рукой
+        [Serializable] public class BoxFile { public string name, text; }
+        [Serializable] public class BoxJobIn { public string id, lang, mode, cmd; public BoxFile[] files; }
+        [Serializable] public class BoxBatchIn { public BoxJobIn[] jobs; }
+        [Serializable] public class BoxJobOut { public string id, stdout, stderr; public int code; public bool timedOut; public double ms; }
+        [Serializable] public class BoxBatchOut { public List<BoxJobOut> results = new List<BoxJobOut>(); public string notes = ""; public bool done; }
+
+        [MenuItem("Стажёр/Прогнать пакет запусков в Docker", false, 25)]
+        public static void RunBoxBatch()
+        {
+            string inFile = Path.Combine(Root, "Temp", "boxbatch.json"), outFile = Path.Combine(Root, "Temp", "boxbatch.out.json");
+            BoxBatchIn batch;
+            try { batch = JsonUtility.FromJson<BoxBatchIn>(File.ReadAllText(inFile)); }
+            catch (Exception e) { File.WriteAllText(Out, "boxbatch: не прочитан Temp/boxbatch.json: " + e.Message + "\n", new UTF8Encoding(false)); return; }
+            if (File.Exists(outFile)) File.Delete(outFile);
+            File.WriteAllText(Out, "boxbatch " + DateTime.Now.ToString("HH:mm:ss") + ": " + batch.jobs.Length + " запусков, итог — в Temp/boxbatch.out.json\n", new UTF8Encoding(false));
+            new System.Threading.Thread(() =>
+            {
+                var res = new BoxBatchOut();
+                var notes = new StringBuilder();
+                foreach (var j in batch.jobs)
+                {
+                    var o = new BoxJobOut { id = j.id, stdout = "", stderr = "" };
+                    try
+                    {
+                        var spec = Intern.Game.LangBox.For(j.lang);
+                        string err = spec == null ? "нет языка " + j.lang : Intern.Game.LangBox.PrepareBox(spec, n => notes.AppendLine(n));
+                        if (err != null) { o.code = -1; o.stderr = err; }
+                        else
+                        {
+                            var files = new Dictionary<string, string>();
+                            foreach (var f in j.files ?? new BoxFile[0]) files[f.name] = f.text;
+                            string box = "batch-" + j.id;
+                            Intern.Game.LangBox.WriteFiles(spec, box, files);
+                            string cmd = !string.IsNullOrEmpty(j.cmd) ? j.cmd : j.mode == "test" ? spec.testCmd : spec.runCmd;
+                            var r = Intern.Game.LangBox.Exec(spec, box, cmd, spec.RunSec + 30);
+                            o.code = r.Code; o.timedOut = r.TimedOut; o.ms = r.Ms; o.stdout = r.Out ?? ""; o.stderr = r.Err ?? "";
+                        }
+                    }
+                    catch (Exception e) { o.code = -2; o.stderr = "исключение: " + e.Message; }
+                    res.results.Add(o);
+                    res.notes = notes.ToString();
+                    try { File.WriteAllText(outFile + ".partial", JsonUtility.ToJson(res), new UTF8Encoding(false)); } catch (Exception) { }
+                }
+                res.done = true;
+                try { File.WriteAllText(outFile, JsonUtility.ToJson(res), new UTF8Encoding(false)); } catch (Exception) { }
+            }) { IsBackground = true }.Start();
+        }
+
         // Пересобрать образ компилятора C++ с нуля (docker rmi + docker build) и записать полный вывод — если сборка в игре не удалась
         [MenuItem("Стажёр/Пересобрать образ C++ (лог в Temp)", false, 24)]
         public static void RebuildCppImage()
