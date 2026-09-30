@@ -8,7 +8,7 @@
 //  • «Selftest последней сборки» — запускает Builds/Stazher-*-win64/Stazher.exe -selftest в окне и, когда он закончит,
 //    копирует отчёт в Temp/selftest_build.txt.
 //  • «Графика: замер FPS последней сборки» — Stazher.exe -bench: FPS на каждом пресете и снимки, итог в Temp/bench_build.txt.
-//  • Команды без меню: слово в Temp/devcmd.txt — shots, pose, dump, resume, play, stop, refresh, builddev, selftest, bench, commit, gallery.
+//  • Команды без меню: слово в Temp/devcmd.txt — shots, pose, dump, resume, play, stop, refresh, builddev, selftest, bench, commit, gallery, city, continue.
 // Итог каждой команды — в Temp/devtools.txt.
 using System;
 using System.Collections.Generic;
@@ -60,6 +60,10 @@ namespace Intern.EditorTools
                 int sep = Array.IndexOf(lines, "---");
                 if (sep <= 0) { log.AppendLine("в Temp/commit.txt нет строки «---» после путей"); return; }
                 var paths = lines.Take(sep).Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+                // пустой .git/index.lock остаётся, если git в другой среде не смог его удалить; живой git держит его секунды
+                var lockFile = Path.Combine(Root, ".git", "index.lock");
+                var lfi = new FileInfo(lockFile);
+                if (lfi.Exists && lfi.Length == 0 && (DateTime.Now - lfi.LastWriteTime).TotalSeconds > 30) { lfi.Delete(); log.AppendLine("убран забытый .git/index.lock"); }
                 string msgFile = Path.Combine(Root, "Temp", "commit_msg.txt");
                 File.WriteAllText(msgFile, string.Join("\n", lines.Skip(sep + 1).ToArray()).Trim() + "\n", new UTF8Encoding(false));
                 foreach (var p in paths)
@@ -344,6 +348,16 @@ namespace Intern.EditorTools
                     case "bench": BenchBuild(); break;
                     case "commit": CommitPush(); break;
                     case "gallery": ModelGallery.Run(); break;
+                    case "city": City(); break;
+                    case "texts": Texts(); break;
+                    case "stats": Stats(); break;
+                    case "continue":
+                        {
+                            var gr = EditorApplication.isPlaying ? UnityEngine.Object.FindFirstObjectByType<Intern.Game.GameRoot>() : null;
+                            if (gr != null && gr.CurMode == Intern.Game.GameRoot.Mode.Menu) gr.UiContinue();
+                            File.WriteAllText(Out, "continue: " + (gr != null ? gr.CurMode.ToString() : "нет игры") + "\n", new UTF8Encoding(false));
+                        }
+                        break;
                     default: File.WriteAllText(Out, "devcmd: неизвестная команда «" + cmd + "»\n", new UTF8Encoding(false)); break;
                 }
             };
@@ -444,6 +458,17 @@ namespace Intern.EditorTools
             File.WriteAllText(Out, log + "идёт съёмка: " + variants.Count + " вариантов\n", new UTF8Encoding(false));
         }
 
+        // город без обеда: построить, включить и встать у бизнес-центра (команда city)
+        static void City()
+        {
+            var gr = EditorApplication.isPlaying ? UnityEngine.Object.FindFirstObjectByType<Intern.Game.GameRoot>() : null;
+            var pl = EditorApplication.isPlaying ? UnityEngine.Object.FindFirstObjectByType<Intern.Game.PlayerController>() : null;
+            if (gr == null || pl == null) { File.WriteAllText(Out, "city: нужен режим Play\n", new UTF8Encoding(false)); return; }
+            var p = gr.DevCity();
+            pl.Teleport(p, 0f);
+            File.WriteAllText(Out, "city: " + p + "\n", new UTF8Encoding(false));
+        }
+
         // закрыть паузу в режиме Play (команда resume)
         static void Resume()
         {
@@ -453,6 +478,59 @@ namespace Intern.EditorTools
         }
 
         [MenuItem("Стажёр/Графика: настройки рендера в журнал", false, 62)]
+        // Все надписи TextMesh в сцене: путь, позиция, размер — чтобы найти лишние
+        static void Texts()
+        {
+            var sb = new StringBuilder("надписи " + DateTime.Now.ToString("HH:mm:ss") + "\n");
+            foreach (var tm in UnityEngine.Object.FindObjectsByType<TextMesh>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            {
+                var p = tm.transform.position;
+                sb.AppendLine(string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.0} {1:0.0} {2:0.0} | cs={3:0.000} sc={4:0.00} | {5} | {6}",
+                    p.x, p.y, p.z, tm.characterSize, tm.transform.lossyScale.x, tm.text.Replace("\n", " / "), PathOf(tm.transform)));
+            }
+            File.WriteAllText(Out, sb.ToString(), new UTF8Encoding(false));
+        }
+
+        // Нагрузка кадра (статистика редактора) и что рисует город: объекты, материалы, сетки
+        static void Stats()
+        {
+            var sb = new StringBuilder("статистика " + DateTime.Now.ToString("HH:mm:ss") + "\n");
+            sb.AppendLine("drawCalls " + UnityStats.drawCalls + " (srp " + UnityStats.srpBatcherDrawCalls + ", static " + UnityStats.staticBatchedDrawCalls + ", std " + UnityStats.standardDrawCalls + ")" + ", setPass " + UnityStats.setPassCalls
+                + ", shadowCasters " + UnityStats.shadowCasters + ", tris " + UnityStats.triangles + ", verts " + UnityStats.vertices
+                + ", frame " + (UnityStats.frameTime * 1000f).ToString("0.00") + " мс, render " + (UnityStats.renderTime * 1000f).ToString("0.00") + " мс");
+            foreach (var rootName in new[] { "City", "Office" })
+            {
+                var go = GameObject.Find(rootName);
+                if (go == null) { sb.AppendLine(rootName + ": нет"); continue; }
+                var rs = go.GetComponentsInChildren<Renderer>(false);
+                var mats = new HashSet<Material>(); var shaders = new Dictionary<string, int>(); int shadow = 0, stat = 0;
+                foreach (var r in rs)
+                {
+                    foreach (var m in r.sharedMaterials) if (m != null && mats.Add(m)) { string sn = m.shader != null ? m.shader.name : "-"; shaders[sn] = (shaders.ContainsKey(sn) ? shaders[sn] : 0) + 1; }
+                    if (r.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.Off) shadow++;
+                    if (r.isPartOfStaticBatch) stat++;
+                }
+                sb.AppendLine(rootName + ": рендереров " + rs.Length + " (в статическом пакете " + stat + ", с тенью " + shadow + "), материалов " + mats.Count + " — "
+                    + string.Join(", ", shaders.Select(kv => kv.Key + " ×" + kv.Value)));
+                var byName = rs.GroupBy(r => r.name).OrderByDescending(g => g.Count()).Take(12);
+                sb.AppendLine("  чаще всего: " + string.Join(", ", byName.Select(g => g.Key + " ×" + g.Count())));
+                var byTris = rs.OfType<MeshRenderer>().GroupBy(r => r.name).Select(g => new { g.Key, T = g.Sum(r => TrisOf(r)) }).OrderByDescending(x => x.T).Take(12);
+                sb.AppendLine("  треугольники: всего " + rs.OfType<MeshRenderer>().Sum(r => TrisOf(r)) + "; " + string.Join(", ", byTris.Select(x => x.Key + " " + x.T)));
+            }
+            File.WriteAllText(Out, sb.ToString(), new UTF8Encoding(false));
+        }
+
+        static long TrisOf(MeshRenderer r)
+        {
+            var mf = r.GetComponent<MeshFilter>(); if (mf == null || mf.sharedMesh == null) return 0;
+            var m = mf.sharedMesh; long n = 0;
+            int first = r.isPartOfStaticBatch ? r.subMeshStartIndex : 0, cnt = r.isPartOfStaticBatch ? r.sharedMaterials.Length : m.subMeshCount;
+            for (int k = first; k < first + cnt && k < m.subMeshCount; k++) n += m.GetSubMesh(k).indexCount / 3;
+            return n;
+        }
+
+        static string PathOf(Transform t) { var s = t.name; while (t.parent != null) { t = t.parent; s = t.name + "/" + s; } return s; }
+
         public static void DumpRender()
         {
             var tweak = UrpTweak();

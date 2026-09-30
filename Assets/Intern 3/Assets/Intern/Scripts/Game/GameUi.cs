@@ -94,6 +94,7 @@ namespace Intern.Game
         {
             codeBg = BuildCodeBackground(); root.Add(codeBg);
             dim = Layer(); dim.style.backgroundColor = new Color(0.05f, 0.06f, 0.17f, 0.74f); root.Add(dim);
+            tagLayer = Layer(); root.Add(tagLayer);         // имена горожан — под облачками
             bubbleLayer = Layer(); root.Add(bubbleLayer);   // облачка реплик — под карточками интерфейса
             hud = BuildHud(); root.Add(hud);
             lunchHud = BuildLunchHud(); root.Add(lunchHud);
@@ -993,6 +994,7 @@ def deploy(env=""staging""):
             if (inMenu) TickCode(dt);
             if (inWalk || inLunch) UpdateHud(); else plaqueShown = false;
             UpdateBubbles(inWalk || inLunch);
+            UpdateTags(inLunch);
             if (lunchLive) UpdateLunchHud();
             UpdateToast(m == GameRoot.Mode.Ide || m == GameRoot.Mode.Transition);
             AnimatePops();

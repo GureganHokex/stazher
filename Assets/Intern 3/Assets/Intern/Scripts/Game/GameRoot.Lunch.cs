@@ -70,6 +70,15 @@ namespace Intern.Game
             yield return Fade(0f, 0.35f);
         }
 
+        // Только для инструментов редактора: построить город (если ещё нет) и включить его, не начиная обед, —
+        // чтобы снимать улицы. Возвращает точку появления у бизнес-центра
+        public Vector3 DevCity()
+        {
+            if (city == null) city = CityBuilder.Build();
+            city.root.gameObject.SetActive(true);
+            return city.spawn.position;
+        }
+
         public void EndLunch(bool timeUp)
         {
             if ((mode != Mode.Lunch && mode != Mode.Shop) || lunch == null) return;

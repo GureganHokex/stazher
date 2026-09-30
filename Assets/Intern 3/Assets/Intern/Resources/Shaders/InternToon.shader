@@ -13,6 +13,7 @@ Shader "Intern/Toon"
         _OutlineWidth ("Outline Width", Float) = 0.0035
         _GroundAO ("Ground AO", Range(0,1)) = 0.22
         _ToonSpec ("Toon Spec (A = strength)", Color) = (1,1,1,0.25)
+        _VColor ("Use Vertex Color", Float) = 0
     }
 
     SubShader
@@ -32,6 +33,7 @@ Shader "Intern/Toon"
             half _RampThreshold;
             half _RampSmooth;
             float _OutlineWidth;
+            half _VColor;          // 1 — цвет из вершин (сетки города, где тысячи деталей разных цветов слиты в одну)
         CBUFFER_END
         ENDHLSL
 
@@ -48,13 +50,14 @@ Shader "Intern/Toon"
             #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; half4 color : COLOR; };
             struct Varyings
             {
                 float4 positionCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
                 float3 normalWS   : TEXCOORD1;
                 half   fog        : TEXCOORD2;
+                half3  tint       : TEXCOORD3;
             };
 
             Varyings vert (Attributes i)
@@ -65,6 +68,7 @@ Shader "Intern/Toon"
                 o.positionWS = p.positionWS;
                 o.normalWS = TransformObjectToWorldNormal(i.normalOS);
                 o.fog = ComputeFogFactor(p.positionCS.z);
+                o.tint = lerp(half3(1, 1, 1), i.color.rgb, _VColor);
                 return o;
             }
 
@@ -76,7 +80,7 @@ Shader "Intern/Toon"
                 half lit = smoothstep(_RampThreshold - _RampSmooth, _RampThreshold + _RampSmooth, ndl);
                 lit *= smoothstep(0.3, 0.7, L.shadowAttenuation);
 
-                half3 baseCol = _BaseColor.rgb;
+                half3 baseCol = _BaseColor.rgb * i.tint;
                 half3 shade = baseCol * _ShadeColor.rgb;
                 half3 col = lerp(shade, baseCol * saturate(L.color), lit);
                 col += baseCol * SampleSH(n) * 0.35;
@@ -90,7 +94,7 @@ Shader "Intern/Toon"
                 col += sp * _ToonSpec.rgb;
                 // мягкое затемнение у пола — фальшивый ambient occlusion
                 col *= lerp(1.0 - _GroundAO, 1.0, saturate(i.positionWS.y * 1.6));
-                col += _EmissionColor.rgb;
+                col += _EmissionColor.rgb * i.tint;
                 col = MixFog(col, i.fog);
                 return half4(col, 1);
             }
@@ -108,8 +112,8 @@ Shader "Intern/Toon"
             #pragma vertex vert
             #pragma fragment frag
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; };
-            struct Varyings { float4 positionCS : SV_POSITION; };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; half4 color : COLOR; };
+            struct Varyings { float4 positionCS : SV_POSITION; half4 col : COLOR; };
 
             Varyings vert (Attributes i)
             {
@@ -122,10 +126,11 @@ Shader "Intern/Toon"
                 off.x *= _ScreenParams.y / _ScreenParams.x;
                 cs.xy += off;
                 o.positionCS = cs;
+                o.col = lerp(_OutlineColor, half4(lerp(i.color.rgb, _OutlineColor.rgb, 0.78), 1), _VColor);
                 return o;
             }
 
-            half4 frag (Varyings i) : SV_Target { return _OutlineColor; }
+            half4 frag (Varyings i) : SV_Target { return i.col; }
             ENDHLSL
         }
 

@@ -4,7 +4,7 @@ Shader "Intern/Fx"
     Properties
     {
         _Color ("Color", Color) = (1,1,1,0.3)
-        _Radial ("Radial (1) / Beam (0)", Float) = 0
+        _Radial ("Radial (1) / Beam (0) / Flat (2)", Float) = 0
         [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend ("Src Blend", Float) = 1
         [Enum(UnityEngine.Rendering.BlendMode)] _DstBlend ("Dst Blend", Float) = 1
     }
@@ -46,7 +46,11 @@ Shader "Intern/Fx"
             half4 frag (Varyings i) : SV_Target
             {
                 half a;
-                if (_Radial > 0.5)
+                if (_Radial > 1.5)
+                {
+                    a = 1.0;   // ровное стекло: витрины, остановка (спринт 4 версии 0.9)
+                }
+                else if (_Radial > 0.5)
                 {
                     half d = length(i.uv * 2.0 - 1.0);
                     a = saturate(1.0 - d);

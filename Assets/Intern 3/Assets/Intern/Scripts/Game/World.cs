@@ -41,8 +41,21 @@ namespace Intern.Game
             // глифы шрифта — 128 px (было 64): вблизи надпись не расплывается; размер в мире тот же
             tm.text = text; tm.font = DefaultFont; tm.fontSize = 128; tm.characterSize = size * 0.5f;
             tm.anchor = TextAnchor.MiddleCenter; tm.alignment = TextAlignment.Center; tm.color = c;
-            if (tm.font != null) go.GetComponent<MeshRenderer>().material = tm.font.material;
+            if (tm.font != null) go.GetComponent<MeshRenderer>().sharedMaterial = TextMat(tm.font);
             return tm;
+        }
+
+        // Материал надписей: шейдер Intern/Text с проверкой глубины (встроенный GUI/Text рисует текст сквозь стены).
+        // Атлас динамического шрифта может пересоздаваться — тогда подставляем новую текстуру.
+        static Material textMat;
+        static Material TextMat(Font f)
+        {
+            if (textMat != null) return textMat;
+            var sh = Resources.Load<Shader>("Shaders/InternText");
+            if (sh == null || !sh.isSupported) return f.material;
+            textMat = new Material(sh) { name = "InternText", mainTexture = f.material.mainTexture };
+            Font.textureRebuilt += fr => { if (fr == f && textMat != null) textMat.mainTexture = fr.material.mainTexture; };
+            return textMat;
         }
 
         // Краткие обёртки

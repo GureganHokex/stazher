@@ -3,6 +3,7 @@
 // рядом с сохранениями (%USERPROFILE%\AppData\LocalLow\Codezilla Games\Стажёр; снимки — в папке bench). Потом выходит.
 // В этом режиме игра ничего не сохраняет: прогресс и настройки игрока остаются как были.
 // Свои ракурсы — файл bench_poses.txt там же: строки «имя|x y z поворот наклон вид» (вид 1 — от первого лица).
+// Ракурсы с z > 200 — в городе: он строится и включается без обеда (без горожан и боя).
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -18,7 +19,8 @@ namespace Intern.Game
         public static bool Requested { get { return Environment.GetCommandLineArgs().Any(a => a == "-bench"); } }
         public static bool Running { get; private set; }
 
-        static readonly string[] DefaultPoses = { "office|4.5 0.05 6.8 75 8 0", "hall|-5 0.08 -4.8 0 12 1", "lead|8.2 0.05 4.1 0 6 1" };
+        static readonly string[] DefaultPoses = { "office|4.5 0.05 6.8 75 8 0", "hall|-5 0.08 -4.8 0 12 1", "lead|8.2 0.05 4.1 0 6 1",
+                                                    "city|0 0.1 302.2 0 8 0", "square|-6 0.1 370 45 4 1" };
         const float Warmup = 2f, Measure = 5f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -68,6 +70,7 @@ namespace Intern.Game
                 var v = parts[1].Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
                 if (walk && pl != null && v.Length >= 5)
                 {
+                    if (float.Parse(v[2], ci) > 200f) root.DevCity();
                     pl.Teleport(new Vector3(float.Parse(v[0], ci), float.Parse(v[1], ci), float.Parse(v[2], ci)), float.Parse(v[3], ci));
                     pl.SetCamPitch(float.Parse(v[4], ci));
                     if (v.Length >= 6 && (v[5] == "1") != pl.firstPerson) pl.ToggleView();

@@ -32,7 +32,7 @@ namespace Intern.Game
         readonly List<GameObject> props = new List<GameObject>();
         public CharacterAnim Anim { get { return anim; } }
         public bool Recyclable;          // можно вернуть тело в пул (обед заберёт в своём кадре)
-        TextMesh tag;
+        NameTag tag;          // имя над головой — рисует интерфейс (спринт 4 версии 0.9)
         SpeechBubble bubble;
         St st = St.Walk;
         List<Vector3> path = new List<Vector3>();
@@ -75,8 +75,8 @@ namespace Intern.Game
             n.Props(rnd);
             foreach (var t in a.GetComponentsInChildren<Transform>(true)) if (!before.Contains(t) && before.Contains(t.parent)) n.props.Add(t.gameObject);
             string label = run.training ? (def.humanitarian ? def.name + " · +10" : def.name + " · не трогать") : def.name;
-            n.tag = OfficeBuilder.Label(label, new Vector3(0, 2.35f, 0), 0.018f, Pal.Hex(def.humanitarian ? def.color : "89D185"), a.transform);
-            n.tag.gameObject.AddComponent<Billboard>();
+            var tagGo = new GameObject("NameTag"); tagGo.transform.SetParent(a.transform, false);
+            n.tag = tagGo.AddComponent<NameTag>(); n.tag.Set(label, Pal.Hex(def.humanitarian ? def.color : "89D185"), 2.2f, def.humanitarian);
             n.nextThink = Time.time + (float)rnd.NextDouble() * 0.3f;
             n.NewWalk(rnd);
             return n;
@@ -169,7 +169,8 @@ namespace Intern.Game
             // отброс битой
             if (knockVel.sqrMagnitude > 0.01f)
             {
-                transform.position += knockVel * dt; knockVel = Vector3.MoveTowards(knockVel, Vector3.zero, 18f * dt);
+                var kp = transform.position + knockVel * dt; knockVel = Vector3.MoveTowards(knockVel, Vector3.zero, 18f * dt);
+                transform.position = city != null ? city.Slide(transform.position, kp, kp) : kp;
                 anim.moveSpeed = 0f; return;
             }
             if (Time.time < staggerUntil) { anim.moveSpeed = 0f; return; }
@@ -364,7 +365,8 @@ namespace Intern.Game
             var dir = to / d;
             yaw = Mathf.MoveTowardsAngle(yaw, Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg, 540f * dt);
             transform.rotation = Quaternion.Euler(0, yaw, 0);
-            transform.position = me + dir * Mathf.Min(d, spd * dt);
+            var np = me + dir * Mathf.Min(d, spd * dt);
+            transform.position = city != null ? city.Slide(me, np, target) : np;   // у стоящей машины — вдоль борта
             anim.moveSpeed = spd;
             return false;
         }

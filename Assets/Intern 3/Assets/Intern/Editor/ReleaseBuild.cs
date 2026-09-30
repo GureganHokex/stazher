@@ -33,6 +33,7 @@ namespace Intern.EditorTools
         static bool Build(string version, string folder)
         {
             ApplyPlayerSettings(version);
+            EnsureFogVariants();
             string root = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds"));
             string dir = Path.Combine(root, folder);
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
@@ -60,6 +61,23 @@ namespace Intern.EditorTools
             File.WriteAllText(Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Temp", "release_build.txt")), sb.ToString(), new UTF8Encoding(false));
             Debug.Log("[Стажёр] Сборка " + version + ": " + s.result + ", " + (s.totalSize / 1048576.0).ToString("0.0") + " МБ → " + dir);
             return s.result == BuildResult.Succeeded;
+        }
+
+        // Дымка над городом (CityAtmosphere) — линейный туман: без этих настроек Unity выкидывает варианты шейдеров с туманом,
+        // потому что в сцене туман выключен, и в сборке город остаётся без дымки
+        static void EnsureFogVariants()
+        {
+            var gs = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/GraphicsSettings.asset").FirstOrDefault();
+            if (gs == null) return;
+            var so = new SerializedObject(gs);
+            var strip = so.FindProperty("m_FogStripping");
+            var lin = so.FindProperty("m_FogKeepLinear");
+            if (strip == null || lin == null) return;
+            if (strip.intValue == 1 && lin.boolValue) return;
+            strip.intValue = 1; lin.boolValue = true;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            AssetDatabase.SaveAssets();
+            Debug.Log("[Стажёр] Туман: варианты шейдеров с линейным туманом включены в сборку");
         }
 
         // Текст «Прочитай.txt» в архиве релиза; {0} — версия
