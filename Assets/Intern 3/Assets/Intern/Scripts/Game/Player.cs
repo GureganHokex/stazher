@@ -212,6 +212,7 @@ namespace Intern.Game
 
         public void FaceCameraYaw(float yaw) { camYaw = yaw; }
         public float CamPitch { get { return camPitch; } }
+        public void SetCamPitch(float pitch) { camPitch = pitch; }
 
         // Отдача: камера подпрыгивает вверх и чуть в сторону
         // Отдача: камера подпрыгивает и потом возвращается (остаётся только пятая часть)

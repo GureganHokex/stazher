@@ -1,8 +1,10 @@
 // Сборка для Windows: меню «Стажёр → Собрать релиз для Windows» (Builds/Stazher-<версия>-win64) и
 // «Стажёр → Сборка для проверки» (версия 0.9.0-dev, Builds/Stazher-0.9.0-dev-<дата>-win64 — не релиз, никуда не выкладывается).
 // Выставляет имя игры, студию, версию и иконку и пишет короткий отчёт в Temp/release_build.txt.
+// Релиз сам кладёт в папку «Прочитай.txt» с версией и упаковывает Builds/Stazher-<версия>-win64.zip (без папок DoNotShip/DontShip).
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using UnityEditor;
@@ -19,12 +21,16 @@ namespace Intern.EditorTools
         const string IconPath = "Assets/Intern 3/Assets/Intern/Branding/icon.png";
 
         [MenuItem("Стажёр/Собрать релиз для Windows", false, 1)]
-        public static void BuildWindows() { Build(Version, "Stazher-" + Version + "-win64"); }
+        public static void BuildWindows()
+        {
+            string folder = "Stazher-" + Version + "-win64";
+            if (Build(Version, folder)) Package(Version, folder);
+        }
 
         [MenuItem("Стажёр/Сборка для проверки (dev)", false, 3)]
         public static void BuildDev() { Build(DevVersion, "Stazher-" + DevVersion + "-" + DateTime.Now.ToString("MMdd-HHmm") + "-win64"); }
 
-        static void Build(string version, string folder)
+        static bool Build(string version, string folder)
         {
             ApplyPlayerSettings(version);
             string root = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds"));
@@ -53,6 +59,42 @@ namespace Intern.EditorTools
                     if (m.type == LogType.Error || m.type == LogType.Exception) sb.AppendLine("ERR " + m.content);
             File.WriteAllText(Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Temp", "release_build.txt")), sb.ToString(), new UTF8Encoding(false));
             Debug.Log("[Стажёр] Сборка " + version + ": " + s.result + ", " + (s.totalSize / 1048576.0).ToString("0.0") + " МБ → " + dir);
+            return s.result == BuildResult.Succeeded;
+        }
+
+        // Текст «Прочитай.txt» в архиве релиза; {0} — версия
+        const string Readme =
+            "Стажёр {0} — симулятор стажёра в IT-компании (Codezilla Games)\r\n\r\n" +
+            "Запуск: Stazher.exe. Если Windows покажет «Система Windows защитила ваш компьютер» —\r\n" +
+            "«Подробнее» → «Выполнить в любом случае» (игра не подписана сертификатом).\r\n\r\n" +
+            "Управление: WASD — ходить, Shift — бег, Space — прыжок, E — действие, V — вид, Esc — пауза, F12 — скриншот.\r\n" +
+            "За компьютером: Ctrl+Enter — проверить, Ctrl+F5 — запустить, F5 — отладка (Python), 1–9 — выбрать ответ, Esc — встать.\r\n\r\n" +
+            "Языки: основной язык выбирается в паузе. Для терминала и компилируемых языков (Go, Java, C#, C++, Rust,\r\n" +
+            "PHP, Kotlin, Swift) нужен Docker Desktop — образ компилятора скачается один раз, при первой задаче.\r\n" +
+            "Без Docker задачи на этих языках проверяются по коду.\r\n\r\n" +
+            "Сохранения и скриншоты: %USERPROFILE%\\AppData\\LocalLow\\Codezilla Games\\Стажёр\r\n" +
+            "Самопроверка: Stazher.exe -selftest (отчёт selftest.txt в той же папке).\r\n\r\n" +
+            "Исходники и новости: https://github.com/GureganHokex/stazher\r\n";
+
+        // «Прочитай.txt» и zip-архив релиза: папка с игрой внутри архива, служебные папки Unity не попадают
+        static void Package(string version, string folder)
+        {
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds"));
+            string dir = Path.Combine(root, folder), zip = Path.Combine(root, folder + ".zip");
+            File.WriteAllText(Path.Combine(dir, "Прочитай.txt"), string.Format(Readme, version), new UTF8Encoding(true));
+            if (File.Exists(zip)) File.Delete(zip);
+            int n = 0;
+            using (var za = ZipFile.Open(zip, ZipArchiveMode.Create))
+                foreach (var f in Directory.GetFiles(dir, "*", SearchOption.AllDirectories).OrderBy(x => x, StringComparer.Ordinal))
+                {
+                    string rel = f.Substring(dir.Length + 1).Replace('\\', '/');
+                    if (rel.Split('/').Any(part => part.Contains("DoNotShip") || part.Contains("DontShip"))) continue;
+                    za.CreateEntryFromFile(f, folder + "/" + rel, System.IO.Compression.CompressionLevel.Optimal);
+                    n++;
+                }
+            string info = "zip: " + zip + ", файлов " + n + ", " + (new FileInfo(zip).Length / 1048576.0).ToString("0.0") + " МБ";
+            File.AppendAllText(Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Temp", "release_build.txt")), info + "\n", new UTF8Encoding(false));
+            Debug.Log("[Стажёр] " + info);
         }
 
         [MenuItem("Стажёр/Применить настройки релиза", false, 2)]

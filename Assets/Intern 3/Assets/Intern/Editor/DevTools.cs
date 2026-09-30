@@ -7,6 +7,8 @@
 //  • «Проверить ветки языков в Docker» — эталоны задач с запуском (Go и дальше) проходят go test, заготовки — нет; итог в Temp/langcheck.txt.
 //  • «Selftest последней сборки» — запускает Builds/Stazher-*-win64/Stazher.exe -selftest в окне и, когда он закончит,
 //    копирует отчёт в Temp/selftest_build.txt.
+//  • «Графика: замер FPS последней сборки» — Stazher.exe -bench: FPS на каждом пресете и снимки, итог в Temp/bench_build.txt.
+//  • Команды без меню: слово в Temp/devcmd.txt — shots, pose, dump, resume, play, stop, refresh, builddev, selftest, bench, commit.
 // Итог каждой команды — в Temp/devtools.txt.
 using System;
 using System.Collections.Generic;
@@ -311,6 +313,150 @@ namespace Intern.EditorTools
             }) { IsBackground = true }.Start();
         }
 
+        // ---------- команды из файла: Temp/devcmd.txt (одно слово) — чтобы не открывать меню, пока идёт игра ----------
+        // shots — снимки ракурса, pose — запомнить ракурс, dump — настройки рендера в журнал
+        [InitializeOnLoadMethod]
+        static void WatchCommands()
+        {
+            double nextCheck = 0;
+            EditorApplication.update += () =>
+            {
+                if (EditorApplication.timeSinceStartup < nextCheck) return;
+                nextCheck = EditorApplication.timeSinceStartup + 0.5;
+                string f = Path.Combine(Root, "Temp", "devcmd.txt");
+                if (!File.Exists(f)) return;
+                string cmd;
+                try { cmd = File.ReadAllText(f).Trim(); File.Delete(f); } catch (Exception) { return; }
+                switch (cmd)
+                {
+                    case "shots": Shots(); break;
+                    case "pose": SavePose(); break;
+                    case "dump": DumpRender(); break;
+                    case "resume": Resume(); break;
+                    case "play": EditorApplication.isPlaying = true; File.WriteAllText(Out, "play\n", new UTF8Encoding(false)); break;
+                    case "stop": EditorApplication.isPlaying = false; File.WriteAllText(Out, "stop\n", new UTF8Encoding(false)); break;
+                    case "refresh": File.WriteAllText(Out, "refresh " + DateTime.Now.ToString("HH:mm:ss") + "\n", new UTF8Encoding(false)); AssetDatabase.Refresh(); break;
+                    case "builddev":
+                        if (EditorApplication.isPlaying) File.WriteAllText(Out, "builddev: сначала выйти из Play\n", new UTF8Encoding(false));
+                        else ReleaseBuild.BuildDev();
+                        break;
+                    case "selftest": SelftestBuild(); break;
+                    case "bench": BenchBuild(); break;
+                    case "commit": CommitPush(); break;
+                    default: File.WriteAllText(Out, "devcmd: неизвестная команда «" + cmd + "»\n", new UTF8Encoding(false)); break;
+                }
+            };
+        }
+
+        // ---------- снимки для проверки графики (только в режиме Play) ----------
+        // Temp/pose.txt — ракурс «x y z yaw pitch fp»; Temp/shots.txt — варианты «имя|настройки», настройки — как у UrpLook.Tweak,
+        // плюс quality=0..3 (пресет игры). Снимки — Temp/shots/<имя>.png, журнал — Temp/devtools.txt
+        static System.Reflection.MethodInfo UrpTweak()
+        {
+            var t = Type.GetType("Intern.Look.UrpLook, Intern.URP");
+            return t != null ? t.GetMethod("Tweak", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) : null;
+        }
+
+        [MenuItem("Стажёр/Графика: запомнить ракурс", false, 60)]
+        public static void SavePose()
+        {
+            var pl = UnityEngine.Object.FindFirstObjectByType<Intern.Game.PlayerController>();
+            if (!EditorApplication.isPlaying || pl == null) { File.WriteAllText(Out, "ракурс: нужен режим Play\n", new UTF8Encoding(false)); return; }
+            var p = pl.Position; var ci = System.Globalization.CultureInfo.InvariantCulture;
+            string line = string.Format(ci, "{0:0.###} {1:0.###} {2:0.###} {3:0.#} {4:0.#} {5}", p.x, p.y, p.z, pl.CamYaw, pl.CamPitch, pl.firstPerson ? 1 : 0);
+            File.WriteAllText(Path.Combine(Root, "Temp", "pose.txt"), line + "\n", new UTF8Encoding(false));
+            File.WriteAllText(Out, "ракурс запомнен: " + line + "\n", new UTF8Encoding(false));
+        }
+
+        [MenuItem("Стажёр/Графика: снимки ракурса", false, 61)]
+        public static void Shots()
+        {
+            var log = new StringBuilder("снимки " + DateTime.Now.ToString("HH:mm:ss") + "\n");
+            var pl = UnityEngine.Object.FindFirstObjectByType<Intern.Game.PlayerController>();
+            if (!EditorApplication.isPlaying || pl == null) { File.WriteAllText(Out, log + "нужен режим Play\n", new UTF8Encoding(false)); return; }
+            var gr = UnityEngine.Object.FindFirstObjectByType<Intern.Game.GameRoot>();
+            if (gr != null) gr.UiResume();   // пауза закрывала бы кадр
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            string poseFile = Path.Combine(Root, "Temp", "pose.txt");
+            if (File.Exists(poseFile))
+            {
+                var v = File.ReadAllText(poseFile).Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (v.Length >= 5)
+                {
+                    pl.Teleport(new Vector3(float.Parse(v[0], ci), float.Parse(v[1], ci), float.Parse(v[2], ci)), float.Parse(v[3], ci));
+                    pl.SetCamPitch(float.Parse(v[4], ci));
+                    if (v.Length >= 6 && (v[5] == "1") != pl.firstPerson) pl.ToggleView();
+                    log.AppendLine("ракурс: " + string.Join(" ", v));
+                }
+            }
+            string listFile = Path.Combine(Root, "Temp", "shots.txt");
+            var variants = File.Exists(listFile)
+                ? File.ReadAllLines(listFile).Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith("#")).ToList()
+                : new List<string> { "base|" };
+            string dir = Path.Combine(Root, "Temp", "shots");
+            Directory.CreateDirectory(dir);
+            var tweak = UrpTweak();
+            string savedSettings = JsonUtility.ToJson(Intern.Game.GameConfig.S);   // пресеты вариантов меняют настройки — после съёмки вернём
+            int idx = 0; double next = EditorApplication.timeSinceStartup + 1.5; int phase = 0;
+            EditorApplication.CallbackFunction step = null;
+            step = () =>
+            {
+                try
+                {
+                    if (!EditorApplication.isPlaying) { EditorApplication.update -= step; log.AppendLine("Play остановлен"); File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false)); return; }
+                    if (EditorApplication.timeSinceStartup < next) return;
+                    if (idx >= variants.Count)
+                    {
+                        EditorApplication.update -= step;
+                        if (tweak != null) tweak.Invoke(null, new object[] { "reset" });
+                        Intern.Game.GameConfig.S = JsonUtility.FromJson<Intern.Game.GameSettings>(savedSettings); Intern.Game.GameConfig.ApplyGraphics();
+                        log.AppendLine("готово: " + variants.Count + " снимков в Temp/shots");
+                        File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false));
+                        return;
+                    }
+                    var parts = variants[idx].Split(new[] { '|' }, 2);
+                    string name = parts[0].Trim(), spec = parts.Length > 1 ? parts[1].Trim() : "";
+                    if (phase == 0)
+                    {
+                        // настройки варианта: сначала вернуть прошлые эксперименты, потом пресет, потом правки
+                        if (tweak != null) tweak.Invoke(null, new object[] { "reset" });
+                        var rest = new List<string>();
+                        foreach (var kv in spec.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            if (kv.Trim().StartsWith("quality=")) { Intern.Game.GameConfig.SetQuality(int.Parse(kv.Trim().Substring(8))); Intern.Game.GameConfig.ApplyGraphics(); }
+                            else rest.Add(kv.Trim());
+                        }
+                        string res = rest.Count > 0 && tweak != null ? (string)tweak.Invoke(null, new object[] { string.Join(";", rest.ToArray()) }) : "";
+                        log.AppendLine(name + ": " + spec + (res.Length > 0 ? " → " + res.Replace("\n", "; ") : ""));
+                        phase = 1; next = EditorApplication.timeSinceStartup + 1.2;
+                    }
+                    else
+                    {
+                        ScreenCapture.CaptureScreenshot(Path.Combine(dir, name + ".png"));
+                        phase = 0; idx++; next = EditorApplication.timeSinceStartup + 0.8;
+                    }
+                }
+                catch (Exception e) { EditorApplication.update -= step; log.AppendLine("ошибка: " + e); File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false)); }
+            };
+            EditorApplication.update += step;
+            File.WriteAllText(Out, log + "идёт съёмка: " + variants.Count + " вариантов\n", new UTF8Encoding(false));
+        }
+
+        // закрыть паузу в режиме Play (команда resume)
+        static void Resume()
+        {
+            var gr = EditorApplication.isPlaying ? UnityEngine.Object.FindFirstObjectByType<Intern.Game.GameRoot>() : null;
+            if (gr != null) gr.UiResume();
+            File.WriteAllText(Out, "resume: " + (gr != null ? gr.CurMode.ToString() : "нет игры") + "\n", new UTF8Encoding(false));
+        }
+
+        [MenuItem("Стажёр/Графика: настройки рендера в журнал", false, 62)]
+        public static void DumpRender()
+        {
+            var tweak = UrpTweak();
+            File.WriteAllText(Out, "рендер " + DateTime.Now.ToString("HH:mm:ss") + "\n" + (tweak != null ? (string)tweak.Invoke(null, new object[] { "dump" }) : "нет UrpLook") + "\n", new UTF8Encoding(false));
+        }
+
         [MenuItem("Стажёр/Selftest последней сборки", false, 21)]
         public static void SelftestBuild()
         {
@@ -332,6 +478,49 @@ namespace Intern.EditorTools
                     {
                         p.WaitForExit(15 * 60 * 1000);
                         var fresh = File.Exists(report) && File.GetLastWriteTime(report) >= started;
+                        string text = fresh ? File.ReadAllText(report) : "отчёт не обновился";
+                        // версия внутри сборки должна совпадать с версией в имени папки (Stazher-0.9.0-win64, Stazher-0.9.0-dev-1001-1200-win64)
+                        var fm = System.Text.RegularExpressions.Regex.Match(Path.GetFileName(dir), @"^Stazher-(\d+\.\d+\.\d+(?:-dev)?)-");
+                        var hm = System.Text.RegularExpressions.Regex.Match(text, @"^Стажёр (\S+) ·", System.Text.RegularExpressions.RegexOptions.Multiline);
+                        string ver = fm.Success && hm.Success ? (fm.Groups[1].Value == hm.Groups[1].Value ? "версия сборки: " + hm.Groups[1].Value + " — совпадает с папкой" : "версия сборки: " + hm.Groups[1].Value + " — НЕ совпадает с папкой " + fm.Groups[1].Value) : "версия сборки: не удалось сверить";
+                        File.WriteAllText(copy, "exit " + (p.HasExited ? p.ExitCode.ToString() : "timeout") + "\n" + ver + "\n" + text, new UTF8Encoding(false));
+                    }
+                    catch (Exception e) { try { File.WriteAllText(copy, "ошибка: " + e.Message); } catch { } }
+                }) { IsBackground = true }.Start();
+            }
+            catch (Exception e) { log.AppendLine("ошибка: " + e.Message); }
+            finally { File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false)); }
+        }
+
+        // Замер графики последней сборки: Stazher.exe -bench в окне 1920×1080 — FPS на каждом пресете и снимки;
+        // отчёт копируется в Temp/bench_build.txt, снимки — в Temp/bench
+        [MenuItem("Стажёр/Графика: замер FPS последней сборки", false, 63)]
+        public static void BenchBuild()
+        {
+            var log = new StringBuilder("bench " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\n");
+            try
+            {
+                var dir = Directory.GetDirectories(Path.Combine(Root, "Builds"), "Stazher-*-win64").OrderBy(Directory.GetLastWriteTime).LastOrDefault();
+                if (dir == null) { log.AppendLine("сборок нет"); return; }
+                string exe = Path.Combine(dir, "Stazher.exe");
+                string data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "AppData", "LocalLow", "Codezilla Games", "Стажёр");
+                string report = Path.Combine(data, "bench.txt"), shots = Path.Combine(data, "bench");
+                string copy = Path.Combine(Root, "Temp", "bench_build.txt"), copyShots = Path.Combine(Root, "Temp", "bench");
+                if (File.Exists(copy)) File.Delete(copy);
+                var p = Process.Start(new ProcessStartInfo(exe, "-bench -screen-fullscreen 0 -screen-width 1920 -screen-height 1080") { WorkingDirectory = dir, UseShellExecute = false });
+                log.AppendLine("запущено: " + exe + " (pid " + p.Id + "), отчёт появится в Temp/bench_build.txt");
+                var started = DateTime.Now;
+                new System.Threading.Thread(() =>
+                {
+                    try
+                    {
+                        p.WaitForExit(5 * 60 * 1000);
+                        var fresh = File.Exists(report) && File.GetLastWriteTime(report) >= started;
+                        Directory.CreateDirectory(copyShots);
+                        if (Directory.Exists(shots))
+                            foreach (var f in Directory.GetFiles(shots, "*.png")) File.Copy(f, Path.Combine(copyShots, Path.GetFileName(f)), true);
+                        string plog = Path.Combine(data, "Player.log");
+                        if (File.Exists(plog)) File.Copy(plog, Path.Combine(Root, "Temp", "bench_player.log"), true);   // предупреждения рендера — там
                         File.WriteAllText(copy, "exit " + (p.HasExited ? p.ExitCode.ToString() : "timeout") + "\n" + (fresh ? File.ReadAllText(report) : "отчёт не обновился"), new UTF8Encoding(false));
                     }
                     catch (Exception e) { try { File.WriteAllText(copy, "ошибка: " + e.Message); } catch { } }

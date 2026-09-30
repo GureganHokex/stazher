@@ -20,7 +20,8 @@ namespace Intern.Game
         public int quality = 2;             // 0 низкое … 3 ультра, 4 своё
         public float renderScale = 1f;
         public int aa = 3;                  // см. GameConfig.AaNames
-        public int shadows = 2;             // 0 выкл, 1 средние, 2 высокие
+        public int shadows = 2;             // 0 выкл, 1 средние, 2 высокие, 3 очень высокие (карта теней 4096)
+        public int ao = 2;                  // затенение углов (SSAO): 0 выкл, 1 среднее, 2 высокое
         public bool post = true;
         public bool screenAnim = true;      // прокрутка кода на мониторах коллег
         // звук
@@ -47,9 +48,13 @@ namespace Intern.Game
         public static readonly string[] WindowModes = { "Полный экран", "Окно без рамки", "В окне" };
         public static readonly int[] FpsValues = { 30, 60, 120, 144, 240, -1 };
         public static readonly string[] FpsNames = { "30", "60", "120", "144", "240", "Без ограничений" };
+        // Версия для интерфейса — из самой сборки (Player Settings → Version), а не вписанная руками: в 0.8.0 в меню осталось «v0.7»
+        public static string VersionLabel { get { return "v" + Application.version; } }
+
         public static readonly string[] QualityNames = { "Низкое", "Среднее", "Высокое", "Ультра", "Своё" };
         public static readonly string[] AaNames = { "Выключено", "FXAA — быстрое", "SMAA — чёткое", "MSAA 4× + SMAA", "MSAA 8× + SMAA" };
-        public static readonly string[] ShadowNames = { "Выключены", "Средние", "Высокие" };
+        public static readonly string[] ShadowNames = { "Выключены", "Средние", "Высокие", "Очень высокие" };
+        public static readonly string[] AoNames = { "Выключено", "Среднее", "Высокое" };
 
         public static void Load()
         {
@@ -63,25 +68,28 @@ namespace Intern.Game
             S.aa = Mathf.Clamp(S.aa, 0, AaNames.Length - 1);
             S.quality = Mathf.Clamp(S.quality, 0, QualityNames.Length - 1);
             S.dayLength = Mathf.Clamp(S.dayLength, 0, 2);
+            S.shadows = Mathf.Clamp(S.shadows, 0, ShadowNames.Length - 1);
+            S.ao = Mathf.Clamp(S.ao, 0, AoNames.Length - 1);
+            if (S.quality < 4) SetQuality(S.quality);   // пресеты могли поменяться с прошлой версии — берём актуальные
         }
 
-        public static void Save() { PlayerPrefs.SetString(Key, JsonUtility.ToJson(S)); PlayerPrefs.Save(); }
+        public static void Save() { if (Bench.Running) return; PlayerPrefs.SetString(Key, JsonUtility.ToJson(S)); PlayerPrefs.Save(); }
 
         // Изменили что-то в меню настроек: применить и запомнить
         public static void Commit() { ApplyAll(); Save(); }
 
         public static void ResetAll() { S = new GameSettings(); Commit(); }
 
-        // Предустановки качества графики: масштаб рендера, сглаживание, тени, пост-обработка
+        // Предустановки качества графики: масштаб рендера, сглаживание, тени, затенение углов, пост-обработка
         static readonly float[] PresetScale = { 0.75f, 1f, 1f, 1.25f };
-        static readonly int[] PresetAa = { 1, 2, 3, 4 }, PresetShadows = { 0, 1, 2, 2 };
+        static readonly int[] PresetAa = { 1, 2, 3, 4 }, PresetShadows = { 0, 1, 2, 3 }, PresetAo = { 0, 1, 2, 2 };
         static readonly bool[] PresetPost = { false, true, true, true };
 
         public static void SetQuality(int q)
         {
             S.quality = q;
             if (q < 0 || q > 3) return;
-            S.renderScale = PresetScale[q]; S.aa = PresetAa[q]; S.shadows = PresetShadows[q]; S.post = PresetPost[q];
+            S.renderScale = PresetScale[q]; S.aa = PresetAa[q]; S.shadows = PresetShadows[q]; S.ao = PresetAo[q]; S.post = PresetPost[q];
         }
 
         // Поменяли отдельный параметр графики: если совпало с предустановкой — показываем её, иначе «своё»
@@ -89,7 +97,7 @@ namespace Intern.Game
         {
             S.quality = 4;
             for (int q = 0; q < 4; q++)
-                if (Mathf.Approximately(S.renderScale, PresetScale[q]) && S.aa == PresetAa[q] && S.shadows == PresetShadows[q] && S.post == PresetPost[q]) { S.quality = q; return; }
+                if (Mathf.Approximately(S.renderScale, PresetScale[q]) && S.aa == PresetAa[q] && S.shadows == PresetShadows[q] && S.ao == PresetAo[q] && S.post == PresetPost[q]) { S.quality = q; return; }
         }
 
         // Разрешения монитора без повторов (частоты обновления не различаем), от большего к меньшему
@@ -123,7 +131,7 @@ namespace Intern.Game
             var mode = S.windowMode == 0 ? FullScreenMode.ExclusiveFullScreen : S.windowMode == 1 ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed;
             var res = CurrentRes;
 #if !UNITY_EDITOR
-            if (Screen.width != res.x || Screen.height != res.y || Screen.fullScreenMode != mode) Screen.SetResolution(res.x, res.y, mode);
+            if (!Bench.Running && (Screen.width != res.x || Screen.height != res.y || Screen.fullScreenMode != mode)) Screen.SetResolution(res.x, res.y, mode);
 #endif
             QualitySettings.vSyncCount = S.vsync ? 1 : 0;
             Application.targetFrameRate = S.vsync ? -1 : FpsValues[Mathf.Clamp(S.fps, 0, FpsValues.Length - 1)];
@@ -131,11 +139,14 @@ namespace Intern.Game
 
         public static void ApplyGraphics()
         {
-            float shadowDist = S.shadows == 0 ? 0f : S.shadows == 1 ? 18f : 30f;
+            // тени: средние — жёсткие, карта 2048, 2 каскада; высокие — мягкие, 4 каскада; очень высокие — ещё и карта 4096
+            float shadowDist = S.shadows == 0 ? 0f : S.shadows == 1 ? 18f : S.shadows == 2 ? 30f : 40f;
+            int shadowRes = S.shadows >= 3 ? 4096 : 2048, cascades = S.shadows >= 2 ? 4 : 2;
             int msaa = S.aa == 3 ? 4 : S.aa == 4 ? 8 : 1;
             int aaMode = S.aa == 0 ? 0 : S.aa == 1 ? 1 : 2;
             float exposure = 0.1f + (S.brightness - 1f) * 1.6f;
             CallUrp("Configure", new object[] { S.renderScale, msaa, aaMode, shadowDist, S.post, exposure });
+            CallUrp("ConfigureQuality", new object[] { S.ao, shadowRes, cascades });
             foreach (var l in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
                 if (l.type == LightType.Directional) l.shadows = S.shadows == 0 ? LightShadows.None : S.shadows == 1 ? LightShadows.Hard : LightShadows.Soft;
             ScreenScroller.Animate = S.screenAnim;

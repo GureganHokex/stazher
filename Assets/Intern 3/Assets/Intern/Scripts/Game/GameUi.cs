@@ -329,7 +329,7 @@ def deploy(env=""staging""):
             layer.Add(wrap);
 
             var foot = K.Box(true); foot.style.alignItems = Align.Center; foot.style.marginTop = 30f; foot.pickingMode = PickingMode.Ignore; foot.style.opacity = 0.8f;
-            foot.Add(K.T("v0.7", 14f, Muted)); foot.Add(Dot());
+            foot.Add(K.T(GameConfig.VersionLabel, 14f, Muted)); foot.Add(Dot());
             foot.Add(Keycap("Esc", 0.8f)); var fb = K.T("назад", 14f, Muted); foot.Add(fb);
             layer.Add(foot);
             return layer;
@@ -684,6 +684,8 @@ def deploy(env=""staging""):
                             new UiSelect(GameConfig.AaNames, S.aa, v => { S.aa = v; GameConfig.GraphicsTouched(); GameConfig.Commit(); RefreshSettings(); })));
                         c.Add(Row("Тени", "Тени от солнца из окон и ламп.",
                             new UiSelect(GameConfig.ShadowNames, S.shadows, v => { S.shadows = v; GameConfig.GraphicsTouched(); GameConfig.Commit(); RefreshSettings(); })));
+                        c.Add(Row("Затенение углов", "Мягкая тень в углах и у предметов на стене. Выключенное — быстрее.",
+                            new UiSelect(GameConfig.AoNames, S.ao, v => { S.ao = v; GameConfig.GraphicsTouched(); GameConfig.Commit(); RefreshSettings(); })));
                         c.Add(Row("Пост-обработка", "Мягкое свечение, сочные цвета и виньетка.",
                             new UiToggle(S.post, v => { S.post = v; GameConfig.GraphicsTouched(); GameConfig.Commit(); RefreshSettings(); })));
                         c.Add(Row("Код на мониторах коллег", "Прокрутка кода на чужих экранах в офисе.",

@@ -30,6 +30,10 @@ namespace Intern.Game
             int ok = 0, fail = 0;
             var started = DateTime.Now;
             sb.AppendLine("Стажёр " + Application.version + " · самопроверка " + started.ToString("yyyy-MM-dd HH:mm:ss"));
+            // версия в меню — из сборки: «0.9.0» или «0.9.0-dev», и надпись в меню совпадает с ней
+            bool verOk = System.Text.RegularExpressions.Regex.IsMatch(Application.version ?? "", @"^\d+\.\d+\.\d+(-dev)?$") && GameConfig.VersionLabel == "v" + Application.version;
+            sb.AppendLine("версия в меню: " + GameConfig.VersionLabel + (verOk ? " — ок" : " — НЕ СОВПАДАЕТ со сборкой"));
+            if (verOk) ok++; else fail++;
             sb.AppendLine("SQLite: " + (SqlRun.Available ? SqlRun.Library + " " + SqlRun.Version : "НЕТ — " + SqlRun.LoadError));
             var counts = new Dictionary<string, int>();
             var files = Tracks.All.ToList();
