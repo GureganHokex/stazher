@@ -305,6 +305,7 @@ namespace Intern.Game
             if (gunModel != null) Destroy(gunModel.gameObject);
             meleeModel = gunModel = null;
             DropFpArms();
+            DropGunDouble(); DropMeleeDouble();
             if (trail != null) { trail.Destroy(); trail = null; }
             comboIdx = -1;
             if (player != null) { player.fovScale = 1f; player.shoulderX = 0.35f; player.faceCamera = false; player.speedMul = 1f; player.scopeView = false; }
@@ -314,6 +315,7 @@ namespace Intern.Game
         // Модели заново (купили, поставили обвес)
         public void Rebuild()
         {
+            DropGunDouble(); DropMeleeDouble();
             if (meleeModel != null) Destroy(meleeModel.gameObject);
             if (gunModel != null) Destroy(gunModel.gameObject);
             var m = ars.Melee;
@@ -363,8 +365,23 @@ namespace Intern.Game
                 return;
             }
             if (to == 1 && ars.Gun == null) { if (run != null && run.Say != null) run.Say("Огнестрела нет — купи в оружейной «Железо» на площади."); return; }
-            slot = to; ads = false; nextAt = Mathf.Max(nextAt, Time.time + 0.25f);
+            if (swapTo >= 0) { swapTo = to; return; }
+            // сначала убрать то, что в руках (ствол опускается, клинок уходит вниз), потом достать другое
+            swapTo = to; swapAt = Time.time; ads = false; reloadStart = -1f;
+            nextAt = Mathf.Max(nextAt, Time.time + PutAway + 0.25f);
+            Sfx.Play("swoosh", player.Position + Vector3.up * 1.1f, 0.18f, 0.1f, 0.6f);
+        }
+
+        // ---------- смена оружия: убрать (PutAway с) → достать ----------
+        public const float PutAway = 0.22f;
+        int swapTo = -1; float swapAt = -9f, meleeReady = 1f;
+        public bool Swapping { get { return swapTo >= 0; } }
+        void SwapTick()
+        {
+            if (swapTo < 0 || Time.time - swapAt < PutAway) return;
+            slot = swapTo; swapTo = -1; meleeReady = 0f;
             ApplySlot();
+            Sfx.Play("swoosh", player.Position + Vector3.up * 1.1f, 0.22f, 0.1f, 0.6f);
         }
 
         // Ввод и стрельба; active — игрок управляет (не пауза, не магазин)
@@ -376,6 +393,7 @@ namespace Intern.Game
             if (throwBackAt > 0f && Time.time >= throwBackAt) { throwBackAt = -1f; ApplySlot(); }
             if (pendingHitAt > 0f && Time.time >= pendingHitAt) { pendingHitAt = -1f; MeleeHit(Current, 1f); }
             if (Reloading && Time.time - reloadStart >= reloadDur) FinishReload();
+            SwapTick();
 
             var def = Current;
             ads = ((active && InputX.AimHeld()) || devAds) && !def.Melee && !Reloading;
@@ -394,6 +412,7 @@ namespace Intern.Game
             if (Mathf.Abs(wheel) > 0.01f && !ads) Switch(slot == 0 ? 1 : 0);
             if (InputX.Reload()) StartReload();
 
+            if (Swapping) return;
             if (def.Melee)
             {
                 if (InputX.Attack()) MeleeClick(def);
@@ -409,7 +428,7 @@ namespace Intern.Game
         public void DevSelect(string id)
         {
             var d = Balance.Weapon(id); if (d == null || !ars.Owns(id)) return;
-            ars.Equip(id); slot = d.Melee ? 0 : 1; ads = false; reloadStart = -1f; nextAt = 0f;
+            ars.Equip(id); slot = d.Melee ? 0 : 1; ads = false; reloadStart = -1f; nextAt = 0f; swapTo = -1; meleeReady = 0f;
             Rebuild();
         }
         public void DevEmpty() { var w = CurrentSave; if (w != null && !Current.Melee) w.mag = 0; }

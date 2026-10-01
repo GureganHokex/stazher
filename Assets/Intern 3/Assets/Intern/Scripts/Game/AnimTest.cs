@@ -583,7 +583,7 @@ namespace Intern.Game
             // вторая камера в углу кадра — сбоку от игрока: видно руки, оружие и ноги
             var side = new GameObject("AT_SideCam").AddComponent<Camera>();
             side.rect = new Rect(0.64f, 0.03f, 0.34f, 0.46f); side.depth = pl.cam.depth + 1; side.fieldOfView = 40f;
-            side.clearFlags = CameraClearFlags.SolidColor; side.backgroundColor = pl.cam.backgroundColor; side.nearClipPlane = 0.05f;
+            side.cullingMask = FpView.OtherMask; side.clearFlags = CameraClearFlags.SolidColor; side.backgroundColor = pl.cam.backgroundColor; side.nearClipPlane = 0.05f;
             InputX.DevDrive = true; InputX.DevMove = Vector2.zero; InputX.DevLook = Vector2.zero; InputX.DevSprint = false;
             watch = pl.avatar;
             yield return null;
@@ -645,14 +645,14 @@ namespace Intern.Game
             InputX.DevDrive = true; InputX.DevMove = Vector2.zero; InputX.DevLook = Vector2.zero; InputX.DevSprint = false;
             var side = new GameObject("AT_SideCam").AddComponent<Camera>();
             side.rect = new Rect(0.6f, 0.02f, 0.39f, 0.5f); side.depth = pl.cam.depth + 1; side.fieldOfView = 30f;
-            side.clearFlags = CameraClearFlags.SolidColor; side.backgroundColor = pl.cam.backgroundColor; side.nearClipPlane = 0.05f;
+            side.cullingMask = FpView.OtherMask; side.clearFlags = CameraClearFlags.SolidColor; side.backgroundColor = pl.cam.backgroundColor; side.nearClipPlane = 0.05f;
             var front = new GameObject("AT_FrontCam").AddComponent<Camera>();
             front.rect = new Rect(0.01f, 0.02f, 0.33f, 0.44f); front.depth = pl.cam.depth + 1; front.fieldOfView = 30f;
-            front.clearFlags = CameraClearFlags.SolidColor; front.backgroundColor = new Color(0.78f, 0.8f, 0.84f); front.nearClipPlane = 0.05f;
+            front.cullingMask = FpView.OtherMask; front.clearFlags = CameraClearFlags.SolidColor; front.backgroundColor = new Color(0.78f, 0.8f, 0.84f); front.nearClipPlane = 0.05f;
             // взгляд из глаз от третьего лица (руки тела, не отдельные руки у камеры) — сверить с видом из Blender
             var eyeCam = new GameObject("AT_EyeCam").AddComponent<Camera>();
             eyeCam.rect = new Rect(0.36f, 0.55f, 0.28f, 0.44f); eyeCam.depth = pl.cam.depth + 1; eyeCam.fieldOfView = 50f;
-            eyeCam.clearFlags = CameraClearFlags.SolidColor; eyeCam.backgroundColor = new Color(0.25f, 0.25f, 0.27f); eyeCam.nearClipPlane = 0.22f;
+            eyeCam.cullingMask = FpView.OtherMask; eyeCam.clearFlags = CameraClearFlags.SolidColor; eyeCam.backgroundColor = new Color(0.25f, 0.25f, 0.27f); eyeCam.nearClipPlane = 0.22f;
             watch = null;
             float t = 0f;
             Action cams = () =>
@@ -675,7 +675,7 @@ namespace Intern.Game
             for (int view = 0; view < 2; view++)
             {
                 if (view == 1) pl.ToggleView();
-                side.enabled = front.enabled = eyeCam.enabled = view == 0;   // от первого лица — чистый кадр
+                eyeCam.enabled = view == 0;   // окна сбоку и спереди — в обоих видах: от первого лица тело со стороны должно быть целым
                 foreach (var id in weaponFilter ?? AllWeapons)
                 {
                     var def = Balance.Weapon(id);
@@ -719,6 +719,10 @@ namespace Intern.Game
                             if ((t - g0) >= shots * 0.4f) { int before = cb.MagNow; cb.DevAttack(); if (cb.MagNow < before) shots++; }
                             cb.Tick(Time.deltaTime, false); cams(); t += Time.deltaTime; yield return Tick();
                         }
+                        // смена оружия: ствол убирается, достаётся холодное
+                        cb.Switch(0);
+                        float sw0 = t;
+                        while (t - sw0 < 0.8f) { cb.Tick(Time.deltaTime, false); cams(); t += Time.deltaTime; yield return Tick(); }
                     }
                 }
                 if (view == 1) pl.ToggleView();

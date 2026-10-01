@@ -115,6 +115,7 @@ namespace Intern.Game
                         if (m.HasProperty("_Glossiness")) m.SetFloat("_Glossiness", k.smooth);
                         if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", k.metal);
                         if (k.emit > 0f) ModelLib.Emit(m, c * k.emit);
+                        else WeaponTex.Apply(m, WeaponTex.KindOf(n));   // шлифовка, зерно, волокна, насечка (развёртка из Blender)
                         wmats[key] = m;
                     }
                     ms[i] = m;

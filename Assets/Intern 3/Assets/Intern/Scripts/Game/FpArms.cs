@@ -2,7 +2,9 @@
 // а плечи у мультяшного стажёра на 40 см ниже — свои руки тела дотягиваются до ствола в кадре только задранными вверх.
 // Поэтому, как в шутерах, от первого лица руки — отдельные: копия скелета персонажа, в сетках которой оставлены
 // только треугольники рук (по весам костей: плечо, локоть, кисть, пальцы), в той же одежде. Копия висит у камеры,
-// плечи — чуть ниже и позади неё, кисти ставит тот же IK. Руки самого тела в это время сжаты в плечо (не мешают в кадре).
+// плечи — чуть ниже и позади неё, кисти ставит тот же IK.
+// Доводка (D-01): руки тела больше не сжимаются в плечо. Сетка тела делится на «руки» и «остальное»; для камеры игрока
+// руки тела — только тень, для остальных камер тело целое и само держит оружие, а руки у камеры не рисуются (FpView).
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -16,8 +18,14 @@ namespace Intern.Game
         readonly Transform[] fR = new Transform[15], fL = new Transform[15];
         Transform[] reset;
         float signR, signL;
-        CharacterAnim body; Transform bodyUpR, bodyUpL; Vector3 bodyScaleR, bodyScaleL;
+        CharacterAnim body;
         bool shown;
+        string key;
+        Renderer[] fpRenderers = new Renderer[0];
+        // руки тела: отдельные сетки с треугольниками рук рядом с сетками тела
+        class BodySplit { public SkinnedMeshRenderer src, arms; public Mesh full, rest; }
+        readonly List<BodySplit> splits = new List<BodySplit>();
+        static readonly Dictionary<Mesh, KeyValuePair<Mesh, Mesh>> splitCache = new Dictionary<Mesh, KeyValuePair<Mesh, Mesh>>();
         Transform srcRig;
         public bool Fits(CharacterAnim av) { return root != null && av == body && av != null && av.rig == srcRig; }
         public bool Shown { get { return shown; } }
@@ -48,11 +56,21 @@ namespace Intern.Game
             if (src == null || !src.isReadable) return null;
             Mesh m;
             if (cut.TryGetValue(src, out m)) return m;
+            m = Subset(smr, src, true, "_fparms");
+            cut[src] = m;
+            return m;
+        }
+
+        // Часть сетки: arms — только треугольники рук, иначе — всё, кроме них (null, если частей нет)
+        static Mesh Subset(SkinnedMeshRenderer smr, Mesh src, bool arms, string suffix)
+        {
+            if (src == null || !src.isReadable) return null;
+            Mesh m;
             var bones = smr.bones;
             var arm = new bool[bones.Length];
             for (int i = 0; i < bones.Length; i++) arm[i] = bones[i] != null && IsArm(bones[i].name);
             var bw = src.boneWeights;
-            if (bw == null || bw.Length != src.vertexCount) { cut[src] = null; return null; }
+            if (bw == null || bw.Length != src.vertexCount) return null;
             var aw = new float[bw.Length];
             for (int v = 0; v < bw.Length; v++)
             {
@@ -63,20 +81,37 @@ namespace Intern.Game
                 if (w.boneIndex3 < arm.Length && arm[w.boneIndex3]) a += w.weight3;
                 aw[v] = a;
             }
-            m = Object.Instantiate(src); m.name = src.name + "_fparms";
+            m = Object.Instantiate(src); m.name = src.name + suffix;
             int kept = 0;
             for (int sm = 0; sm < src.subMeshCount; sm++)
             {
                 var tri = src.GetTriangles(sm);
                 var keep = new List<int>(tri.Length / 4);
                 for (int i = 0; i + 2 < tri.Length; i += 3)
-                    if (aw[tri[i]] >= 0.5f && aw[tri[i + 1]] >= 0.5f && aw[tri[i + 2]] >= 0.5f) { keep.Add(tri[i]); keep.Add(tri[i + 1]); keep.Add(tri[i + 2]); }
+                {
+                    bool isArm = aw[tri[i]] >= 0.5f && aw[tri[i + 1]] >= 0.5f && aw[tri[i + 2]] >= 0.5f;
+                    if (isArm == arms) { keep.Add(tri[i]); keep.Add(tri[i + 1]); keep.Add(tri[i + 2]); }
+                }
                 m.SetTriangles(keep, sm);
                 kept += keep.Count / 3;
             }
             if (kept == 0) { Object.Destroy(m); m = null; }
-            cut[src] = m;
             return m;
+        }
+
+        // Сетка тела → (руки, остальное); один раз на каждую сетку (и на каждую гладкость)
+        static bool Split(SkinnedMeshRenderer smr, Mesh full, out Mesh arms, out Mesh rest)
+        {
+            KeyValuePair<Mesh, Mesh> kv;
+            if (!splitCache.TryGetValue(full, out kv))
+            {
+                var a = Subset(smr, full, true, "_bodyarms");
+                var r = a != null ? Subset(smr, full, false, "_noarms") : null;
+                kv = new KeyValuePair<Mesh, Mesh>(a, r);
+                splitCache[full] = kv;
+            }
+            arms = kv.Key; rest = kv.Value;
+            return arms != null && rest != null;
         }
 
         public static FpArms Build(CharacterAnim av, Transform parent)
@@ -88,6 +123,9 @@ namespace Intern.Game
             foreach (var j in copy.GetComponentsInChildren<Joint>(true)) Object.Destroy(j);
             foreach (var rb in copy.GetComponentsInChildren<Rigidbody>(true)) Object.Destroy(rb);
             foreach (var c in copy.GetComponentsInChildren<Collider>(true)) Object.Destroy(c);
+            // руки тела и тени-двойники (FpView), если успели появиться на скелете, — не копируем
+            foreach (var t in copy.GetComponentsInChildren<Transform>(true))
+                if (t != null && t != copy.transform && (t.name.EndsWith("_Arms") || t.name.EndsWith("_Shadow"))) { t.gameObject.SetActive(false); Object.Destroy(t.gameObject); }
             foreach (var mb in copy.GetComponentsInChildren<MonoBehaviour>(true)) Object.Destroy(mb);
             foreach (var r in copy.GetComponentsInChildren<Renderer>(true))
             {
@@ -98,7 +136,7 @@ namespace Intern.Game
                 smr.shadowCastingMode = ShadowCastingMode.Off; smr.receiveShadows = true;
                 smr.updateWhenOffscreen = false;
             }
-            foreach (var t in copy.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = 2;
+            foreach (var t in copy.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = FpView.MainOnlyLayer;   // только камера игрока
             var a = new FpArms { root = copy.transform, body = av, srcRig = av.rig };
             System.Func<string, Transform> F = n => ModelLib.Find(copy.transform, n);
             a.clR = F("ClavicleR"); a.clL = F("ClavicleL"); a.upR = F("ShoulderR"); a.upL = F("ShoulderL");
@@ -113,8 +151,24 @@ namespace Intern.Game
             foreach (var t in a.reset) t.localRotation = Quaternion.identity;
             a.signR = ArmSolver.ElbowSign(a.haR); a.signL = ArmSolver.ElbowSign(a.haL);
             JointHelpers.Attach(copy, copy.transform);
-            a.bodyUpR = av.armR; a.bodyUpL = av.armL;
-            a.bodyScaleR = av.armR.localScale; a.bodyScaleL = av.armL.localScale;
+            a.key = "fparms:" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(a);
+            a.fpRenderers = copy.GetComponentsInChildren<Renderer>(true);
+            // руки тела — своими сетками рядом с сетками тела (пока не нужны — выключены)
+            foreach (var smr in av.rig.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (smr.sharedMesh == null || !smr.sharedMesh.isReadable) continue;
+                Mesh am, rm;
+                if (!Split(smr, smr.sharedMesh, out am, out rm)) continue;
+                // дочерний объект сетки тела: выключенный костюм выключает и его руки
+                var go = new GameObject(smr.name + "_Arms"); go.layer = smr.gameObject.layer;
+                go.transform.SetParent(smr.transform, false);
+                var ar = go.AddComponent<SkinnedMeshRenderer>();
+                ar.bones = smr.bones; ar.rootBone = smr.rootBone; ar.sharedMesh = am; ar.sharedMaterials = smr.sharedMaterials;
+                ar.localBounds = smr.localBounds; ar.quality = smr.quality; ar.updateWhenOffscreen = smr.updateWhenOffscreen;
+                ar.shadowCastingMode = smr.shadowCastingMode; ar.receiveShadows = smr.receiveShadows;
+                ar.enabled = false;
+                a.splits.Add(new BodySplit { src = smr, arms = ar, full = smr.sharedMesh, rest = rm });
+            }
             copy.SetActive(false);
             return a;
         }
@@ -124,14 +178,37 @@ namespace Intern.Game
         {
             if (root == null) return;
             if (on && !root.gameObject.activeSelf) root.gameObject.SetActive(true);
+            if (on) KeepSplit();
             if (on == shown) return;
             shown = on;
             root.gameObject.SetActive(on);
-            if (bodyUpR != null) bodyUpR.localScale = on ? Vector3.one * 0.001f : bodyScaleR;
-            if (bodyUpL != null) bodyUpL.localScale = on ? Vector3.one * 0.001f : bodyScaleL;
+            var bodyArms = new List<Renderer>();
+            foreach (var sp in splits)
+            {
+                if (sp.src == null || sp.arms == null) continue;
+                if (on) { sp.src.sharedMesh = sp.rest; sp.arms.enabled = true; bodyArms.Add(sp.arms); }
+                else { if (sp.src.sharedMesh == sp.rest) sp.src.sharedMesh = sp.full; sp.arms.enabled = false; }
+            }
+            FpView.HideForMain(key, bodyArms, on);
         }
 
-        // В оптике: руки тела сжаты, но и свои у камеры не видны
+        // Качество моделей могло смениться (сетка тела заменена гладкой) — делим заново
+        void KeepSplit()
+        {
+            if (!shown) return;
+            foreach (var sp in splits)
+            {
+                if (sp.src == null || sp.arms == null || sp.src.sharedMesh == sp.rest || sp.src.sharedMesh == null) continue;
+                Mesh am, rm;
+                sp.full = sp.src.sharedMesh;
+                if (Split(sp.src, sp.full, out am, out rm)) { sp.rest = rm; sp.arms.sharedMesh = am; sp.src.sharedMesh = rm; }
+            }
+        }
+
+        // Для самопроверки: сколько сеток тела разделено на руки и остальное
+        public int DevSplits { get { int n = 0; foreach (var sp in splits) if (sp.src != null && sp.arms != null && sp.rest != null) n++; return n; } }
+
+        // В оптике: камера игрока не видит ни руки тела, ни свои у камеры (тело со стороны целое)
         public void Conceal()
         {
             Show(true);
@@ -165,6 +242,8 @@ namespace Intern.Game
         public void Destroy()
         {
             Show(false);
+            foreach (var sp in splits) if (sp.arms != null) Object.Destroy(sp.arms.gameObject);
+            splits.Clear();
             if (root != null) Object.Destroy(root.gameObject);
             root = null;
         }

@@ -141,6 +141,8 @@ namespace Intern.Game
             if (Av != null) Av.guardClip = null;
             if (trail != null) trail.Emit(false);
             if (Av != null && slot != 1) Av.holdClip = null;
+            if (slot != 1 || run == null) DropGunDouble();
+            if (slot != 0 || run == null) DropMeleeDouble();
             if (run == null || gunModel == null || slot != 1 || Av == null || Av.elbowR == null) { if (fpArms != null) fpArms.Show(false); return; }
             if (!Av.v4 || Av.handR == null) { OldPlace(); return; }
             var g = gunModel; var sp = GunSpec.Of(g.id);
@@ -150,7 +152,7 @@ namespace Intern.Game
             float s = Av.transform.lossyScale.y;
 
             adsW = Mathf.MoveTowards(adsW, ads ? 1f : 0f, dt * 5.5f);
-            drawW = Mathf.MoveTowards(drawW, 1f, dt / 0.32f);
+            drawW = Mathf.MoveTowards(drawW, swapTo >= 0 ? 0f : 1f, dt / (swapTo >= 0 ? PutAway : 0.32f));   // убирает перед сменой / достаёт
             lowW = Mathf.MoveTowards(lowW, Av.moveSpeed > 5.2f && !ads && Time.time - lastShotAt > 0.4f ? 1f : 0f, dt * 4f);
             Spring(ref kickBack, ref kickBackV, dt, 380f, 34f);
             Spring(ref kickPitch, ref kickPitchV, dt, 260f, 28f);
@@ -182,54 +184,11 @@ namespace Intern.Game
                 rot = Quaternion.Slerp(hipRot, camT.rotation, S01(adsW));
                 pos = eyeW - rot * eyeLocal;
             }
-            else if (grip != null && Av.torso != null)
-            {
-                // как в позе: от груди, потом довернуть на цель вокруг затыльника (пистолет — вокруг рукояти)
-                rot = Av.torso.rotation * grip.chestRot;
-                pos = Av.torso.position + Av.torso.rotation * (grip.chestPos * s);
-                Vector3 pivL = sp.longGun ? stockLocal : gripLocal;
-                Vector3 piv = pos + rot * pivL;
-                Vector3 want = aim - piv; if (want.sqrMagnitude < 1f) want = aimDir;
-                rot = Quaternion.FromToRotation(rot * Vector3.forward, want.normalized) * rot;
-                pos = piv - rot * pivL;
-            }
-            else if (sp.longGun)
-            {
-                var chest = Av.torso != null ? Av.torso.rotation : Av.transform.rotation;
-                Vector3 pocket = Av.armR.position + chest * (sp.pocket * s) + Vector3.up * (0.025f * adsW * s);
-                Vector3 dir = aim - pocket; if (dir.sqrMagnitude < 1f) dir = aimDir;
-                rot = Quaternion.LookRotation(dir.normalized, Vector3.up);
-                pos = pocket - rot * stockLocal;
-            }
-            else
-            {
-                Vector3 mid = (Av.armR.position + Av.armL.position) * 0.5f;
-                Vector3 d0 = aim - mid; if (d0.sqrMagnitude < 1f) d0 = aimDir;
-                Vector3 off = Vector3.Lerp(sp.pistolAt, sp.pistolAt + new Vector3(-0.01f, 0.05f, 0.03f), S01(adsW));
-                Vector3 gp = mid + Quaternion.LookRotation(d0.normalized, Vector3.up) * (off * s);
-                Vector3 dir = aim - gp; if (dir.sqrMagnitude < 1f) dir = aimDir;
-                rot = Quaternion.LookRotation(dir.normalized, Vector3.up);
-                pos = gp - rot * gripLocal;
-            }
-            // опущен (достаёт, бежит): дуло вниз вокруг рукояти, ствол ближе к телу
-            if (ready < 0.999f)
-            {
-                Vector3 gw = pos + rot * gripLocal;
-                var down = Quaternion.AngleAxis(sp.longGun ? 38f : 55f, rot * Vector3.right) * Quaternion.AngleAxis(sp.longGun ? -18f : 0f, Vector3.up);
-                Quaternion r2 = Quaternion.Slerp(down * rot, rot, ready);
-                Vector3 drop = (Vector3.down * (sp.longGun ? 0.12f : 0.2f) + (rot * Vector3.back) * (sp.longGun ? 0.06f : 0.2f)) * s;
-                pos = gw + drop * (1f - ready) - r2 * gripLocal; rot = r2;
-            }
+            else TpPose(g, sp, grip, aim, aimDir, gripLocal, stockLocal, s, out pos, out rot);
+            Lowered(sp, ready, gripLocal, s, ref pos, ref rot);
             // перезарядка: ствол наклонён к левой руке
             ReloadTilt(sp, ref pos, ref rot, gripLocal, s, dt);
-            // отдача: поворот вокруг рукояти и отход назад
-            {
-                Vector3 gw = pos + rot * gripLocal;
-                Quaternion kr = Quaternion.Euler(-kickPitch, kickYaw, kickRoll);
-                Quaternion r2 = rot * kr;
-                pos = gw - r2 * gripLocal - (r2 * Vector3.forward) * kickBack * s + Vector3.up * (kickBack * 0.25f * s);
-                rot = r2;
-            }
+            Kick(gripLocal, s, ref pos, ref rot);
             g.transform.SetPositionAndRotation(pos, rot);
             bool hide = player.scopeView && Scoped && adsW > 0.85f;
             g.SetVisible(!hide);
@@ -268,8 +227,9 @@ namespace Intern.Game
             float squeeze = onTrigger ? 14f : 0f;
             if (hide)
             {
-                // в оптике рук не видно: прицел закрывает кадр
+                // в оптике рук не видно: прицел закрывает кадр; со стороны тело держит винтовку
                 if (FpReady()) fpArms.Conceal();
+                OutsideGun(g, sp, grip, aim, aimDir, gripLocal, stockLocal, ready, s, squeeze, idx);
             }
             else if (fp && FpReady())
             {
@@ -279,6 +239,8 @@ namespace Intern.Game
                 Vector3 cr2 = camT.right, dn = -camT.up;
                 fpArms.IK(true, tR, hr, cr2 * (sp.longGun ? 0.8f : 0.5f) + dn * 1f - camT.forward * 0.2f, 0.45f);
                 if (g.gripL != null) fpArms.IK(false, tL, hl, dn * 1f - cr2 * 0.35f - camT.forward * 0.1f, 0.5f);
+                // со стороны и в тени тело держит двойник ствола, как от третьего лица (камера игрока видит руки у камеры)
+                OutsideGun(g, sp, grip, aim, aimDir, gripLocal, stockLocal, ready, s, squeeze, idx);
                 if (grip != null)
                 {
                     GripLib.SetFingers(fpArms.FingerBones(true), grip.fingers[0], true, squeeze, 1f - rightW * 0.7f);
@@ -301,6 +263,7 @@ namespace Intern.Game
             else
             {
                 if (fpArms != null) fpArms.Show(false);
+                DropGunDouble();
                 Av.ArmIK(true, tR, hr, poleR, 1f, 0.45f);
                 Av.ArmIK(false, tL, hl, poleL, g.gripL != null ? 1f : 0f, 0.5f);
                 if (grip != null)
@@ -317,6 +280,136 @@ namespace Intern.Game
             }
             leftW = Mathf.MoveTowards(leftW, leftFree ? 1f : 0f, dt * 8f);
             rightW = Mathf.MoveTowards(rightW, rightFree ? 1f : 0f, dt * 8f);
+        }
+
+        // Ствол от третьего лица: от груди по позе из Blender (или по старым правилам), довёрнут на цель
+        void TpPose(WeaponModel g, GunSpec sp, GripLib.Grip grip, Vector3 aim, Vector3 aimDir, Vector3 gripLocal, Vector3 stockLocal, float s, out Vector3 pos, out Quaternion rot)
+        {
+            if (grip != null && Av.torso != null)
+            {
+                // как в позе: от груди, потом довернуть на цель вокруг затыльника (пистолет — вокруг рукояти)
+                rot = Av.torso.rotation * grip.chestRot;
+                pos = Av.torso.position + Av.torso.rotation * (grip.chestPos * s);
+                Vector3 pivL = sp.longGun ? stockLocal : gripLocal;
+                Vector3 piv = pos + rot * pivL;
+                Vector3 want = aim - piv; if (want.sqrMagnitude < 1f) want = aimDir;
+                rot = Quaternion.FromToRotation(rot * Vector3.forward, want.normalized) * rot;
+                pos = piv - rot * pivL;
+            }
+            else if (sp.longGun)
+            {
+                var chest = Av.torso != null ? Av.torso.rotation : Av.transform.rotation;
+                Vector3 pocket = Av.armR.position + chest * (sp.pocket * s) + Vector3.up * (0.025f * adsW * s);
+                Vector3 dir = aim - pocket; if (dir.sqrMagnitude < 1f) dir = aimDir;
+                rot = Quaternion.LookRotation(dir.normalized, Vector3.up);
+                pos = pocket - rot * stockLocal;
+            }
+            else
+            {
+                Vector3 mid = (Av.armR.position + Av.armL.position) * 0.5f;
+                Vector3 d0 = aim - mid; if (d0.sqrMagnitude < 1f) d0 = aimDir;
+                Vector3 off = Vector3.Lerp(sp.pistolAt, sp.pistolAt + new Vector3(-0.01f, 0.05f, 0.03f), S01(adsW));
+                Vector3 gp = mid + Quaternion.LookRotation(d0.normalized, Vector3.up) * (off * s);
+                Vector3 dir = aim - gp; if (dir.sqrMagnitude < 1f) dir = aimDir;
+                rot = Quaternion.LookRotation(dir.normalized, Vector3.up);
+                pos = gp - rot * gripLocal;
+            }
+        }
+
+        // Опущен (достаёт, бежит): дуло вниз вокруг рукояти, ствол ближе к телу
+        void Lowered(GunSpec sp, float ready, Vector3 gripLocal, float s, ref Vector3 pos, ref Quaternion rot)
+        {
+            if (ready < 0.999f)
+            {
+                Vector3 gw = pos + rot * gripLocal;
+                var down = Quaternion.AngleAxis(sp.longGun ? 38f : 55f, rot * Vector3.right) * Quaternion.AngleAxis(sp.longGun ? -18f : 0f, Vector3.up);
+                Quaternion r2 = Quaternion.Slerp(down * rot, rot, ready);
+                Vector3 drop = (Vector3.down * (sp.longGun ? 0.12f : 0.2f) + (rot * Vector3.back) * (sp.longGun ? 0.06f : 0.2f)) * s;
+                pos = gw + drop * (1f - ready) - r2 * gripLocal; rot = r2;
+            }
+        }
+
+        // Отдача: поворот вокруг рукояти и отход назад
+        void Kick(Vector3 gripLocal, float s, ref Vector3 pos, ref Quaternion rot)
+        {
+            {
+                Vector3 gw = pos + rot * gripLocal;
+                Quaternion kr = Quaternion.Euler(-kickPitch, kickYaw, kickRoll);
+                Quaternion r2 = rot * kr;
+                pos = gw - r2 * gripLocal - (r2 * Vector3.forward) * kickBack * s + Vector3.up * (kickBack * 0.25f * s);
+                rot = r2;
+            }
+        }
+
+        // ---------- двойник оружия для вида со стороны (от первого лица) ----------
+        WeaponDouble gunDouble, meleeDouble;
+
+        void OutsideGun(WeaponModel g, GunSpec sp, GripLib.Grip grip, Vector3 aim, Vector3 aimDir, Vector3 gripLocal, Vector3 stockLocal,
+                        float ready, float s, float squeeze, float idx)
+        {
+            if (gunDouble == null || gunDouble.Src != g || gunDouble.Root == null)
+            {
+                DropGunDouble();
+                gunDouble = WeaponDouble.For(g);
+                FpView.KeepForMain("gun", g.gameObject, true);
+            }
+            if (gunDouble == null) return;
+            gunDouble.Sync();
+            Vector3 pos; Quaternion rot;
+            TpPose(g, sp, grip, aim, aimDir, gripLocal, stockLocal, s, out pos, out rot);
+            Lowered(sp, ready, gripLocal, s, ref pos, ref rot);
+            Kick(gripLocal, s, ref pos, ref rot);
+            var R = gunDouble.Root;
+            R.SetPositionAndRotation(pos, rot);
+            Quaternion hr, hl; Vector3 tR, tL, poleR, poleL;
+            Vector3 cr = Av.torso != null ? Av.torso.right : Av.transform.right;
+            if (grip != null)
+            {
+                hr = rot * grip.handRot[0]; hl = rot * grip.handRot[1];
+                tR = R.TransformPoint(grip.handPos[0]) + hr * (CharacterAnim.PalmR * s);
+                tL = R.TransformPoint(grip.handPos[1]) + hl * (CharacterAnim.PalmL * s);
+                poleR = R.TransformPoint(grip.elbow[0]) - (Av.armR.position + tR) * 0.5f;
+                poleL = R.TransformPoint(grip.elbow[1]) - (Av.armL.position + tL) * 0.5f;
+            }
+            else
+            {
+                var gR = gunDouble.Of(g.grip); var gL = gunDouble.Of(g.gripL);
+                hr = rot * CharacterAnim.HandRot(true, sp.fR, sp.nR); hl = rot * CharacterAnim.HandRot(false, sp.fL, sp.nL);
+                tR = gR != null ? gR.position : R.position; tL = gL != null ? gL.position + rot * (sp.offL * s) : tR;
+                poleR = cr * 0.6f + Vector3.down; poleL = Vector3.down - cr * 0.4f;
+            }
+            if (g.pump != null && sp.cycle == "pump") tL += rot * (Quaternion.Inverse(g.transform.rotation) * (g.pump.position - g.PartRestW(g.pump)));
+            BodyHoldsGun(g, tR, hr, tL, hl, poleR, poleL, grip, sp, squeeze, idx, tR);
+        }
+
+        void DropGunDouble()
+        {
+            if (gunDouble != null) { gunDouble.Destroy(); gunDouble = null; }
+            FpView.KeepForMain("gun", null, false);
+        }
+
+        void DropMeleeDouble()
+        {
+            if (meleeDouble != null) { meleeDouble.Destroy(); meleeDouble = null; }
+            FpView.KeepForMain("melee", null, false);
+        }
+
+        // Руки тела на стволе (то же, что от третьего лица): IK к точкам хвата и пальцы
+        void BodyHoldsGun(WeaponModel g, Vector3 tR, Quaternion hr, Vector3 tL, Quaternion hl, Vector3 poleR, Vector3 poleL,
+                          GripLib.Grip grip, GunSpec sp, float squeeze, float idx, Vector3 trig)
+        {
+            Av.ArmIK(true, tR, hr, poleR, 1f, 0.45f);
+            Av.ArmIK(false, tL, hl, poleL, g.gripL != null ? 1f : 0f, 0.5f);
+            if (grip != null)
+            {
+                GripLib.SetFingers(Av.FingerBones(true), grip.fingers[0], true, squeeze, 1f - rightW * 0.7f);
+                GripLib.SetFingers(Av.FingerBones(false), grip.fingers[1], false, 0f, 1f - leftW * 0.6f);
+            }
+            else
+            {
+                Av.Fingers(true, sp.curlR, idx, sp.thumbR, 1f - rightW * 0.7f);
+                if (g.gripL != null) Av.Fingers(false, sp.curlL, sp.indexL, sp.thumbL, 1f - leftW * 0.6f);
+            }
         }
 
         bool FpReady()

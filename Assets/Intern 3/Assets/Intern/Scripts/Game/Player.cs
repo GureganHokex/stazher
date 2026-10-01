@@ -34,6 +34,7 @@ namespace Intern.Game
 
             var camGo = new GameObject("PlayerCamera");
             cam = camGo.AddComponent<Camera>();
+            FpView.Main = cam;
             cam.fieldOfView = 60; cam.nearClipPlane = 0.05f;
             cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = Pal.Hex("BDE7FF");
             camGo.tag = "MainCamera";
@@ -226,6 +227,12 @@ namespace Intern.Game
         {
             camPitch = Mathf.Clamp(camPitch - pitch * 0.2f, firstPerson ? -80f : -30f, 70f);
             kickPitch = Mathf.Min(kickPitch + pitch * 0.8f, 12f); kickYaw += yaw;
+        }
+
+        // Толчок камеры без сдвига прицела (попадание в ближнем бою): вверх-вниз и вбок, сразу возвращается
+        public void Punch(float pitch, float yaw)
+        {
+            kickPitch = Mathf.Clamp(kickPitch + pitch, 0f, 12f); kickYaw = Mathf.Clamp(kickYaw + yaw, -6f, 6f);
         }
 
         // Рывок катаной: сдвиг с учётом стен

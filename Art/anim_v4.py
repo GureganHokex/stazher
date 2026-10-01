@@ -319,7 +319,8 @@ class Gait:
             sway=0.022, yaw=4.5, roll=4.0, tilt=2.0, lean=2.0, tilt_bob=1.0,
             twist=0.9, spine_roll=0.8, head_pitch=0.0,  # корпус крутится навстречу тазу, выравнивает наклон
             arm=16.0, arm_base=-2.0, arm_lag=0.06, elbow=16.0, elbow_amp=14.0, arm_out=7.0, arm_cross=0.0,
-            curl=22.0, thumb=14.0, clav=2.0,
+            curl=22.0, thumb=14.0, clav=2.0, arm_twist=0.0,
+            posture=1.0,                                # изгибы позвоночника и шеи (D-05)
         )
         d.update(k); self.__dict__.update(d)
 
@@ -444,6 +445,7 @@ class Gait:
         lean_sp = -g.tilt_bob * math.cos(2 * tau * (phi - mid)) / 3.0
         for i, b in enumerate(("Spine", "Spine2", "Torso")):
             pose.rot[b] = qmul(qaxis(Y, tw), qmul(qaxis(X, lean_sp + (g.lean * 0.3 if i == 2 else 0.0)), qaxis(Z, rl)))
+        posture_spine(pose, g.posture)
         # ---- ноги
         contacts = {}
         if not ik: return pose, contacts
@@ -465,12 +467,14 @@ class Gait:
             pose.rot["Elbow" + sd] = qaxis(X, -el)
             pose.rot["Clavicle" + sd] = qaxis(Y, s * g.clav * fwd * -1.0)
             hand_pose(pose, sd, g.curl, g.thumb, wrist=(8.0, 4.0, 0.0))
+        posture_shoulders(pose, g.posture)
         # ---- голова: держит взгляд вперёд
         wp, wr = sk.fk(pose)
         tq = wr["Torso"]
         want = qaxis(X, g.head_pitch)
         rel = qmul(qconj(tq), want)
         pose.rot["Neck"] = qslerp(QI, rel, 0.5); pose.rot["Head"] = qslerp(QI, rel, 0.5)
+        posture_neck(pose, g.posture)
         return pose, contacts
 
 # ============================================================ Blender: просмотр клипов на модели
@@ -520,7 +524,9 @@ def bake_action(arm, name, poses, fps=30, loop=True, root_motion=None):
 # ============================================================ библиотека клипов
 FPS = 30
 
-WALK = dict(v=1.4, T=0.86, duty=0.6, lift=0.18, lift_at=0.3, arm_out=0.0, front=0.36, drop=0.017, bob=0.012, land=12, swing_shape=(1.0, 1.4))
+# руки при ходьбе (D-04): позади локоть почти прямой, впереди сгиб ~35°; плечевой пояс чуть ходит за рукой
+WALK = dict(v=1.4, T=0.86, duty=0.6, lift=0.18, lift_at=0.3, arm_out=1.5, front=0.36, drop=0.017, bob=0.012, land=12, swing_shape=(1.0, 1.4),
+            arm=19.0, arm_base=1.0, elbow=9.0, elbow_amp=26.0, arm_lag=0.07, clav=3.5, yaw=5.0, twist=1.1, heel_off=0.5)
 RUN = dict(v=3.8, T=0.667, duty=0.32, front=0.34, drop=0.05, bob=0.03, bob_at=0.0, land=5, flat=0.2, heel_off=0.45, push=-60, roll_toe=-40,
            lift=0.32, lift_at=0.33, clear=0.14, clear_at=0.62, lean=8, yaw=7, roll=5, sway=0.015, width=0.07,
            swing_shape=(0.7, 1.1), swing_ends=(0.3, 0.1),
@@ -562,6 +568,28 @@ def relaxed_arms(pose, t=0.0, breath=0.0, sway=0.0):
         pose.rot["Elbow" + sd] = qaxis(X, -(13.0 + 1.5 * breath))
         hand_pose(pose, sd, 24.0, 16.0, spread=2.0, wrist=(10.0, 4.0, 6.0))
 
+# ---------- осанка (доводка 0.9, D-05): позвоночник не доска — поясница прогнута, грудной отдел чуть скруглён,
+# шея наклонена вперёд, голова держит взгляд ровно; плечи опущены и чуть вперёд
+POSTURE = dict(pelvis=5.0, lumbar=-6.0, mid=-1.0, thor=5.0, neck=11.0, clav_down=3.0, clav_fwd=4.0)
+
+def posture_spine(pose, k=1.0):
+    """Добавить изгибы позвоночника к уже выставленным поворотам таза и корпуса (до IK ног)."""
+    P = POSTURE
+    pose.rot["Hips"] = qmul(pose.rot.get("Hips", QI), qaxis(X, P["pelvis"] * k))
+    for b, a in (("Spine", P["lumbar"]), ("Spine2", P["mid"]), ("Torso", P["thor"])):
+        pose.rot[b] = qmul(pose.rot.get(b, QI), qaxis(X, a * k))
+
+def posture_neck(pose, k=1.0):
+    """После head_look: шея вперёд, голова назад на столько же — взгляд не меняется."""
+    a = POSTURE["neck"] * k
+    pose.rot["Neck"] = qmul(pose.rot.get("Neck", QI), qaxis(X, a))
+    pose.rot["Head"] = qmul(qaxis(X, -a), pose.rot.get("Head", QI))
+
+def posture_shoulders(pose, k=1.0):
+    for sd, s in (("L", -1.0), ("R", 1.0)):
+        # правая ключица (+X): вперёд — поворот вокруг Y на минус, вниз — вокруг Z на минус; левая — наоборот
+        pose.rot["Clavicle" + sd] = qmul(pose.rot.get("Clavicle" + sd, QI), qmul(qaxis(Y, -s * POSTURE["clav_fwd"] * k), qaxis(Z, -s * POSTURE["clav_down"] * k)))
+
 def head_look(pose, sk, yaw=0.0, pitch=0.0, roll=0.0, neck_share=0.45):
     """Голова смотрит в заданную сторону (в осях персонажа), что бы ни делал корпус."""
     wp, wr = sk.fk(pose)
@@ -582,9 +610,12 @@ def idle_pose(sk, t, L=8.0):
     pose.rot["Hips"] = qmul(qaxis(Y, 2.0 * w), qmul(qaxis(X, 1.5), qaxis(Z, -2.5 * w)))
     for i, b in enumerate(("Spine", "Spine2", "Torso")):
         pose.rot[b] = qmul(qaxis(Y, -0.8 * w), qmul(qaxis(X, -0.9 * br + (0.6 if i == 0 else 0.0)), qaxis(Z, 1.0 * w)))
+    posture_spine(pose)
     stand_feet(pose, sk)
     relaxed_arms(pose, t, br, sway=0.8 * math.sin(tau * t / L + 1.0))
+    posture_shoulders(pose)
     head_look(pose, sk, yaw=3.0 * math.sin(tau * t / L * 1.0 + 0.7), pitch=2.0 + 1.5 * math.sin(tau * 2 * t / L + 2.0) - 1.0 * br)
+    posture_neck(pose)
     return pose
 
 SEAT_DROP = 0.31

@@ -416,10 +416,17 @@ namespace Intern.Game
 
         public void SetSitInstant(float v) { sit = sitTarget = v; }
 
+        // Голова «спрятана» только для камеры игрока (вид от первого лица, оптика, камера вплотную): со стороны и в тени
+        // она на месте (FpView). Рендереры не выключаются.
+        bool headHidden; Renderer[] headHiddenSet;
         public void SetHeadVisible(bool v)
         {
-            foreach (var r in headRenderers) if (r != null) r.enabled = v;
+            if (headHidden == !v && headHiddenSet == headRenderers) return;
+            headHidden = !v; headHiddenSet = headRenderers;
+            foreach (var r in headRenderers) if (r != null) r.enabled = true;
+            FpView.HideForMain("head:" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this), headRenderers, !v);
         }
+        public bool HeadHidden { get { return headHidden; } }
 
         // ---------- Постройка модели ----------
         public void Build(Appearance ap)

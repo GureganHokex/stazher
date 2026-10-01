@@ -151,7 +151,10 @@ namespace Intern.Game
         public int DevCombo { get { return comboIdx; } }
 
         MeleeMove CurMove { get { var ms = Moves(Current.id); return comboIdx >= 0 && comboIdx < ms.Length ? ms[comboIdx] : null; } }
-        float StrikeU { get { var m = CurMove; return m != null ? (Time.time - strikeAt) / m.len : 9f; } }
+        // попадание: удар на мгновение замирает (стоп-кадр), камера вздрагивает
+        float freezeFrom = -9f, freezeLen;
+        float Frozen { get { return freezeFrom >= strikeAt ? Mathf.Clamp(Time.time - freezeFrom, 0f, freezeLen) : 0f; } }
+        float StrikeU { get { var m = CurMove; return m != null ? (Time.time - strikeAt - Frozen) / m.len : 9f; } }
         bool Striking { get { return CurMove != null && StrikeU < 1f; } }
 
         // Клик: первый удар, следующий в серии или в очередь
@@ -230,14 +233,24 @@ namespace Intern.Game
                 var dir = (fwd * 0.6f + push * 0.8f).normalized;
                 var at = n.transform.position + Vector3.up * (m.side == Vector3.down ? 1.62f : 1.25f) - push * 0.18f;
                 n.Hit(Mathf.RoundToInt(ars.Damage(def) * m.dmg), player.Position, at, dir, knock, stun);
-                if (i == 0) Sfx.Play(def.id == "bat" ? "hit_bat" : "hit_blade", at, 0.9f);
+                if (i == 0)
+                {
+                    Sfx.Play(def.id == "bat" ? "hit_bat" : "hit_blade", at, 0.9f);
+                    // вес удара: тяжёлая бита замирает дольше, нож — коротко
+                    float hs = def.id == "bat" ? 0.09f : def.id == "katana" ? 0.07f : 0.05f;
+                    freezeFrom = Time.time; freezeLen = hs;
+                    if (Av != null) Av.FreezeAction(hs);
+                    float side = Vector3.Dot(push, rot * Vector3.right);
+                    player.Punch(def.id == "bat" ? 2.2f : 1.2f, -side * (def.id == "bat" ? 1.6f : 0.8f));
+                }
             }
         }
 
         // ---------- поза: стойка и удар (IK), след клинка ----------
         void MeleePose(float dt)
         {
-            var w = meleeModel; if (w == null || !w.gameObject.activeInHierarchy || Av == null || !Av.v4 || Av.handR == null) { if (Av != null) Av.guardClip = null; if (fpArms != null) fpArms.Show(false); if (trail != null) trail.Emit(false); return; }
+            var w = meleeModel; if (w == null || !w.gameObject.activeInHierarchy || Av == null || !Av.v4 || Av.handR == null) { if (Av != null) Av.guardClip = null; if (fpArms != null) fpArms.Show(false); DropMeleeDouble(); if (trail != null) trail.Emit(false); return; }
+            DropGunDouble();
             var def = Current; string id = def.id;
             var camT = player.cam.transform;
             bool fp = player.firstPerson;
@@ -303,13 +316,16 @@ namespace Intern.Game
         void MeleeClipPose(WeaponModel w, GripLib.Grip gm, string id, MeleeMove m, float u, bool fp, Transform camT, float s, float dt)
         {
             holdW = Mathf.MoveTowards(holdW, 1f, dt * 6f);
+            // достаёт (0 → 1 за 0,3 с) и убирает перед сменой оружия (1 → 0): стойка тела — тем же весом
+            meleeReady = Mathf.MoveTowards(meleeReady, swapTo >= 0 ? 0f : 1f, dt / (swapTo >= 0 ? PutAway : 0.3f));
+            Av.holdRight = meleeReady > 0.5f || swapTo < 0;
             Av.AimStance(0f, camT.forward, 0f, 0f, holdW);
             Transform hand;
             bool fpOn = fp && FpReady();
             if (fpOn)
             {
                 fpArms.Show(true);
-                // кисть тела по костям (руки тела сжаты), разворот груди — из клипа
+                // кисть тела по костям (поза клипа до IK этого кадра), разворот груди — из клипа
                 Vector3 hp; Quaternion hq;
                 BoneFk(Av.torso, Av.handR, out hp, out hq);
                 Vector3 up = Av.transform.up, cf = Vector3.ProjectOnPlane(Av.torso.forward, up), bf = Vector3.ProjectOnPlane(Av.transform.forward, up);
@@ -319,6 +335,8 @@ namespace Intern.Game
                 Vector3 flat = Vector3.ProjectOnPlane(camT.forward, Vector3.up);
                 Quaternion pitch = flat.sqrMagnitude > 1e-4f ? camT.rotation * Quaternion.Inverse(Quaternion.LookRotation(flat, Vector3.up)) : Quaternion.identity;
                 Vector3 tgt = camT.position + pitch * (hp + hq * (CharacterAnim.PalmR * s) - camT.position) + camT.rotation * (FpLift(id) * s);
+                // достаёт / убирает: снизу из-за края кадра
+                tgt += camT.rotation * (new Vector3(0.05f, -0.42f, -0.06f) * (1f - S01(meleeReady)) * s);
                 // замах над головой и за плечо — не через камеру: кисть не ближе 0,3 м перед глазами и не выше линии взгляда
                 Vector3 lc = camT.InverseTransformPoint(tgt) / s;
                 if (lc.y > 0.04f) lc.y = 0.04f + (lc.y - 0.04f) * 0.35f;
@@ -341,13 +359,34 @@ namespace Intern.Game
             // оружие сидит в кисти так же, как в рендере Blender
             if (w.transform.parent != hand) w.transform.SetParent(hand, false);
             w.transform.localPosition = gm.attachPos; w.transform.localRotation = gm.attachRot;
+            // со стороны и в тени тело держит двойник оружия в своей кисти (поза клипа), камера игрока — оригинал у камеры
+            Transform body = w.transform;
+            if (fpOn)
+            {
+                if (meleeDouble == null || meleeDouble.Src != w || meleeDouble.Root == null)
+                {
+                    DropMeleeDouble();
+                    meleeDouble = WeaponDouble.For(w);
+                    FpView.KeepForMain("melee", w.gameObject, true);
+                }
+                if (meleeDouble != null)
+                {
+                    meleeDouble.Sync();
+                    body = meleeDouble.Root;
+                    if (body.parent != Av.handR) body.SetParent(Av.handR, false);
+                    body.localPosition = gm.attachPos; body.localRotation = gm.attachRot; body.localScale = Vector3.one;
+                }
+            }
+            else DropMeleeDouble();
             if (gm.two)
             {
                 // левая — точно на рукоять (после смешивания клипов кисть могла съехать на миллиметры)
                 var hrL = w.transform.rotation * gm.handRot[1];
                 var tL = w.transform.position + w.transform.rotation * (gm.handPos[1] * s) + hrL * (CharacterAnim.PalmL * s);
                 if (fpOn) fpArms.IK(false, tL, hrL, camT.rotation * new Vector3(-0.6f, -1f, -0.2f), 0.4f);
-                else Av.ArmIK(false, tL, hrL, Av.elbowL.position - (Av.armL.position + tL) * 0.5f, 1f, 0.5f);
+                var hbL = body.rotation * gm.handRot[1];
+                var bL = body.position + body.rotation * (gm.handPos[1] * s) + hbL * (CharacterAnim.PalmL * s);
+                Av.ArmIK(false, bL, hbL, Av.elbowL.position - (Av.armL.position + bL) * 0.5f, 1f, 0.5f);
             }
             if (trail == null || trail.Weapon != w) { if (trail != null) trail.Destroy(); trail = WeaponTrail.For(w, id); }
             bool cut = m != null && u > m.hitAt - 0.22f && u < m.hitAt + 0.2f;

@@ -266,7 +266,7 @@ namespace Intern.Game
             Layer(HoldClip() ?? (twoHanded ? cAim2 : cAim1), 0f, aimW);
             if (actC != null)
             {
-                float t = (now - actAt) * actSpeed;
+                float t = (now - actAt - ActFrozen(now)) * actSpeed;
                 if (t >= actC.len) actC = null;
                 else Layer(actC, t, Window(t, actC.len, 0.03f, 0.05f));
             }
@@ -361,6 +361,10 @@ namespace Intern.Game
             return actC != null;
         }
         public void StopAction() { actC = null; }
+        // Удар попал: клип замирает на hs секунд («вес» удара), потом идёт дальше с того же места
+        float actFreezeFrom = -9f, actFreezeLen;
+        public void FreezeAction(float hs) { if (actC == null) return; actFreezeFrom = Time.time; actFreezeLen = hs; }
+        float ActFrozen(float now) { return actFreezeFrom >= actAt ? Mathf.Clamp(now - actFreezeFrom, 0f, actFreezeLen) : 0f; }
         public bool Acting { get { return actC != null; } }
 
         Vector2 gaitVel;   // скорость земли под опорной ногой в смеси клипов (направление × скорость)
