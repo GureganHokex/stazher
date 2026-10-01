@@ -305,6 +305,8 @@ namespace Intern.Game
             if (gunModel != null) Destroy(gunModel.gameObject);
             meleeModel = gunModel = null;
             DropFpArms();
+            if (trail != null) { trail.Destroy(); trail = null; }
+            comboIdx = -1;
             if (player != null) { player.fovScale = 1f; player.shoulderX = 0.35f; player.faceCamera = false; player.speedMul = 1f; player.scopeView = false; }
             if (Av != null) { Av.holdRight = false; Av.aimGun = false; Av.twoHanded = false; }
         }
@@ -338,6 +340,7 @@ namespace Intern.Game
 
         void ApplySlot()
         {
+            comboIdx = -1; strikeQueued = false;
             if (meleeModel != null) meleeModel.gameObject.SetActive(slot == 0 && !KnifeAway);
             if (gunModel != null) gunModel.gameObject.SetActive(slot == 1);
             if (Av != null) { Av.holdRight = slot == 0; Av.aimGun = slot == 1; Av.twoHanded = slot == 1 && gunModel != null && (gunModel.twoHanded || gunModel.imported); }
@@ -381,6 +384,7 @@ namespace Intern.Game
             player.speedMul = run.PlayerSpeedMul * slow;
             player.shoulderX = Mathf.MoveTowards(player.shoulderX, def.Melee ? 0.35f : 0.72f, dt * 1.4f);
             if (Av != null) Av.aimPitch = player.CamPitch;
+            if (def.Melee) MeleeTick(def);
             if (!active) return;
 
             if (InputX.Slot1()) Switch(0);
@@ -391,7 +395,7 @@ namespace Intern.Game
 
             if (def.Melee)
             {
-                if (InputX.Attack() && Time.time >= nextAt && !KnifeAway) Swing(def);
+                if (InputX.Attack()) MeleeClick(def);
                 if (InputX.AimPressed()) MeleeSpecial(def);
                 return;
             }
@@ -412,7 +416,7 @@ namespace Intern.Game
         {
             var def = Current;
             if (Time.time < nextAt) return;
-            if (def.Melee) { if (!KnifeAway) Swing(def); }
+            if (def.Melee) MeleeClick(def);
             else Fire(def);
         }
 
@@ -454,7 +458,7 @@ namespace Intern.Game
         {
             var fwd = Quaternion.Euler(0, player.CamYaw, 0) * Vector3.forward;
             player.FaceYaw(player.CamYaw);
-            if (Av != null) Av.swingStart = Time.time;
+            StartStrike(def, Moves(def.id).Length - 1);   // рывок — с уколом
             var hit = new HashSet<CityNpc>();
             float dur = 0.2f, done = 0f;
             while (done < dist)
@@ -487,7 +491,11 @@ namespace Intern.Game
             if (Reloading) return;
             if (Overheated) return;
             var w = CurrentSave;
-            if (MagNow <= 0) { StartReload(); nextAt = Time.time + 0.2f; return; }
+            if (MagNow <= 0)
+            {
+                if (Reserve <= 0 && gunModel != null) Sfx.Play("dry", gunModel.transform.position, 0.6f, 0.05f, 0.5f);
+                StartReload(); nextAt = Time.time + 0.2f; return;
+            }
             nextAt = Time.time + 1f / def.rate;
             w.mag--; lastShotAt = Time.time;
             if (ars.Overheats(def)) { heat += 1f; if (heat >= 60f) { overheatUntil = Time.time + 2.2f; if (run.Say != null) run.Say("Пулемёт перегрелся!"); } }
@@ -512,12 +520,14 @@ namespace Intern.Game
                     {
                         if (!n.Alive) { n.Shove(h.point, dir * (10f + ars.Damage(def) * 0.5f)); continue; }   // лежащее тело толкает, пуля летит дальше
                         n.Hit(ars.Damage(def), player.Position, h.point, dir, def.id == "shotgun" ? 0.25f : 0f, 0f);
+                        if (p == 0) Sfx.Play("hit_flesh", h.point, 0.8f);
                         end = h.point;
                         if (--pierce > 0) continue;
                         break;
                     }
                     end = h.point;
                     Gore.Dust(h.point, h.normal);
+                    if (p == 0 || p == 5) Sfx.Play("impact", h.point, 0.55f, 0.12f);
                     break;
                 }
                 Fx.Tracer(muzzle, end);

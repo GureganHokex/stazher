@@ -13,6 +13,14 @@ namespace Intern.Game
         bool reloadEmpty, partDropped, boxDropped;
         float pumpAt = -9f, boltAt = -9f, tiltW;
         GameObject shellHand;
+        readonly System.Collections.Generic.HashSet<string> rlSounds = new System.Collections.Generic.HashSet<string>();
+        // звук перезарядки один раз за перезарядку (у дробовика — за патрон)
+        void RlSound(string key, string id, float u, float at, Vector3 pos)
+        {
+            if (u < at) return;
+            string k = key + reloadStart.ToString("0.000");
+            if (rlSounds.Add(k)) Sfx.Play(id, pos, 0.7f, 0.05f, 0.6f);
+        }
 
         struct Key { public float u; public Vector3 p; public Quaternion r; public Key(float u, Vector3 p, Quaternion r) { this.u = u; this.p = p; this.r = r; } }
 
@@ -34,7 +42,7 @@ namespace Intern.Game
         void BeginReloadAnim(WeaponDef def)
         {
             reloadEmpty = MagNow <= 0;
-            partDropped = false; boxDropped = false;
+            partDropped = false; boxDropped = false; rlSounds.Clear();
             if (def.id == "shotgun") reloadDur = Mathf.Max(0.3f, ars.ReloadTime(def) / 4.5f);
             else if (!reloadEmpty) reloadDur *= 0.8f;
         }
@@ -84,6 +92,7 @@ namespace Intern.Game
                 Path(new[] { new Key(0f, G, GR), new Key(0.32f, P, PR), new Key(0.62f, K0, KR), new Key(0.8f, K1, KR), new Key(1f, G, GR) }, u, out hp, out hrt);
                 ShellInHand(u > 0.3f && u < 0.8f, hp, hrt);
                 Hand(hp, hrt);
+                RlSound("shell", "shell_in", u, 0.78f, K1);
                 return;
             }
             if (sp.cycle == "mg") { BeltReload(g, u, G, GR, P, PR); return; }
@@ -120,6 +129,9 @@ namespace Intern.Game
             if (u >= outAt && !partDropped) { partDropped = true; Casings.DropPart(g.magPart, player, (pistol ? down * 0.5f : down * 1.2f - back * 0.6f)); }
             bool held = pistol ? (u >= inAt && u < seatAt) : ((u >= 0.12f && u < outAt) || (u >= inAt && u < seatAt));
             g.ShowMag(!(u >= outAt && u < inAt));
+            RlSound("out", "mag_out", u, pistol ? 0.04f : 0.14f, M0);
+            RlSound("in", "mag_in", u, seatAt - 0.02f, M0);
+            if (reloadEmpty && (pistol || sp.cycle == "rifle" || sp.cycle == "smg")) RlSound("rack", pistol ? "slide" : "bolt", u, pistol ? 0.84f : 0.85f, g.transform.position);
             // кисть в точке хвата: магазин сдвигается так, чтобы хват был в ней
             if (held) g.Move(g.magPart, g.transform.InverseTransformVector(hp - M0));
 
@@ -158,6 +170,8 @@ namespace Intern.Game
                          new Key(0.84f, C, CR), new Key(0.92f, G, GR) }, u, out hp, out hr);
             Hand(hp, hr);
             if (g.cover != null) g.Move(g.cover, Vector3.zero, Quaternion.Euler(80f * open, 0f, 0f));
+            RlSound("c1", "cover", u, 0.11f, C); RlSound("bo", "mag_out", u, 0.3f, B0); RlSound("bi", "mag_in", u, 0.63f, B0);
+            RlSound("bl", "belt", u, 0.68f, L); RlSound("c2", "cover", u, 0.83f, C); RlSound("ch", "bolt", u, 0.88f, G);
             if (u >= 0.4f && !boxDropped && g.ammoBox != null) { boxDropped = true; Casings.DropPart(g.ammoBox, player, down * 1f + left * 0.8f); }
             bool gone = u >= 0.4f && u < 0.52f;
             if (g.ammoBox != null)

@@ -21,6 +21,8 @@ namespace Intern.Game
         Transform srcRig;
         public bool Fits(CharacterAnim av) { return root != null && av == body && av != null && av.rig == srcRig; }
         public bool Shown { get { return shown; } }
+        public Vector3 ShoulderR { get { return upR.position; } }
+        public Transform HandR { get { return haR; } }
 
         static readonly Dictionary<Mesh, Mesh> cut = new Dictionary<Mesh, Mesh>();
         static readonly HashSet<string> ArmBones = new HashSet<string>();

@@ -103,6 +103,7 @@ namespace Intern.Game
                 new KeyValuePair<string, Func<IEnumerator>>("lunch", LunchScene),
                 new KeyValuePair<string, Func<IEnumerator>>("player", PlayerScene),
                 new KeyValuePair<string, Func<IEnumerator>>("weapons", WeaponsScene),
+                new KeyValuePair<string, Func<IEnumerator>>("hits", HitsScene),
             };
             foreach (var sc in scenes)
             {
@@ -328,6 +329,37 @@ namespace Intern.Game
                 a.moveSpeed = t > 9.8f ? 1.2f : 0f;
                 a.transform.position += a.transform.forward * a.moveSpeed * Time.deltaTime;
                 CamFixed(camP, a.transform.position + Vector3.up * 1.0f, 42f);
+                t += Time.deltaTime;
+                yield return Tick();
+            }
+        }
+
+        // Реакции на удары (спринт 8): спереди в грудь, справа в голову, сзади в спину, в бедро, сильный удар битой
+        IEnumerator HitsScene()
+        {
+            var a = Actor("Dev1", SP, 0f); watch = null;
+            yield return null;
+            float t = 0f;
+            var camP = a.transform.position + new Vector3(2.6f, 1.35f, 2.2f);
+            var hits = new[]
+            {
+                new KeyValuePair<float, Vector3[]>(0.4f, new[] { Vector3.back, new Vector3(0.08f, 1.35f, 0.15f) }),
+                new KeyValuePair<float, Vector3[]>(2.6f, new[] { Vector3.left, new Vector3(0.12f, 1.72f, 0.02f) }),
+                new KeyValuePair<float, Vector3[]>(4.8f, new[] { Vector3.forward, new Vector3(-0.05f, 1.2f, -0.15f) }),
+                new KeyValuePair<float, Vector3[]>(7.0f, new[] { Vector3.back, new Vector3(-0.1f, 0.75f, 0.1f) }),
+                new KeyValuePair<float, Vector3[]>(9.2f, new[] { Vector3.right * 0.8f + Vector3.back * 0.6f, new Vector3(-0.15f, 1.3f, 0.05f) }),
+            };
+            int next = 0;
+            while (t < 11.5f)
+            {
+                if (next < hits.Length && t >= hits[next].Key)
+                {
+                    var h = hits[next].Value;
+                    a.HitReact(a.transform.TransformDirection(h[0]), a.transform.TransformPoint(h[1]), next == 4 ? 1.6f : 0.9f);
+                    log.AppendLine(string.Format(ci, "  удар {0} на {1:0.0} с", next, t));
+                    next++;
+                }
+                CamFixed(camP, a.transform.position + Vector3.up * 1.1f, 40f);
                 t += Time.deltaTime;
                 yield return Tick();
             }

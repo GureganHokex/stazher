@@ -477,14 +477,14 @@ namespace Intern.Game
             if (!def.humanitarian)
             {
                 if (!hitOnce) { hitOnce = true; run.OnWrongHit(this, Cries[Mathf.Clamp(System.Array.IndexOf(new[] { "accountant", "engineer", "cashier", "itguy" }, def.id), 0, 3)]); }
-                anim.React(5, 2f); anim.Flinch(); Say(Cries[Mathf.Clamp(System.Array.IndexOf(new[] { "accountant", "engineer", "cashier", "itguy" }, def.id), 0, 3)], 2f);
+                anim.React(5, 2f); anim.HitReact(dir, point, Mathf.Clamp(damage / 35f, 0.4f, 1.3f) + knock * 0.25f); Say(Cries[Mathf.Clamp(System.Array.IndexOf(new[] { "accountant", "engineer", "cashier", "itguy" }, def.id), 0, 3)], 2f);
                 if (st != St.Flee) Flee();
                 return;
             }
             hp -= damage;
             if (hp > 0) StandUp();
             anim.React(4, 1.5f);
-            if (hp > 0) anim.Flinch();
+            if (hp > 0) anim.HitReact(dir, point, Mathf.Clamp(damage / 35f, 0.4f, 1.3f) + knock * 0.25f);
             if (run.training) stun = Mathf.Max(stun, 0.7f);   // обучение: после удара чуть замирает
             if (knock > 0f) { var k = dir; k.y = 0; knockVel = k.normalized * knock * 6f; }
             if (stun > 0f) staggerUntil = Time.time + stun;

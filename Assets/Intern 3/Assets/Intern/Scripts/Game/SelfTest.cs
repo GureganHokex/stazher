@@ -102,6 +102,11 @@ namespace Intern.Game
             yield return RagdollSim(rdBad, rdInfo);
             foreach (var line in rdBad) { fail++; sb.AppendLine("FAIL ragdoll: " + line); }
             foreach (var line in rdInfo) sb.AppendLine(line);
+            var wpBad = new List<string>(); var wpInfo = new List<string>();
+            yield return WeaponSim(wpBad, wpInfo);
+            foreach (var line in wpBad) { fail++; sb.AppendLine("FAIL оружие: " + line); }
+            foreach (var line in wpInfo) sb.AppendLine(line);
+            if (wpBad.Count == 0) ok++;
             sb.AppendLine("режимы: " + string.Join(", ", counts.Select(kv => kv.Key + " " + kv.Value).ToArray()));
             sb.AppendLine("итог: " + ok + " ок, " + fail + " ошибок, " + (DateTime.Now - started).TotalSeconds.ToString("0") + " с");
             string file = Path.Combine(Application.persistentDataPath, "selftest.txt");
@@ -232,6 +237,79 @@ namespace Intern.Game
             CharacterAnim.IKDistance = ikD; CharacterAnim.LodDistance = lodD;
             UnityEngine.Object.Destroy(a.gameObject);
             UnityEngine.Object.Destroy(floor);
+            yield return null;
+        }
+
+        // Оружие (спринт 8 версии 0.9): модели из Blender с точками хвата и подвижными деталями, серии ударов,
+        // звуки, IK руки (кулак попадает в точку), руки от первого лица (в копии остались треугольники рук)
+        IEnumerator WeaponSim(List<string> bad, List<string> info)
+        {
+            string[] ids = { "knife", "bat", "katana", "pistol", "smg", "shotgun", "rifle", "sniper", "mg" };
+            int models = 0, combos = 0;
+            foreach (var id in ids)
+            {
+                var def = Balance.Weapon(id);
+                if (def == null) { bad.Add(id + ": нет в балансе"); continue; }
+                var m = WeaponModel.Build(def, null, null);
+                if (m == null) { bad.Add(id + ": модель не построилась"); continue; }
+                if (!m.imported) bad.Add(id + ": модель не из Blender (нет Resources/Models/Weapons/" + id + ")");
+                else models++;
+                if (m.grip == null) bad.Add(id + ": нет точки GripR");
+                if (def.Melee)
+                {
+                    if (m.tip == null) bad.Add(id + ": нет острия Tip");
+                    if (id != "knife" && m.gripL == null) bad.Add(id + ": нет GripL для второй руки");
+                    combos += PlayerCombat.DevCheckMoves(id, bad);
+                }
+                else
+                {
+                    if (m.muzzle == null || m.gripL == null || m.eye == null) bad.Add(id + ": нет Muzzle/GripL/Eye");
+                    if (id != "shotgun" && id != "mg" && m.magPart == null) bad.Add(id + ": нет магазина");
+                    if (id == "pistol" && m.slide == null) bad.Add("pistol: нет затворной рамы");
+                    if (id == "shotgun" && m.pump == null) bad.Add("shotgun: нет цевья");
+                    if (id == "sniper" && m.boltHandle == null) bad.Add("sniper: нет рукояти затвора");
+                    if (id == "mg" && (m.cover == null || m.ammoBox == null)) bad.Add("mg: нет крышки или короба");
+                    if (!Sfx.Has("shot_" + id)) bad.Add(id + ": нет звука выстрела");
+                }
+                UnityEngine.Object.Destroy(m.gameObject);
+            }
+            foreach (var snd in new[] { "dry", "slide", "bolt", "mag_out", "mag_in", "shell_in", "pump", "cover", "tink", "swoosh", "hit_flesh", "hit_blade", "hit_bat", "impact" })
+                if (!Sfx.Has(snd)) bad.Add("нет звука " + snd);
+            string ik = "", fpa = "";
+            if (ModelLib.HasCharacter("Dev1"))
+            {
+                var a = CharacterAnim.Spawn("Dev1", null, new Vector3(2100f, 0f, 1000f), 0f, null);
+                yield return null;
+                if (a.v4)
+                {
+                    float worst = 0f;
+                    foreach (bool right in new[] { true, false })
+                    {
+                        var sh = right ? a.armR.position : a.armL.position;
+                        var tgt = sh + a.transform.rotation * new Vector3(right ? -0.12f : 0.12f, -0.12f, 0.38f);
+                        var rot = a.transform.rotation * CharacterAnim.HandRot(right, new Vector3(0f, -0.4f, 0.9f), right ? Vector3.left : Vector3.right);
+                        a.ArmIK(right, tgt, rot, Vector3.down + a.transform.right * (right ? 1f : -1f));
+                        var hand = right ? a.handR : a.handL;
+                        float err = Vector3.Distance(hand.TransformPoint(right ? CharacterAnim.PalmR : CharacterAnim.PalmL), tgt);
+                        float ang = Quaternion.Angle(hand.rotation, rot);
+                        worst = Mathf.Max(worst, err);
+                        if (err > 0.01f || ang > 2f) bad.Add("IK " + (right ? "правой" : "левой") + " руки: промах " + (err * 100f).ToString("0.0") + " см, поворот " + ang.ToString("0") + "°");
+                    }
+                    ik = ", IK рук: промах " + (worst * 1000f).ToString("0.0") + " мм";
+                    var fa = FpArms.Build(a, null);
+                    if (fa == null) bad.Add("руки от первого лица не построились");
+                    else
+                    {
+                        int tris = 0;
+                        foreach (var r in fa.root.GetComponentsInChildren<SkinnedMeshRenderer>(true)) if (r.enabled && r.sharedMesh != null) for (int k = 0; k < r.sharedMesh.subMeshCount; k++) tris += r.sharedMesh.GetTriangles(k).Length / 3;
+                        if (tris < 200) bad.Add("руки от первого лица: треугольников " + tris);
+                        fpa = ", руки от 1-го лица: " + tris + " треуг.";
+                        fa.Destroy();
+                    }
+                }
+                UnityEngine.Object.Destroy(a.gameObject);
+            }
+            info.Add("оружие: моделей из Blender " + models + " из 9, ударов в сериях " + combos + ik + fpa);
             yield return null;
         }
 

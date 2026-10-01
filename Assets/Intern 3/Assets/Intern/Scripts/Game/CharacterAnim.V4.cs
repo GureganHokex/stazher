@@ -318,6 +318,7 @@ namespace Intern.Game
             if (FootIK && near && grounded && sit < 0.05f && airW < 0.5f) FeetIK(dt, pos);
             else { feet[0].planted = feet[1].planted = false; feet[0].stepping = feet[1].stepping = false; feet[0].lockW = feet[1].lockW = 0f; gs[0] = gs[1] = 0f; }
 
+            ReactTick();
             FaceTick(dt);
         }
 

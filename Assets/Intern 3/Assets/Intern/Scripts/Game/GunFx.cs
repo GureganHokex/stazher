@@ -387,7 +387,7 @@ namespace Intern.Game
     // Гильзы: вылетают из окна выброса, кувыркаются, звенят об пол (звук — в спринте 8, задача 5), лежат 4 с
     public static class Casings
     {
-        class C { public GameObject go; public Rigidbody rb; public Collider col; public GameObject head; public float until; }
+        class C { public GameObject go; public Rigidbody rb; public Collider col; public GameObject head; public float until; public Clink snd; }
         static readonly List<C> pool = new List<C>();
         static Material brass, hull;
         static PhysicsMaterial bounce;
@@ -424,6 +424,7 @@ namespace Intern.Game
                     var cap = c.go.AddComponent<CapsuleCollider>(); cap.radius = 0.5f; cap.height = 2f; cap.sharedMaterial = bounce; c.col = cap;
                     c.rb = c.go.AddComponent<Rigidbody>(); c.rb.mass = 0.012f; c.rb.linearDamping = 0.05f; c.rb.angularDamping = 0.4f;
                     c.rb.interpolation = RigidbodyInterpolation.Interpolate; c.rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                    c.snd = c.go.AddComponent<Clink>();
                     c.head = new GameObject("Head"); c.head.layer = 2; c.head.transform.SetParent(c.go.transform, false);
                     c.head.AddComponent<MeshFilter>().sharedMesh = cyl;
                     var hr = c.head.AddComponent<MeshRenderer>(); hr.sharedMaterial = brass; hr.shadowCastingMode = ShadowCastingMode.Off;
@@ -446,6 +447,7 @@ namespace Intern.Game
             c.rb.linearVelocity = v;
             c.rb.angularVelocity = t.up * Random.Range(-28f, 28f) + Random.insideUnitSphere * 10f;
             c.until = Time.time + 4f;
+            if (c.snd != null) { c.snd.left = 2; c.snd.id = sp.shell ? "thunk" : "tink"; }
             Runner.Watch();
         }
 
@@ -479,7 +481,21 @@ namespace Intern.Game
             var carry = Vector3.zero;
             if (pl != null) { var cc = pl.GetComponent<CharacterController>(); if (cc != null) { Physics.IgnoreCollision(bc, cc, true); carry = cc.velocity; } }
             rb.linearVelocity = vel + carry; rb.angularVelocity = Random.insideUnitSphere * 5f;
+            var cl = go.AddComponent<Clink>(); cl.left = 1; cl.id = "thunk";
             Object.Destroy(go, 6f);
+        }
+
+        // Звон о землю: два первых удара, громкость — от скорости
+        public class Clink : MonoBehaviour
+        {
+            public int left; public string id = "tink"; float last;
+            void OnCollisionEnter(Collision c)
+            {
+                if (left <= 0 || Time.time - last < 0.05f) return;
+                float v = c.relativeVelocity.magnitude; if (v < 0.4f) return;
+                left--; last = Time.time;
+                Sfx.Play(id, transform.position, Mathf.Clamp01(v / 4f) * 0.35f, 0.12f);
+            }
         }
 
         // Убирает упавшие гильзы через 4 с

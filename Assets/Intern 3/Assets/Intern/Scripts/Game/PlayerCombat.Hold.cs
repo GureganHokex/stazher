@@ -86,7 +86,7 @@ namespace Intern.Game
     public partial class PlayerCombat
     {
         float adsW, drawW = 1f, lowW, holdW;
-        bool pumpEjected;
+        bool pumpEjected; float pumpSoundAt = -9f, boltSoundAt = -9f;
         float kickBack, kickBackV, kickPitch, kickPitchV, kickRoll, kickRollV, kickYaw, kickYawV;
         float shotAt = -9f;
         bool dustOpen;
@@ -119,6 +119,8 @@ namespace Intern.Game
                 flashFx.Fire(sp, silenced);
             }
             if (sp.cycle != "pump" && sp.cycle != "boltaction") Casings.Eject(gunModel, sp, player);
+            var mz = gunModel.muzzle != null ? gunModel.muzzle.position : gunModel.transform.position;
+            Sfx.Play(silenced ? "shot_silenced" : "shot_" + def.id, mz, silenced ? 0.7f : 1f, 0.06f, 0.6f, 4f);
             if (sp.cycle == "rifle") dustOpen = true;
         }
 
@@ -132,8 +134,10 @@ namespace Intern.Game
 
         void LateUpdate()
         {
-            if (run == null || gunModel == null || slot != 1 || Av == null || Av.elbowR == null) { if (fpArms != null) fpArms.Show(false); return; }
             float dt = Mathf.Clamp(Time.deltaTime, 0.0001f, 0.05f);
+            if (run != null && slot == 0 && Av != null) { MeleePose(dt); return; }
+            if (trail != null) trail.Emit(false);
+            if (run == null || gunModel == null || slot != 1 || Av == null || Av.elbowR == null) { if (fpArms != null) fpArms.Show(false); return; }
             if (!Av.v4 || Av.handR == null) { OldPlace(); return; }
             var g = gunModel; var sp = GunSpec.Of(g.id);
             if (poseFor != g) { poseFor = g; drawW = 0f; dustOpen = false; ResetSprings(); }
@@ -253,7 +257,11 @@ namespace Intern.Game
 
         bool FpReady()
         {
-            if (fpArms != null && !fpArms.Fits(Av)) { fpArms.Destroy(); fpArms = null; }
+            if (fpArms != null && !fpArms.Fits(Av))
+            {
+                if (meleeModel != null && fpArms.root != null && meleeModel.transform.IsChildOf(fpArms.root) && Av != null && Av.handR != null) meleeModel.transform.SetParent(Av.handR, false);
+                fpArms.Destroy(); fpArms = null;
+            }
             if (fpArms == null) fpArms = FpArms.Build(Av, transform);
             return fpArms != null;
         }
@@ -299,6 +307,7 @@ namespace Intern.Game
                     float u = (Time.time - pumpAt) / 0.34f;
                     if (u > 0f && u < 1f && !Reloading)
                     {
+                        if (pumpSoundAt != pumpAt) { pumpSoundAt = pumpAt; Sfx.Play("pump", g.transform.position, 0.7f, 0.04f, 0.6f); }
                         float b = u < 0.45f ? S01(u / 0.45f) : 1f - S01((u - 0.45f) / 0.55f);
                         g.Move(g.pump, new Vector3(0f, 0f, -0.085f * b));
                         if (u >= 0.42f && !pumpEjected) { pumpEjected = true; Casings.Eject(g, sp, player); }
@@ -315,6 +324,7 @@ namespace Intern.Game
                         float back = S01((u - 0.2f) / 0.25f) * (1f - S01((u - 0.55f) / 0.25f));
                         if (u > 0f && u < 1f)
                         {
+                            if (boltSoundAt != boltAt) { boltSoundAt = boltAt; Sfx.Play("bolt", g.transform.position, 0.7f, 0.04f, 0.6f); }
                             g.Move(g.boltHandle, new Vector3(0f, 0f, -0.085f * back), Quaternion.Euler(0f, 0f, 62f * lift));
                             if (back > 0.9f && !pumpEjected) { pumpEjected = true; Casings.Eject(g, sp, player); }
                         }
