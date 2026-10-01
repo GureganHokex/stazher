@@ -30,10 +30,16 @@ HOLD = {
     # пистолет: стойка «равнобедренный треугольник» — руки почти прямые, рукоять у линии глаз, левая ладонь
     # закрывает левую сторону рукояти поверх пальцев правой, большие пальцы вперёд вдоль рамы
     "pistol": dict(place="pistol", at=(0.03, 0.15, 0.55), twist=0.0, head=(0.0, 4.0, 0.0),
-                   R=dict(anchor="GripR", at=(0.0, 0.0, 0.0), f=(0.0, -0.4, 0.92), n=(-1.0, 0.0, 0.0), curl=62.0, thumb=12.0, trig=True,
-                          pole=(0.6, -1.0, -0.2)),
-                   L=dict(anchor="GripR", at=(-0.024, -0.022, 0.028), f=(0.25, -0.6, 0.76), n=(1.0, 0.15, -0.1), curl=58.0, thumb=6.0,
-                          pole=(-0.6, -1.0, -0.2))),
+                   # правая: перепонка большого пальца на затылке рукояти, ладонь на правой щёчке, костяшки у переднего угла,
+                   # средний, безымянный и мизинец обхватывают переднюю грань и ложатся на левую щёчку; большой — вдоль рамы слева
+                   R=dict(K=(0.020, -0.050, -0.020), f=(0.22, -0.16, 0.97), n=(-0.97, 0.0, 0.22), curl=62.0, thumb=12.0, trig=True,
+                          tips={"Middle": (-0.022, -0.050, -0.040), "Ring": (-0.022, -0.066, -0.044), "Pinky": (-0.020, -0.081, -0.048)},
+                          thumb_tip=(-0.022, -0.019, -0.030), pole=(0.6, -1.0, -0.2)),
+                   # левая: пятка ладони закрывает левую щёчку и кончики пальцев правой, пальцы обхватывают пальцы правой спереди,
+                   # указательный — под спусковой скобой, большой — вперёд вдоль рамы под большим правой
+                   L=dict(K=(-0.032, -0.066, -0.004), f=(0.30, -0.45, 0.84), n=(0.93, 0.15, -0.33), curl=58.0, thumb=6.0,
+                          tips={"Index": (0.028, -0.054, -0.014), "Middle": (0.030, -0.068, -0.016), "Ring": (0.028, -0.083, -0.020), "Pinky": (0.024, -0.096, -0.024)},
+                          thumb_tip=(-0.026, -0.031, 0.010), pole=(-0.6, -1.0, -0.2))),
     # винтовки: затыльник в плечевой впадине, корпус развёрнут (левое плечо вперёд), голова склонена к прикладу,
     # правая — на шейке приклада или пистолетной рукояти, локоть в сторону; левая — под цевьём ладонью вверх, локоть вниз
     "sniper": dict(place="shoulder", at=(-0.05, 0.0, 0.07), twist=38.0, head=(0.0, 16.0, 14.0),
@@ -74,6 +80,71 @@ def hand_rot(sd, f, n):
 
 def wpoint(Wp, Wq, p): return vadd(Wp, qrot(Wq, p))
 
+# ---------------------------------------------------------------- пальцы по цели
+# Рукоять пистолета (оси оружия, м; замер сетки): ширина ±1,5 см, передняя и задняя грань с наклоном рукояти
+GRIPBOX = {"pistol": dict(y=(-0.125, -0.02), x=0.015, front=(-0.032, 0.275), back=(-0.080, 0.225), y0=-0.07)}
+
+def box_pen(box, p, r=0.008):
+    """Насколько точка (оси оружия) с радиусом пальца r вошла в рукоять."""
+    if box is None or not (box["y"][0] - r < p[1] < box["y"][1] + r): return 0.0
+    fz = box["front"][0] + box["front"][1] * (p[1] - box["y0"]); bz = box["back"][0] + box["back"][1] * (p[1] - box["y0"])
+    d = min(box["x"] + r - abs(p[0]), fz + r - p[2], p[2] - (bz - r))
+    return max(0.0, d)
+
+def palm_pen(sd, Hp, Hq, Wp, Wq, box):
+    """Насколько ладонь (кожа ладони, оси кисти) вошла в рукоять."""
+    s = -1.0 if sd == "R" else 1.0
+    iq = qconj(Wq); worst = 0.0
+    for y, x in ((-0.03, 0.026), (-0.05, 0.026), (-0.07, 0.022), (-0.085, 0.016)):
+        for z in (-0.02, 0.005, 0.03):
+            p = qrot(iq, vsub(vadd(Hp, qrot(Hq, (s * x, y, z))), Wp))
+            worst = max(worst, box_pen(box, p, 0.0))
+    return worst
+
+def finger_pts(sk, Hp, Hq, sd, f, rots):
+    """Суставы пальца и кончик (оси персонажа) при поворотах суставов rots."""
+    names = [f + str(j) + sd for j in (1, 2, 3)]
+    p, q, prev, out = Hp, Hq, "Hand" + sd, []
+    for n, r in zip(names, rots):
+        p = vadd(p, qrot(q, vsub(sk.rest[n], sk.rest[prev]))); q = qmul(q, r); out.append(p); prev = n
+    out.append(vadd(p, qrot(q, vsub(sk.tail[names[2]], sk.rest[names[2]]))))
+    return out
+
+def _cost(pts, Wp, Wq, target, box):
+    iq = qconj(Wq)
+    loc = [qrot(iq, vsub(p, Wp)) for p in pts]
+    pen = 0.0
+    for a, b in zip(loc, loc[1:]):
+        for t in (0.5, 1.0): pen += box_pen(box, vlerp(a, b, t))
+    return vlen(vsub(loc[-1], target)) + 3.0 * pen
+
+def wrap_finger(sk, pose, sd, f, Hp, Hq, Wp, Wq, target, box):
+    """Сгиб пальца (основной сустав и два дальних), при котором кончик ближе всего к цели и палец не входит в рукоять."""
+    ax = (0.0, 0.0, 1.0 if sd == "L" else -1.0)
+    best = None
+    for a in range(0, 101, 5):
+        for b in range(0, 116, 5):
+            rots = (qaxis(ax, a), qaxis(ax, b), qaxis(ax, b * 0.7))
+            c = _cost(finger_pts(sk, Hp, Hq, sd, f, rots), Wp, Wq, target, box)
+            if best is None or c < best[0]: best = (c, rots)
+    for j, r in enumerate(best[1]): pose.rot[f + str(j + 1) + sd] = r
+    return best[0]
+
+def aim_thumb(sk, pose, sd, Hp, Hq, Wp, Wq, target, box):
+    """Большой палец: разворот основания (два угла) и сгиб двух фаланг — кончик к цели, не входя в рукоять."""
+    s = 1.0 if sd == "L" else -1.0
+    tdir = vnorm((0.3 * s, -0.52, 0.8)); tax = vnorm(vcross(tdir, (0.0, 0.0, -1.0)))
+    best = None
+    for a1 in range(-80, 81, 8):
+        for a2 in range(-80, 81, 8):
+            base = qmul(qaxis(Y, a1), qaxis(X, a2))
+            for c in (0.0, 10.0, 20.0, 35.0):
+                rots = (base, qaxis(tax, c), qaxis(tax, c * 0.8))
+                cst = _cost(finger_pts(sk, Hp, Hq, sd, "Thumb", rots), Wp, Wq, target, box)
+                if best is None or cst < best[0]: best = (cst, rots)
+    for j, r in enumerate(best[1]): pose.rot["Thumb" + str(j + 1) + sd] = r
+    return best[0]
+
 # ---------------------------------------------------------------- поза
 def grip_pose(sk, wid, pitch=0.0):
     """Поза с оружием wid и положение оружия: (pose, Wp, Wq) — оружие в осях персонажа (Wp — начало, Wq — поворот)."""
@@ -96,13 +167,29 @@ def grip_pose(sk, wid, pitch=0.0):
         Wp = vsub(pocket, qrot(Wq, A["Stock"]))
     for sd in ("R", "L"):
         d = h[sd]
-        hole = wpoint(Wp, Wq, vadd(A[d["anchor"]], d["at"]))
         hq = qmul(Wq, hand_rot(sd, d["f"], d["n"]))
-        wrist = vsub(hole, qrot(hq, PALM[sd]))
+        if "K" in d:
+            # средняя костяшка — в точку K (оси оружия); ладонь не входит в рукоять — кисть отодвигается от неё
+            wrist = vsub(wpoint(Wp, Wq, d["K"]), qrot(hq, vsub(sk.rest["Middle1" + sd], sk.rest["Hand" + sd])))
+            box = GRIPBOX.get(wid)
+            if box is not None:
+                nw = qrot(hq, (-1.0, 0.0, 0.0) if sd == "R" else (1.0, 0.0, 0.0))     # куда смотрит ладонь
+                for _ in range(40):
+                    # рукоять может утопать в мякоти ладони на palm_in (рука мультяшно толстая — иначе пальцы не обхватят)
+                    if palm_pen(sd, wrist, hq, Wp, Wq, box) < d.get("palm_in", 0.009): break
+                    wrist = vsub(wrist, vmul(nw, 0.002))
+        else:
+            hole = wpoint(Wp, Wq, vadd(A[d["anchor"]], d["at"]))
+            wrist = vsub(hole, qrot(hq, PALM[sd]))
         arm_ik(sk, pose, sd, wrist, hand_q=hq, pole=vnorm(d["pole"]))
         keep = pose.rot["Hand" + sd]
         hand_pose(pose, sd, curl=d["curl"], thumb=d["thumb"], per=d.get("per"))
         pose.rot["Hand" + sd] = keep
+        if d.get("tips") or d.get("thumb_tip"):
+            wp, wr = sk.fk(pose); Hp, Hq = wp["Hand" + sd], wr["Hand" + sd]
+            box = GRIPBOX.get(wid)
+            for fn, T in d.get("tips", {}).items(): wrap_finger(sk, pose, sd, fn, Hp, Hq, Wp, Wq, T, box)
+            if d.get("thumb_tip"): aim_thumb(sk, pose, sd, Hp, Hq, Wp, Wq, d["thumb_tip"], box)
         if d.get("trig"):
             trigger_finger(sk, pose, sd, wpoint(Wp, Wq, vadd(A["Trigger"], (0.0, -0.011, 0.004))))
     hy, hp, hr = h["head"]

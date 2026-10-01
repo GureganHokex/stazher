@@ -23,6 +23,7 @@ namespace Intern.Game
         public bool Shown { get { return shown; } }
         public Vector3 ShoulderR { get { return upR.position; } }
         public Transform HandR { get { return haR; } }
+        public Transform HandL { get { return haL; } }
 
         static readonly Dictionary<Mesh, Mesh> cut = new Dictionary<Mesh, Mesh>();
         static readonly HashSet<string> ArmBones = new HashSet<string>();

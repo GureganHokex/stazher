@@ -649,10 +649,22 @@ namespace Intern.Game
             var front = new GameObject("AT_FrontCam").AddComponent<Camera>();
             front.rect = new Rect(0.01f, 0.02f, 0.33f, 0.44f); front.depth = pl.cam.depth + 1; front.fieldOfView = 30f;
             front.clearFlags = CameraClearFlags.SolidColor; front.backgroundColor = new Color(0.78f, 0.8f, 0.84f); front.nearClipPlane = 0.05f;
+            // взгляд из глаз от третьего лица (руки тела, не отдельные руки у камеры) — сверить с видом из Blender
+            var eyeCam = new GameObject("AT_EyeCam").AddComponent<Camera>();
+            eyeCam.rect = new Rect(0.36f, 0.55f, 0.28f, 0.44f); eyeCam.depth = pl.cam.depth + 1; eyeCam.fieldOfView = 50f;
+            eyeCam.clearFlags = CameraClearFlags.SolidColor; eyeCam.backgroundColor = new Color(0.25f, 0.25f, 0.27f); eyeCam.nearClipPlane = 0.22f;
             watch = null;
             float t = 0f;
             Action cams = () =>
             {
+                var hd = pl.avatar.head;
+                if (hd != null)
+                {
+                    var ep = hd.position + pl.transform.up * 0.1f + pl.transform.forward * 0.1f;
+                    eyeCam.transform.position = ep;
+                    var gp = cb.DevGunGrip;
+                    eyeCam.transform.rotation = Quaternion.LookRotation(gp.HasValue ? gp.Value - ep : pl.transform.forward);
+                }
                 pl.avatar.aimPitch = pl.CamPitch;
                 var pc = pl.Position + Vector3.up * 1.35f;
                 var sp = pc + pl.transform.right * 1.55f + pl.transform.forward * 0.55f + Vector3.up * 0.1f;
@@ -663,7 +675,7 @@ namespace Intern.Game
             for (int view = 0; view < 2; view++)
             {
                 if (view == 1) pl.ToggleView();
-                side.enabled = front.enabled = view == 0;   // от первого лица — чистый кадр
+                side.enabled = front.enabled = eyeCam.enabled = view == 0;   // от первого лица — чистый кадр
                 foreach (var id in weaponFilter ?? AllWeapons)
                 {
                     var def = Balance.Weapon(id);
@@ -695,6 +707,7 @@ namespace Intern.Game
                             if (def.auto || (t - f0) >= shots * 0.45f) { int before = cb.MagNow; cb.DevAttack(); if (cb.MagNow < before) shots++; }
                             cb.Tick(Time.deltaTime, false); cams(); t += Time.deltaTime; yield return Tick();
                         }
+                        if (view == 1) log.AppendLine("    1-е: " + cb.DevGunFp);
                         cb.devAds = false;
                         if (view == 0) cb.DevEmpty();   // от третьего лица — перезарядка с пустого (с затвором), от первого — с патроном
                         cb.StartReload();
@@ -712,7 +725,7 @@ namespace Intern.Game
             }
             InputX.DevDrive = false; InputX.DevMove = Vector2.zero; InputX.DevLook = Vector2.zero;
             cb.devAds = false;
-            Destroy(side.gameObject); Destroy(front.gameObject);
+            Destroy(side.gameObject); Destroy(front.gameObject); Destroy(eyeCam.gameObject);
             cb.End(); if (gr.Arsenal != null) cb.Init(pl, gr.Arsenal);
             if (pl.firstPerson != fp0) pl.ToggleView();
             pl.cinematic = true;

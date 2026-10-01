@@ -131,6 +131,8 @@ namespace Intern.Game
         }
 
         FpArms fpArms;
+        public string DevGunFp = "";
+        public Vector3? DevGunGrip { get { var g = slot == 1 ? gunModel : meleeModel; return g != null && g.grip != null ? g.grip.position : (Vector3?)null; } }
 
         void LateUpdate()
         {
@@ -281,6 +283,13 @@ namespace Intern.Game
                 {
                     GripLib.SetFingers(fpArms.FingerBones(true), grip.fingers[0], true, squeeze, 1f - rightW * 0.7f);
                     GripLib.SetFingers(fpArms.FingerBones(false), grip.fingers[1], false, 0f, 1f - leftW * 0.6f);
+                    var fb = fpArms.FingerBones(true); int nf = 0; foreach (var t in fb) if (t != null) nf++;
+                    DevGunFp = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "кисть R {0:0.0} мм {1:0}°, L {2:0.0} мм {3:0}°, костей пальцев {4}, масштаб {5:0.000}/{6:0.000}, палец {7:0}°, ствол от глаза {8}",
+                        Vector3.Distance(fpArms.HandR.TransformPoint(CharacterAnim.PalmR), tR) * 1000f, Quaternion.Angle(fpArms.HandR.rotation, hr),
+                        Vector3.Distance(fpArms.HandL.TransformPoint(CharacterAnim.PalmL), tL) * 1000f, Quaternion.Angle(fpArms.HandL.rotation, hl),
+                        nf, fpArms.HandR.lossyScale.x, s, fb[1] != null ? Quaternion.Angle(fb[1].localRotation, grip.fingers[0][1]) : -1f,
+                        (camT.InverseTransformPoint(g.grip.position) / s).ToString("F3"));
                 }
                 else
                 {
