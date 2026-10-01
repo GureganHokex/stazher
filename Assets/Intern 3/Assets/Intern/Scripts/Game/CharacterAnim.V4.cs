@@ -261,9 +261,15 @@ namespace Intern.Game
             if (isTyping) typeT += dt;
             Layer(cType, typeT, typeW * Smooth((sit - 0.5f) * 2f));
             holdW = Mathf.MoveTowards(holdW, holdRight && !aimGun && sit < 0.5f ? 1f : 0f, dt * 6f);
-            Layer(cHold, 0f, holdW);
+            Layer(GuardClip() ?? cHold, 0f, holdW);
             aimW = Mathf.MoveTowards(aimW, aimGun && sit < 0.5f ? 1f : 0f, dt * 7f);
-            Layer(twoHanded ? cAim2 : cAim1, 0f, aimW);
+            Layer(HoldClip() ?? (twoHanded ? cAim2 : cAim1), 0f, aimW);
+            if (actC != null)
+            {
+                float t = (now - actAt) * actSpeed;
+                if (t >= actC.len) actC = null;
+                else Layer(actC, t, Window(t, actC.len, 0.03f, 0.05f));
+            }
             if (cWave != null && now < waveUntil) { float t = cWave.len - (waveUntil - now); Layer(cWave, t, Window(t, cWave.len)); }
             if (cSwing != null) { float t = now - swingStart; Layer(cSwing, t, Window(t, cSwing.len, 0.05f, 0.12f)); }
             if (cThrow != null) { float t = now - throwStart; Layer(cThrow, t, Window(t, cThrow.len, 0.06f, 0.15f)); }
@@ -325,6 +331,37 @@ namespace Intern.Game
         }
 
         float lookYaw;
+
+        // Поза с конкретным оружием (клип hold_<оружие> из Art/grips_v1.py) вместо общего прицела
+        public string holdClip;
+        string holdName; AnimClip holdC;
+        AnimClip HoldClip()
+        {
+            if (string.IsNullOrEmpty(holdClip)) return null;
+            if (holdClip != holdName) { holdName = holdClip; holdC = AnimLib.Get(holdClip); }
+            return holdC;
+        }
+
+        // Стойка с холодным оружием (клип mguard_<оружие> из Art/melee_v1.py) вместо общего «держит в руке»
+        public string guardClip;
+        string guardName; AnimClip guardC;
+        AnimClip GuardClip()
+        {
+            if (string.IsNullOrEmpty(guardClip)) return null;
+            if (guardClip != guardName) { guardName = guardClip; guardC = AnimLib.Get(guardClip); }
+            return guardC;
+        }
+
+        // Действие клипом поверх позы (удар холодным оружием m_<оружие>_<n>): за len секунд, начало и конец — стойка
+        AnimClip actC; float actAt = -9f, actSpeed = 1f;
+        public bool PlayAction(string clip, float len)
+        {
+            actC = v4 ? AnimLib.Get(clip) : null;
+            actAt = Time.time; actSpeed = actC != null && len > 0.01f && actC.len > 0.01f ? actC.len / len : 1f;
+            return actC != null;
+        }
+        public void StopAction() { actC = null; }
+        public bool Acting { get { return actC != null; } }
 
         Vector2 gaitVel;   // скорость земли под опорной ногой в смеси клипов (направление × скорость)
         void GaitAdd(AnimClip c, float w, ref float T, ref float vc, ref Vector3 root, ref float cl, ref float cr)

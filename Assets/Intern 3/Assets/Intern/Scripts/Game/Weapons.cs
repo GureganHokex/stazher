@@ -308,7 +308,7 @@ namespace Intern.Game
             if (trail != null) { trail.Destroy(); trail = null; }
             comboIdx = -1;
             if (player != null) { player.fovScale = 1f; player.shoulderX = 0.35f; player.faceCamera = false; player.speedMul = 1f; player.scopeView = false; }
-            if (Av != null) { Av.holdRight = false; Av.aimGun = false; Av.twoHanded = false; }
+            if (Av != null) { Av.holdRight = false; Av.aimGun = false; Av.twoHanded = false; Av.guardClip = null; Av.holdClip = null; Av.StopAction(); }
         }
 
         // Модели заново (купили, поставили обвес)
@@ -341,6 +341,7 @@ namespace Intern.Game
         void ApplySlot()
         {
             comboIdx = -1; strikeQueued = false;
+            if (Av != null) Av.StopAction();
             if (meleeModel != null) meleeModel.gameObject.SetActive(slot == 0 && !KnifeAway);
             if (gunModel != null) gunModel.gameObject.SetActive(slot == 1);
             if (Av != null) { Av.holdRight = slot == 0; Av.aimGun = slot == 1; Av.twoHanded = slot == 1 && gunModel != null && (gunModel.twoHanded || gunModel.imported); }

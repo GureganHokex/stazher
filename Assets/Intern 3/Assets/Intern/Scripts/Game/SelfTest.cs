@@ -245,7 +245,7 @@ namespace Intern.Game
         IEnumerator WeaponSim(List<string> bad, List<string> info)
         {
             string[] ids = { "knife", "bat", "katana", "pistol", "smg", "shotgun", "rifle", "sniper", "mg" };
-            int models = 0, combos = 0;
+            int models = 0, combos = 0, grips = 0;
             foreach (var id in ids)
             {
                 var def = Balance.Weapon(id);
@@ -259,7 +259,18 @@ namespace Intern.Game
                 {
                     if (m.tip == null) bad.Add(id + ": нет острия Tip");
                     if (id != "knife" && m.gripL == null) bad.Add(id + ": нет GripL для второй руки");
-                    combos += PlayerCombat.DevCheckMoves(id, bad);
+                    int n = PlayerCombat.DevCheckMoves(id, bad); combos += n;
+                    // позы из Blender: стойка, удары, крепление в кисти, вторая рука
+                    var gm = GripLib.Get(id);
+                    if (gm == null || !gm.melee) bad.Add(id + ": нет хвата из Blender (grips_v1.txt)");
+                    else
+                    {
+                        grips++;
+                        if (AnimLib.Get(gm.guard) == null) bad.Add(id + ": нет клипа стойки " + gm.guard);
+                        if (gm.strikeLen.Count != n) bad.Add(id + ": ударов в клипах " + gm.strikeLen.Count + ", в серии " + n);
+                        for (int k = 1; k <= gm.strikeLen.Count; k++) if (AnimLib.Get("m_" + id + "_" + k) == null) bad.Add(id + ": нет клипа удара m_" + id + "_" + k);
+                        if (gm.two != (id != "knife")) bad.Add(id + ": неверно, двумя ли руками");
+                    }
                 }
                 else
                 {
@@ -270,6 +281,14 @@ namespace Intern.Game
                     if (id == "sniper" && m.boltHandle == null) bad.Add("sniper: нет рукояти затвора");
                     if (id == "mg" && (m.cover == null || m.ammoBox == null)) bad.Add("mg: нет крышки или короба");
                     if (!Sfx.Has("shot_" + id)) bad.Add(id + ": нет звука выстрела");
+                    var gg = GripLib.Get(id);
+                    if (gg == null || gg.melee) bad.Add(id + ": нет хвата из Blender (grips_v1.txt)");
+                    else
+                    {
+                        grips++;
+                        if (AnimLib.Get("hold_" + id) == null) bad.Add(id + ": нет клипа позы hold_" + id);
+                        if (gg.fingers[0] == null || gg.fingers[1] == null) bad.Add(id + ": нет пальцев в хвате");
+                    }
                 }
                 UnityEngine.Object.Destroy(m.gameObject);
             }
@@ -309,7 +328,8 @@ namespace Intern.Game
                 }
                 UnityEngine.Object.Destroy(a.gameObject);
             }
-            info.Add("оружие: моделей из Blender " + models + " из 9, ударов в сериях " + combos + ik + fpa);
+            if (GripLib.Error != null) bad.Add(GripLib.Error);
+            info.Add("оружие: моделей из Blender " + models + " из 9, хватов из Blender " + grips + " из 9, ударов в сериях " + combos + ik + fpa);
             yield return null;
         }
 

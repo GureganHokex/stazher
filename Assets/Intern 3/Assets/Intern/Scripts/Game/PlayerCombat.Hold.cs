@@ -136,7 +136,9 @@ namespace Intern.Game
         {
             float dt = Mathf.Clamp(Time.deltaTime, 0.0001f, 0.05f);
             if (run != null && slot == 0 && Av != null) { MeleePose(dt); return; }
+            if (Av != null) Av.guardClip = null;
             if (trail != null) trail.Emit(false);
+            if (Av != null && slot != 1) Av.holdClip = null;
             if (run == null || gunModel == null || slot != 1 || Av == null || Av.elbowR == null) { if (fpArms != null) fpArms.Show(false); return; }
             if (!Av.v4 || Av.handR == null) { OldPlace(); return; }
             var g = gunModel; var sp = GunSpec.Of(g.id);
@@ -156,10 +158,13 @@ namespace Intern.Game
 
             Vector3 aim = player.AimPoint(80f);
             Vector3 aimDir = (aim - camT.position).normalized;
+            // поза из Blender (Art/grips_v1.py): клип hold_<оружие> даёт корпус, голову и пальцы, ствол стоит от груди
+            var grip = GripLib.Get(g.id);
+            Av.holdClip = grip != null ? "hold_" + g.id : null;
             // корпус: стойка стрелка (длинный ствол — левое плечо вперёд), голова на цель, отдача корпусом
-            float twist = sp.twist;
+            float twist = grip != null ? 0f : sp.twist;
             holdW = Mathf.MoveTowards(holdW, 1f, dt * 6f);
-            Av.AimStance(twist, aimDir, Mathf.Max(0f, kickPitch) * sp.body * 0.2f, sp.longGun && !fp ? 7f * adsW + 3f : 0f, holdW);
+            Av.AimStance(twist, aimDir, Mathf.Max(0f, kickPitch) * sp.body * 0.2f, grip == null && sp.longGun && !fp ? 7f * adsW + 3f : 0f, holdW);
 
             Vector3 gripLocal = g.Local(g.grip), eyeLocal = g.eye != null ? g.Local(g.eye) : gripLocal + new Vector3(0f, 0.08f, 0f);
             Vector3 stockLocal = g.stockPt != null ? g.Local(g.stockPt) : gripLocal + new Vector3(0f, 0.04f, -0.25f);
@@ -174,6 +179,17 @@ namespace Intern.Game
                 var hipRot = Quaternion.LookRotation(dir.normalized, camT.up) * Quaternion.Euler(-1f, -2f, -6f);
                 rot = Quaternion.Slerp(hipRot, camT.rotation, S01(adsW));
                 pos = eyeW - rot * eyeLocal;
+            }
+            else if (grip != null && Av.torso != null)
+            {
+                // как в позе: от груди, потом довернуть на цель вокруг затыльника (пистолет — вокруг рукояти)
+                rot = Av.torso.rotation * grip.chestRot;
+                pos = Av.torso.position + Av.torso.rotation * (grip.chestPos * s);
+                Vector3 pivL = sp.longGun ? stockLocal : gripLocal;
+                Vector3 piv = pos + rot * pivL;
+                Vector3 want = aim - piv; if (want.sqrMagnitude < 1f) want = aimDir;
+                rot = Quaternion.FromToRotation(rot * Vector3.forward, want.normalized) * rot;
+                pos = piv - rot * pivL;
             }
             else if (sp.longGun)
             {
@@ -216,10 +232,18 @@ namespace Intern.Game
             bool hide = player.scopeView && Scoped && adsW > 0.85f;
             g.SetVisible(!hide);
 
-            // руки: где они на оружии
+            // руки: где они на оружии (из позы Blender — запястья и повороты кистей в осях оружия)
             Quaternion hr = rot * CharacterAnim.HandRot(true, sp.fR, sp.nR);
             Quaternion hl = rot * CharacterAnim.HandRot(false, sp.fL, sp.nL);
             Vector3 tR = g.grip.position, tL = g.gripL != null ? g.gripL.position + rot * (sp.offL * s) : tR;
+            Vector3 eR = Vector3.zero, eL = Vector3.zero;
+            if (grip != null)
+            {
+                hr = rot * grip.handRot[0]; hl = rot * grip.handRot[1];
+                tR = g.transform.TransformPoint(grip.handPos[0]) + hr * (CharacterAnim.PalmR * s);
+                tL = g.transform.TransformPoint(grip.handPos[1]) + hl * (CharacterAnim.PalmL * s);
+                eR = g.transform.TransformPoint(grip.elbow[0]); eL = g.transform.TransformPoint(grip.elbow[1]);
+            }
 
             // подвижные детали: спуск, затвор, цевьё, перезарядка (может забрать руки)
             CycleParts(g, sp, fp, camT, tL, hl);
@@ -227,6 +251,11 @@ namespace Intern.Game
             Vector3 cr = Av.torso != null ? Av.torso.right : Av.transform.right;
             Vector3 poleR = (cr * (sp.longGun ? 0.9f : 0.45f) + Vector3.down * (sp.longGun ? 0.7f : 1f) + (rot * Vector3.back) * 0.3f);
             Vector3 poleL = (Vector3.down * 1f - cr * (sp.longGun ? 0.25f : 0.45f) + (rot * Vector3.back) * 0.2f);
+            if (grip != null)
+            {
+                // локти — как в позе: полюс от середины «плечо — кисть» к локтю
+                poleR = eR - (Av.armR.position + tR) * 0.5f; poleL = eL - (Av.armL.position + tL) * 0.5f;
+            }
             if (g.pump != null && sp.cycle == "pump") tL += g.pump.position - g.PartRestW(g.pump);
             if (rightW > 0f) { tR = Vector3.Lerp(tR, rightAt, rightW); hr = Quaternion.Slerp(hr, rightRot, rightW); }
             if (leftW > 0f) { tL = Vector3.Lerp(tL, leftAt, leftW); hl = Quaternion.Slerp(hl, leftRot, leftW); }
@@ -248,18 +277,34 @@ namespace Intern.Game
                 Vector3 cr2 = camT.right, dn = -camT.up;
                 fpArms.IK(true, tR, hr, cr2 * (sp.longGun ? 0.8f : 0.5f) + dn * 1f - camT.forward * 0.2f, 0.45f);
                 if (g.gripL != null) fpArms.IK(false, tL, hl, dn * 1f - cr2 * 0.35f - camT.forward * 0.1f, 0.5f);
-                fpArms.Fingers(true, sp.curlR, idx, sp.thumbR, 1f - rightW * 0.7f);
-                if (g.gripL != null) fpArms.Fingers(false, sp.curlL, sp.indexL, sp.thumbL, 1f - leftW * 0.6f);
-                if (rightW < 0.3f && g.trigger != null) ArmSolver.TriggerIndex(fpArms.FingerBones(true), true, trig, squeeze);
+                if (grip != null)
+                {
+                    GripLib.SetFingers(fpArms.FingerBones(true), grip.fingers[0], true, squeeze, 1f - rightW * 0.7f);
+                    GripLib.SetFingers(fpArms.FingerBones(false), grip.fingers[1], false, 0f, 1f - leftW * 0.6f);
+                }
+                else
+                {
+                    fpArms.Fingers(true, sp.curlR, idx, sp.thumbR, 1f - rightW * 0.7f);
+                    if (g.gripL != null) fpArms.Fingers(false, sp.curlL, sp.indexL, sp.thumbL, 1f - leftW * 0.6f);
+                    if (rightW < 0.3f && g.trigger != null) ArmSolver.TriggerIndex(fpArms.FingerBones(true), true, trig, squeeze);
+                }
             }
             else
             {
                 if (fpArms != null) fpArms.Show(false);
                 Av.ArmIK(true, tR, hr, poleR, 1f, 0.45f);
                 Av.ArmIK(false, tL, hl, poleL, g.gripL != null ? 1f : 0f, 0.5f);
-                Av.Fingers(true, sp.curlR, idx, sp.thumbR, 1f - rightW * 0.7f);
-                if (g.gripL != null) Av.Fingers(false, sp.curlL, sp.indexL, sp.thumbL, 1f - leftW * 0.6f);
-                if (rightW < 0.3f && g.trigger != null) ArmSolver.TriggerIndex(Av.FingerBones(true), true, trig, squeeze);
+                if (grip != null)
+                {
+                    GripLib.SetFingers(Av.FingerBones(true), grip.fingers[0], true, squeeze, 1f - rightW * 0.7f);
+                    GripLib.SetFingers(Av.FingerBones(false), grip.fingers[1], false, 0f, 1f - leftW * 0.6f);
+                }
+                else
+                {
+                    Av.Fingers(true, sp.curlR, idx, sp.thumbR, 1f - rightW * 0.7f);
+                    if (g.gripL != null) Av.Fingers(false, sp.curlL, sp.indexL, sp.thumbL, 1f - leftW * 0.6f);
+                    if (rightW < 0.3f && g.trigger != null) ArmSolver.TriggerIndex(Av.FingerBones(true), true, trig, squeeze);
+                }
             }
             leftW = Mathf.MoveTowards(leftW, leftFree ? 1f : 0f, dt * 8f);
             rightW = Mathf.MoveTowards(rightW, rightFree ? 1f : 0f, dt * 8f);

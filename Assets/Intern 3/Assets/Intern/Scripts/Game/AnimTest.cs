@@ -663,6 +663,7 @@ namespace Intern.Game
             for (int view = 0; view < 2; view++)
             {
                 if (view == 1) pl.ToggleView();
+                side.enabled = front.enabled = view == 0;   // от первого лица — чистый кадр
                 foreach (var id in weaponFilter ?? AllWeapons)
                 {
                     var def = Balance.Weapon(id);
@@ -681,6 +682,7 @@ namespace Intern.Game
                         }
                         float w0 = t;
                         while (t - w0 < 1.0f) { cb.Tick(Time.deltaTime, false); cams(); t += Time.deltaTime; yield return Tick(); }
+                        log.AppendLine(string.Format(ci, "    FK кисти {0:0.0000}, 1-е: цель {1}, кисть {2}", cb.DevFkError, cb.DevFpTarget.ToString("F2"), cb.DevFpHand.ToString("F2")));
                     }
                     else
                     {

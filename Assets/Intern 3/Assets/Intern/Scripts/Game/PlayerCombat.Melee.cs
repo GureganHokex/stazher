@@ -1,7 +1,10 @@
 // Ближний бой (спринт 8 версии 0.9 «Оружие в руках», задача 2): у ножа, биты и катаны — серии из 3–5 ударов.
 // Каждый удар — путь кулака и направление клинка по ключам (от правого плеча, в осях персонажа), поворот корпуса,
 // своя дуга, урон, отбрасывание и момент попадания. Клик во время удара — следующий удар серии, пауза — серия сначала.
-// Руки ставит тот же IK, что и у огнестрела; двуручные (бита, катана) держит и левая. За клинком — след.
+// Позы — из Blender (Art/melee_v1.py): стойка mguard_<оружие> и удары m_<оружие>_<n> клипами на теле, оружие сидит
+// в правой кисти как в рендере, левая (бита, катана) — на рукояти по точке хвата; длина ударов и момент попадания —
+// оттуда же (grips_v1.txt). От первого лица руки повторяют позу тела в осях камеры. Без данных — прежний IK по ключам.
+// За клинком — след.
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -115,6 +118,13 @@ namespace Intern.Game
                       new[] { eT, V(0f, -1f, 0.12f), V(0f, -1f, 0f), V(0f, -1f, 0f), eT },
                       new[] { 0f, 0.3f, 0.5f, 0.72f, 1f }, new[] { 0f, 15f, -15f, -10f, 0f }, new[] { 0f, 0f, 10f, 8f, 0f }, 0.3f, 0f, 0.5f),
                 };
+                // длина ударов и момент попадания — как в клипах из Blender
+                foreach (var kv in moves)
+                {
+                    var gm = GripLib.Get(kv.Key);
+                    if (gm == null || !gm.melee || gm.strikeLen.Count != kv.Value.Length) continue;
+                    for (int i = 0; i < kv.Value.Length; i++) { kv.Value[i].len = gm.strikeLen[i]; kv.Value[i].hitAt = gm.strikeHit[i]; }
+                }
             }
             MeleeMove[] r; return moves.TryGetValue(id ?? "", out r) ? r : moves["knife"];
         }
@@ -158,7 +168,22 @@ namespace Intern.Game
         {
             comboIdx = idx; strikeAt = Time.time; strikeQueued = false; strikeHit = false; strikeSwoosh = false;
             player.FaceYaw(player.CamYaw);
-            if (Av != null) Av.swingStart = -9f;
+            if (Av != null)
+            {
+                Av.swingStart = -9f;
+                var m = Moves(def.id)[idx];
+                if (MeleeClips(def.id) != null) Av.PlayAction("m_" + def.id + "_" + (idx + 1), m.len);
+            }
+        }
+
+        // Данные хвата и клипы из Blender для этого оружия (null — нет, тогда прежний IK)
+        static string mcId; static GripLib.Grip mcG;
+        static GripLib.Grip MeleeClips(string id)
+        {
+            if (id == mcId) return mcG;
+            var g = GripLib.Get(id);
+            mcId = id; mcG = g != null && g.melee && AnimLib.Get(g.guard) != null && AnimLib.Get("m_" + id + "_1") != null ? g : null;
+            return mcG;
         }
 
         // Ход серии: момент попадания, переход к следующему удару
@@ -212,13 +237,16 @@ namespace Intern.Game
         // ---------- поза: стойка и удар (IK), след клинка ----------
         void MeleePose(float dt)
         {
-            var w = meleeModel; if (w == null || !w.gameObject.activeInHierarchy || Av == null || !Av.v4 || Av.handR == null) { if (fpArms != null) fpArms.Show(false); if (trail != null) trail.Emit(false); return; }
+            var w = meleeModel; if (w == null || !w.gameObject.activeInHierarchy || Av == null || !Av.v4 || Av.handR == null) { if (Av != null) Av.guardClip = null; if (fpArms != null) fpArms.Show(false); if (trail != null) trail.Emit(false); return; }
             var def = Current; string id = def.id;
             var camT = player.cam.transform;
             bool fp = player.firstPerson;
             float s = Av.transform.lossyScale.y;
             var m = Striking ? CurMove : null;
             float u = m != null ? Mathf.Clamp01(StrikeU) : 0f;
+            var gm = MeleeClips(id);
+            Av.guardClip = gm != null ? gm.guard : null;
+            if (gm != null) { MeleeClipPose(w, gm, id, m, u, fp, camT, s, dt); return; }
             Vector3 p = GuardP(id), b = GuardB(id), e = GuardE(id); float twist = 0f, lean = 0f;
             if (m != null)
             {
@@ -268,6 +296,85 @@ namespace Intern.Game
             if (trail == null || trail.Weapon != w) { if (trail != null) trail.Destroy(); trail = WeaponTrail.For(w, id); }
             bool cut = m != null && u > m.hitAt - 0.22f && u < m.hitAt + 0.2f;
             if (trail != null) trail.Emit(cut);
+        }
+
+        // Поза из клипов Blender: тело уже в стойке или ударе (CharacterAnim, слой стойки и слой удара), здесь — оружие
+        // в правой кисти, левая кисть на рукояти; от первого лица руки повторяют кисть тела в осях камеры
+        void MeleeClipPose(WeaponModel w, GripLib.Grip gm, string id, MeleeMove m, float u, bool fp, Transform camT, float s, float dt)
+        {
+            holdW = Mathf.MoveTowards(holdW, 1f, dt * 6f);
+            Av.AimStance(0f, camT.forward, 0f, 0f, holdW);
+            Transform hand;
+            bool fpOn = fp && FpReady();
+            if (fpOn)
+            {
+                fpArms.Show(true);
+                // кисть тела по костям (руки тела сжаты), разворот груди — из клипа
+                Vector3 hp; Quaternion hq;
+                BoneFk(Av.torso, Av.handR, out hp, out hq);
+                Vector3 up = Av.transform.up, cf = Vector3.ProjectOnPlane(Av.torso.forward, up), bf = Vector3.ProjectOnPlane(Av.transform.forward, up);
+                float twist = cf.sqrMagnitude > 1e-4f && bf.sqrMagnitude > 1e-4f ? Vector3.SignedAngle(bf, cf, up) : 0f;
+                fpArms.Place(camT, new Vector3(0f, -0.25f, -0.05f) * s, twist * 0.5f);
+                // то, что видят глаза, поворачивается вместе с наклоном камеры и чуть поднимается в кадр
+                Vector3 flat = Vector3.ProjectOnPlane(camT.forward, Vector3.up);
+                Quaternion pitch = flat.sqrMagnitude > 1e-4f ? camT.rotation * Quaternion.Inverse(Quaternion.LookRotation(flat, Vector3.up)) : Quaternion.identity;
+                Vector3 tgt = camT.position + pitch * (hp + hq * (CharacterAnim.PalmR * s) - camT.position) + camT.rotation * (FpLift(id) * s);
+                // замах над головой и за плечо — не через камеру: кисть не ближе 0,3 м перед глазами и не выше линии взгляда
+                Vector3 lc = camT.InverseTransformPoint(tgt) / s;
+                if (lc.y > 0.04f) lc.y = 0.04f + (lc.y - 0.04f) * 0.35f;
+                if (lc.z < 0.3f) lc.z = 0.3f + (lc.z - 0.3f) * 0.25f;
+                lc.z = Mathf.Max(lc.z, 0.24f);
+                tgt = camT.TransformPoint(lc * s);
+                fpArms.IK(true, tgt, pitch * hq, camT.rotation * new Vector3(0.8f, -1f, -0.3f), 0.4f);
+                DevFpTarget = camT.InverseTransformPoint(tgt) / s; DevFpHand = camT.InverseTransformPoint(fpArms.HandR.TransformPoint(CharacterAnim.PalmR)) / s;
+                hand = fpArms.HandR;
+                CopyFingers(Av.FingerBones(true), fpArms.FingerBones(true));
+                CopyFingers(Av.FingerBones(false), fpArms.FingerBones(false));
+            }
+            else
+            {
+                if (fpArms != null) fpArms.Show(false);
+                hand = Av.handR;
+                Vector3 fp0; Quaternion fq0; BoneFk(Av.torso, Av.handR, out fp0, out fq0);
+                DevFkError = Vector3.Distance(fp0, Av.handR.position) + Quaternion.Angle(fq0, Av.handR.rotation) * 0.001f;
+            }
+            // оружие сидит в кисти так же, как в рендере Blender
+            if (w.transform.parent != hand) w.transform.SetParent(hand, false);
+            w.transform.localPosition = gm.attachPos; w.transform.localRotation = gm.attachRot;
+            if (gm.two)
+            {
+                // левая — точно на рукоять (после смешивания клипов кисть могла съехать на миллиметры)
+                var hrL = w.transform.rotation * gm.handRot[1];
+                var tL = w.transform.position + w.transform.rotation * (gm.handPos[1] * s) + hrL * (CharacterAnim.PalmL * s);
+                if (fpOn) fpArms.IK(false, tL, hrL, camT.rotation * new Vector3(-0.6f, -1f, -0.2f), 0.4f);
+                else Av.ArmIK(false, tL, hrL, Av.elbowL.position - (Av.armL.position + tL) * 0.5f, 1f, 0.5f);
+            }
+            if (trail == null || trail.Weapon != w) { if (trail != null) trail.Destroy(); trail = WeaponTrail.For(w, id); }
+            bool cut = m != null && u > m.hitAt - 0.22f && u < m.hitAt + 0.2f;
+            if (trail != null) trail.Emit(cut);
+        }
+
+        public Vector3 DevFpTarget, DevFpHand; public float DevFkError;
+
+        // от первого лица: поза тела поднята в кадр (камера на высоте макушки — стойка у груди иначе под нижним краем)
+        static Vector3 FpLift(string id) { return id == "bat" ? V(-0.02f, 0.54f, 0.2f) : id == "katana" ? V(0f, 0.6f, 0.16f) : V(-0.06f, 0.56f, 0.2f); }
+
+        static void CopyFingers(Transform[] src, Transform[] dst)
+        {
+            if (src == null || dst == null) return;
+            for (int k = 0; k < src.Length && k < dst.Length; k++) if (src[k] != null && dst[k] != null) dst[k].localRotation = src[k].localRotation;
+        }
+
+        // Мировая поза кости по локальным поворотам от top (руки тела от первого лица сжаты масштабом — позиции не верны)
+        static readonly List<Transform> fkChain = new List<Transform>();
+        static void BoneFk(Transform top, Transform bone, out Vector3 p, out Quaternion q)
+        {
+            fkChain.Clear();
+            var t = bone;
+            for (; t != null && t != top; t = t.parent) fkChain.Add(t);
+            if (t == null || top == null) { p = bone.position; q = bone.rotation; return; }
+            p = top.position; q = top.rotation; float sc = top.lossyScale.x;
+            for (int i = fkChain.Count - 1; i >= 0; i--) { p += q * (fkChain[i].localPosition * sc); q = q * fkChain[i].localRotation; }
         }
 
         // Капсулы тела: корпус (таз — шея), голова (шар), ноги (таз — колени); запас — толщина оружия
