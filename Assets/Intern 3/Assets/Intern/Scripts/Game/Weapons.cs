@@ -140,7 +140,7 @@ namespace Intern.Game
     }
 
     // ======================= модель оружия =======================
-    public class WeaponModel : MonoBehaviour
+    public partial class WeaponModel : MonoBehaviour
     {
         public Transform muzzle, sight, rail, magPoint;
         public Transform grip;   // за что держит правая рука (рукоять)
@@ -161,6 +161,8 @@ namespace Intern.Game
 
         public static WeaponModel Build(WeaponDef def, WeaponSave save, Arsenal ars)
         {
+            var imp = BuildImported(def, save, ars);      // модель из Blender (WeaponModel.Imported.cs)
+            if (imp != null) return imp;
             // Architect: золотое оружие (перк титула)
             Color metal = Golden ? GoldDark : Metal, steel = Golden ? Gold : Steel, wood = Golden ? GoldWarm : Wood;
             var go = new GameObject("Weapon_" + def.id);
@@ -252,7 +254,7 @@ namespace Intern.Game
 
     // ======================= оружие в руках =======================
     [DefaultExecutionOrder(100)]   // после анимации персонажа: ствол ставится в руку уже этого кадра
-    public class PlayerCombat : MonoBehaviour
+    public partial class PlayerCombat : MonoBehaviour
     {
         public Arsenal ars;
         public LunchRun run;
@@ -302,7 +304,8 @@ namespace Intern.Game
             if (meleeModel != null) Destroy(meleeModel.gameObject);
             if (gunModel != null) Destroy(gunModel.gameObject);
             meleeModel = gunModel = null;
-            if (player != null) { player.fovScale = 1f; player.faceCamera = false; player.speedMul = 1f; player.scopeView = false; }
+            DropFpArms();
+            if (player != null) { player.fovScale = 1f; player.shoulderX = 0.35f; player.faceCamera = false; player.speedMul = 1f; player.scopeView = false; }
             if (Av != null) { Av.holdRight = false; Av.aimGun = false; Av.twoHanded = false; }
         }
 
@@ -317,9 +320,9 @@ namespace Intern.Game
             {
                 // скелет v4: рукоять в кулаке, клинок выходит со стороны большого пальца
                 meleeModel.transform.SetParent(Av.handR, false);
-                float gz = meleeModel.grip != null ? meleeModel.grip.localPosition.z : 0f;
-                meleeModel.transform.localPosition = CharacterAnim.PalmR - new Vector3(0f, 0f, gz);
                 meleeModel.transform.localRotation = Quaternion.identity;
+                Vector3 gp = meleeModel.imported ? meleeModel.Local(meleeModel.grip) : new Vector3(0f, 0f, meleeModel.grip != null ? meleeModel.grip.localPosition.z : 0f);
+                meleeModel.transform.localPosition = CharacterAnim.PalmR - gp;
             }
             else
             {
@@ -337,9 +340,10 @@ namespace Intern.Game
         {
             if (meleeModel != null) meleeModel.gameObject.SetActive(slot == 0 && !KnifeAway);
             if (gunModel != null) gunModel.gameObject.SetActive(slot == 1);
-            if (Av != null) { Av.holdRight = slot == 0; Av.aimGun = slot == 1; Av.twoHanded = slot == 1 && gunModel != null && gunModel.twoHanded; }
+            if (Av != null) { Av.holdRight = slot == 0; Av.aimGun = slot == 1; Av.twoHanded = slot == 1 && gunModel != null && (gunModel.twoHanded || gunModel.imported); }
             player.faceCamera = slot == 1;
             reloadStart = -1f;
+            if (slot == 1) { drawW = 0f; holdW = 0f; }
         }
 
         public void Switch(int to)
@@ -370,11 +374,12 @@ namespace Intern.Game
             if (Reloading && Time.time - reloadStart >= reloadDur) FinishReload();
 
             var def = Current;
-            ads = active && !def.Melee && InputX.AimHeld() && !Reloading;
+            ads = ((active && InputX.AimHeld()) || devAds) && !def.Melee && !Reloading;
             player.fovScale = ads ? 1f / ars.Zoom(def) : 1f;
             player.scopeView = Scoped;
             float slow = ads ? 0.6f : 1f;
             player.speedMul = run.PlayerSpeedMul * slow;
+            player.shoulderX = Mathf.MoveTowards(player.shoulderX, def.Melee ? 0.35f : 0.72f, dt * 1.4f);
             if (Av != null) Av.aimPitch = player.CamPitch;
             if (!active) return;
 
@@ -392,6 +397,23 @@ namespace Intern.Game
             }
             bool trigger = def.auto ? InputX.AttackHeld() : InputX.Attack();
             if (trigger && Time.time >= nextAt) Fire(def);
+        }
+
+        // ---------- для проверки (AnimTest): клик атаки, прицел, выбор оружия без перебора ----------
+        public bool devAds;
+        public void DevSelect(string id)
+        {
+            var d = Balance.Weapon(id); if (d == null || !ars.Owns(id)) return;
+            ars.Equip(id); slot = d.Melee ? 0 : 1; ads = false; reloadStart = -1f; nextAt = 0f;
+            Rebuild();
+        }
+        public void DevEmpty() { var w = CurrentSave; if (w != null && !Current.Melee) w.mag = 0; }
+        public void DevAttack()
+        {
+            var def = Current;
+            if (Time.time < nextAt) return;
+            if (def.Melee) { if (!KnifeAway) Swing(def); }
+            else Fire(def);
         }
 
         // ---------- ближний бой ----------
@@ -461,6 +483,7 @@ namespace Intern.Game
         // ---------- огнестрел ----------
         void Fire(WeaponDef def)
         {
+            if (Reloading && def.id == "shotgun" && MagNow > 0) reloadStart = -1f;   // дробовик: выстрел прерывает перезарядку
             if (Reloading) return;
             if (Overheated) return;
             var w = CurrentSave;
@@ -499,7 +522,7 @@ namespace Intern.Game
                 }
                 Fx.Tracer(muzzle, end);
             }
-            Fx.Flash(muzzle, gunModel != null ? gunModel.transform.forward : cam.forward);
+            ShotFx(def);
             float rec = ars.Recoil(def);
             player.AddRecoil(rec * UnityEngine.Random.Range(0.7f, 1.1f), rec * UnityEngine.Random.Range(-0.35f, 0.35f));
             spreadKick = Mathf.Min(spreadKick + rec * 0.35f, 4f);
@@ -515,29 +538,16 @@ namespace Intern.Game
             if (MagNow >= MagSize) return;
             if (Reserve <= 0) { if (run != null && run.Say != null) run.Say("Патроны кончились. Ларёк с патронами — на площади."); return; }
             reloadStart = Time.time; reloadDur = ars.ReloadTime(def);
+            BeginReloadAnim(def);
         }
 
         void FinishReload()
         {
+            var def = Current; var w = CurrentSave; if (w == null) { reloadStart = -1f; return; }
+            if (ReloadStep(def, w)) return;   // дробовик — по патрону
             reloadStart = -1f;
-            var def = Current; var w = CurrentSave; if (w == null) return;
             int need = MagSize - Mathf.Max(0, w.mag), take = Mathf.Min(need, Reserve);
             ars.AddAmmo(def.ammo, -take); w.mag = Mathf.Max(0, w.mag) + take;
-        }
-
-        // Ствол в руке смотрит туда, куда целится камера
-        void LateUpdate()
-        {
-            if (run == null || gunModel == null || slot != 1 || Av == null || Av.elbowR == null) return;
-            bool palm = Av.v4 && Av.handR != null;
-            var hand = palm ? Av.handR.TransformPoint(CharacterAnim.PalmR) : Av.elbowR.TransformPoint(new Vector3(0, -0.27f, 0.03f));
-            var aim = player.AimPoint(60f);
-            var dir = aim - hand; if (dir.sqrMagnitude < 0.25f) dir = player.cam.transform.forward;
-            gunModel.transform.position = hand;
-            gunModel.transform.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
-            // скелет v4: рукоять — в кулаке (кисть обхватывает её верх), а не начало ствола в запястье
-            if (palm && gunModel.grip != null)
-                gunModel.transform.position += hand - gunModel.transform.TransformPoint(gunModel.grip.localPosition + new Vector3(0f, 0.02f, 0f));
         }
     }
 
@@ -563,20 +573,21 @@ namespace Intern.Game
         }
     }
 
-    // Трассеры и вспышки выстрелов
-    public static class Fx
+    // Трассеры и вспышки выстрелов (вспышка на стволе, дым, искры, гильзы — GunFx.cs)
+    public static partial class Fx
     {
         static Material tracerMat, flashMat;
 
         public static void Tracer(Vector3 a, Vector3 b)
         {
-            if (tracerMat == null) tracerMat = Look.FxMat(new Color(1f, 0.85f, 0.4f, 0.9f), false, true);
+            if (tracerMat == null) tracerMat = TexMat(SparkTex(), true);
             if (tracerMat == null) return;
-            var go = new GameObject("Tracer");
+            var go = new GameObject("Tracer"); go.layer = 2;
             var lr = go.AddComponent<LineRenderer>();
-            lr.sharedMaterial = tracerMat; lr.positionCount = 2; lr.SetPosition(0, a); lr.SetPosition(1, b);
-            lr.startWidth = 0.025f; lr.endWidth = 0.01f; lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; lr.receiveShadows = false;
-            UnityEngine.Object.Destroy(go, 0.05f);
+            lr.sharedMaterial = tracerMat; lr.positionCount = 2; lr.SetPosition(0, a); lr.SetPosition(1, a);
+            lr.startWidth = 0.008f; lr.endWidth = 0.024f; lr.startColor = new Color(1f, 0.7f, 0.35f, 0.5f); lr.endColor = new Color(1f, 0.95f, 0.8f, 1f); lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; lr.receiveShadows = false;
+            var tr = go.AddComponent<TracerRun>(); tr.a = a; tr.b = b;
+            UnityEngine.Object.Destroy(go, 1.5f);
         }
 
         public static void Flash(Vector3 at, Vector3 fwd)

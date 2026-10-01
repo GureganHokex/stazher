@@ -12,6 +12,7 @@ namespace Intern.Game
         public bool cinematic;          // камерой управляет сцена (посадка за компьютер, гардероб, меню)
         public float speedBoostUntil;
         // обед: оружие и эффекты
+        public float shoulderX = 0.35f;  // камера над правым плечом (с огнестрелом — правее, чтобы ствол был виден)
         public float speedMul = 1f;     // прицеливание, энергетик, «А зачем?», оглушение (0)
         public float fovScale = 1f;     // прицел и оптика
         public bool scopeView;          // смотрим в оптику: камера на уровне глаз, голова скрыта (иначе в прицеле видно свою макушку)
@@ -180,7 +181,7 @@ namespace Intern.Game
             var pivot = transform.position + Vector3.up * (Tall ? 1.65f : 1.45f);
             var rot = Quaternion.Euler(camPitch - kickPitch, camYaw + kickYaw, 0);
             var back = rot * Vector3.back;
-            var shoulder = rot * Vector3.right * 0.35f;
+            var shoulder = rot * Vector3.right * shoulderX;
             float want = camDist;
             RaycastHit hit;
             if (Physics.SphereCast(pivot, 0.22f, (back * camDist + shoulder).normalized, out hit, camDist, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))

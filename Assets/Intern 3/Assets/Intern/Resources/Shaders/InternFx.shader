@@ -1,10 +1,12 @@
 // Эффекты: солнечные лучи, пылинки (аддитивно) и мягкие тени-пятна (полупрозрачно).
+// Режим 3 (спринт 8): по текстуре — вспышка выстрела, дым, искры (цвет текстуры × _Color × цвет вершин).
 Shader "Intern/Fx"
 {
     Properties
     {
         _Color ("Color", Color) = (1,1,1,0.3)
-        _Radial ("Radial (1) / Beam (0) / Flat (2)", Float) = 0
+        _Radial ("Radial (1) / Beam (0) / Flat (2) / Texture (3)", Float) = 0
+        _MainTex ("Texture", 2D) = "white" {}
         [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend ("Src Blend", Float) = 1
         [Enum(UnityEngine.Rendering.BlendMode)] _DstBlend ("Dst Blend", Float) = 1
     }
@@ -24,7 +26,9 @@ Shader "Intern/Fx"
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
+            TEXTURE2D(_MainTex); SAMPLER(sampler_MainTex);
             CBUFFER_START(UnityPerMaterial)
+                float4 _MainTex_ST;
                 half4 _Color;
                 half _Radial;
                 half _SrcBlend;
@@ -46,7 +50,13 @@ Shader "Intern/Fx"
             half4 frag (Varyings i) : SV_Target
             {
                 half a;
-                if (_Radial > 1.5)
+                half3 tint = half3(1, 1, 1);
+                if (_Radial > 2.5)
+                {
+                    half4 t = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv);
+                    a = t.a; tint = t.rgb;
+                }
+                else if (_Radial > 1.5)
                 {
                     a = 1.0;   // ровное стекло: витрины, остановка (спринт 4 версии 0.9)
                 }
@@ -62,6 +72,7 @@ Shader "Intern/Fx"
                     a = i.uv.y * i.uv.y * sin(saturate(i.uv.x) * 3.14159);
                 }
                 half4 c = _Color * i.color;
+                c.rgb *= tint;
                 c.a *= a;
                 // для аддитивного режима (One, One) заранее умножаем цвет на прозрачность
                 if (_SrcBlend < 1.5 && _DstBlend < 1.5) c.rgb *= c.a;

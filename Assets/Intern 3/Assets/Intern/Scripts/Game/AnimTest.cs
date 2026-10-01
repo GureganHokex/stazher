@@ -76,7 +76,7 @@ namespace Intern.Game
             string tagFile = Path.Combine(Root, "Temp", "animtag.txt");
             string tag = File.Exists(tagFile) ? File.ReadAllText(tagFile).Trim() : "after";
             string only = null;
-            if (tag.Contains(" ")) { var p = tag.Split(' '); tag = p[0]; only = p[1]; }
+            if (tag.Contains(" ")) { var p = tag.Split(' '); tag = p[0]; only = p[1]; weaponFilter = p.Length > 2 ? p[2].Split(',') : null; }
             log.AppendLine("animtest " + tag + " " + DateTime.Now.ToString("HH:mm:ss") + ", клипов " + AnimLib.Count + (AnimLib.Error != null ? " (" + AnimLib.Error + ")" : ""));
             CharacterAnim.UseV4 = tag != "before";
             JointHelpers.Stretch = !tag.Contains("nostretch");
@@ -102,6 +102,7 @@ namespace Intern.Game
                 new KeyValuePair<string, Func<IEnumerator>>("office", Office),
                 new KeyValuePair<string, Func<IEnumerator>>("lunch", LunchScene),
                 new KeyValuePair<string, Func<IEnumerator>>("player", PlayerScene),
+                new KeyValuePair<string, Func<IEnumerator>>("weapons", WeaponsScene),
             };
             foreach (var sc in scenes)
             {
@@ -538,6 +539,100 @@ namespace Intern.Game
             }
             InputX.DevDrive = false; InputX.DevMove = Vector2.zero; InputX.DevLook = Vector2.zero; InputX.DevSprint = false;
             Destroy(side.gameObject);
+            cb.End(); if (gr.Arsenal != null) cb.Init(pl, gr.Arsenal);
+            if (pl.firstPerson != fp0) pl.ToggleView();
+            pl.cinematic = true;
+            pl.Teleport(new Vector3(40f, 0.1f, 250f), 0f);
+        }
+
+        // Всё оружие по очереди (спринт 8 «Оружие в руках»): игрок от третьего, потом от первого лица; сбоку — вторая камера.
+        // Холодное: пять нажатий подряд (серия ударов). Огнестрел: прицел, очередь или несколько выстрелов, перезарядка, ещё выстрелы.
+        string[] weaponFilter;   // третье слово метки: оружие через запятую (только оно)
+        public static readonly string[] AllWeapons = { "knife", "bat", "katana", "pistol", "smg", "shotgun", "rifle", "sniper", "mg" };
+        IEnumerator WeaponsScene()
+        {
+            var cb = gr.Combat; var city = gr.DevCityRefs;
+            if (cb == null || city == null || pl.avatar == null) { log.AppendLine("weapons: нет боя или города"); yield break; }
+            var run = new LunchRun(city, 600f, () => pl.Position, () => pl.cam.transform, false, false);
+            run.Cleanup();
+            var ars = new Arsenal(new SaveData());
+            foreach (var id in AllWeapons) ars.Add(id);
+            foreach (var am in new[] { "pistol", "auto", "shell", "rifle", "belt" }) ars.AddAmmo(am, 500);
+            cb.Init(pl, ars); cb.Begin(run);
+            bool fp0 = pl.firstPerson;
+            if (pl.firstPerson) pl.ToggleView();
+            var at = G0 + new Vector3(6f, 0.1f, -14f);
+            pl.Teleport(at, 0f); pl.SetCamPitch(6f);
+            pl.cinematic = false;
+            InputX.DevDrive = true; InputX.DevMove = Vector2.zero; InputX.DevLook = Vector2.zero; InputX.DevSprint = false;
+            var side = new GameObject("AT_SideCam").AddComponent<Camera>();
+            side.rect = new Rect(0.6f, 0.02f, 0.39f, 0.5f); side.depth = pl.cam.depth + 1; side.fieldOfView = 30f;
+            side.clearFlags = CameraClearFlags.SolidColor; side.backgroundColor = pl.cam.backgroundColor; side.nearClipPlane = 0.05f;
+            var front = new GameObject("AT_FrontCam").AddComponent<Camera>();
+            front.rect = new Rect(0.01f, 0.02f, 0.33f, 0.44f); front.depth = pl.cam.depth + 1; front.fieldOfView = 30f;
+            front.clearFlags = CameraClearFlags.SolidColor; front.backgroundColor = new Color(0.78f, 0.8f, 0.84f); front.nearClipPlane = 0.05f;
+            watch = null;
+            float t = 0f;
+            Action cams = () =>
+            {
+                pl.avatar.aimPitch = pl.CamPitch;
+                var pc = pl.Position + Vector3.up * 1.35f;
+                var sp = pc + pl.transform.right * 1.55f + pl.transform.forward * 0.55f + Vector3.up * 0.1f;
+                side.transform.position = sp; side.transform.rotation = Quaternion.LookRotation(pc + pl.transform.forward * 0.3f - sp);
+                var fpos = pc - pl.transform.right * 0.9f + pl.transform.forward * 1.5f + Vector3.up * 0.05f;
+                front.transform.position = fpos; front.transform.rotation = Quaternion.LookRotation(pc + pl.transform.forward * 0.3f - fpos);
+            };
+            for (int view = 0; view < 2; view++)
+            {
+                if (view == 1) pl.ToggleView();
+                foreach (var id in weaponFilter ?? AllWeapons)
+                {
+                    var def = Balance.Weapon(id);
+                    cb.DevSelect(id);
+                    log.AppendLine(string.Format(ci, "  {0} {1}: кадр {2}", view == 0 ? "3-е" : "1-е", id, frame));
+                    float s0 = t;
+                    // достаёт и стоит
+                    while (t - s0 < 0.7f) { cb.Tick(Time.deltaTime, false); cams(); t += Time.deltaTime; yield return Tick(); }
+                    if (def.Melee)
+                    {
+                        // серия: пять нажатий с паузой 0,3 с
+                        for (int k = 0; k < 5; k++)
+                        {
+                            float k0 = t; cb.DevAttack();
+                            while (t - k0 < 0.3f) { cb.DevAttack(); cb.Tick(Time.deltaTime, false); cams(); t += Time.deltaTime; yield return Tick(); }
+                        }
+                        float w0 = t;
+                        while (t - w0 < 1.0f) { cb.Tick(Time.deltaTime, false); cams(); t += Time.deltaTime; yield return Tick(); }
+                    }
+                    else
+                    {
+                        cb.devAds = true;
+                        float a0 = t;
+                        while (t - a0 < 0.5f) { cb.Tick(Time.deltaTime, false); cams(); t += Time.deltaTime; yield return Tick(); }
+                        float f0 = t; int shots = 0;
+                        while (t - f0 < (def.auto ? 1.0f : 1.6f))
+                        {
+                            if (def.auto || (t - f0) >= shots * 0.45f) { int before = cb.MagNow; cb.DevAttack(); if (cb.MagNow < before) shots++; }
+                            cb.Tick(Time.deltaTime, false); cams(); t += Time.deltaTime; yield return Tick();
+                        }
+                        cb.devAds = false;
+                        if (view == 0) cb.DevEmpty();   // от третьего лица — перезарядка с пустого (с затвором), от первого — с патроном
+                        cb.StartReload();
+                        float r0 = t;
+                        while ((cb.Reloading || t - r0 < 0.3f) && t - r0 < 6f) { cb.Tick(Time.deltaTime, false); cams(); t += Time.deltaTime; yield return Tick(); }
+                        float g0 = t; shots = 0;
+                        while (t - g0 < 0.8f)
+                        {
+                            if ((t - g0) >= shots * 0.4f) { int before = cb.MagNow; cb.DevAttack(); if (cb.MagNow < before) shots++; }
+                            cb.Tick(Time.deltaTime, false); cams(); t += Time.deltaTime; yield return Tick();
+                        }
+                    }
+                }
+                if (view == 1) pl.ToggleView();
+            }
+            InputX.DevDrive = false; InputX.DevMove = Vector2.zero; InputX.DevLook = Vector2.zero;
+            cb.devAds = false;
+            Destroy(side.gameObject); Destroy(front.gameObject);
             cb.End(); if (gr.Arsenal != null) cb.Init(pl, gr.Arsenal);
             if (pl.firstPerson != fp0) pl.ToggleView();
             pl.cinematic = true;
