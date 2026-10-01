@@ -165,6 +165,10 @@ namespace Intern.Game
             if (!a.v4) bad.Add("Dev1: скелет не v4 — анимация по-старому, кодом");
             else
             {
+                // веса кожи: у тела десятки «главных» костей (если экспорт потерял группы весов, всё тело висит на тазу и не гнётся)
+                var bodySmr = a.GetComponentsInChildren<SkinnedMeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Body"));
+                int owners = bodySmr != null && bodySmr.sharedMesh != null ? bodySmr.sharedMesh.boneWeights.Select(w => w.boneIndex0).Distinct().Count() : 0;
+                if (owners < 30) bad.Add("Dev1: веса тела потеряны — главных костей " + owners + " (нужно 30+), тело не будет гнуться");
                 var feet = new[] { ModelLib.Find(a.rig, "FootL"), ModelLib.Find(a.rig, "FootR") };
                 var heel = new Vector3(0f, -0.1f, -0.072f); var ball = new Vector3(0f, -0.1f, 0.092f);
                 var parts = new List<string>();
@@ -209,6 +213,21 @@ namespace Intern.Game
                     parts.Add(tag + " " + v.ToString("0.0") + " м/с: скольжение " + sl.ToString("0.00") + " м/с, низ " + low.ToString("0.00") + ", таз " + hipLo.ToString("0.00") + "…" + hipHi.ToString("0.00"));
                 }
                 info.Add("анимация v4: клипов " + AnimLib.Count + ", " + string.Join("; ", parts.ToArray()));
+                // помощники локтей и коленей: повёрнуты на половину сгиба, сечение растянуто не больше чем в 1,5 раза
+                var jh = a.GetComponent<JointHelpers>();
+                if (jh == null || jh.Count < 4) bad.Add("Dev1: нет помощников локтей и коленей (" + (jh == null ? 0 : jh.Count) + " из 4)");
+                else
+                {
+                    var js = new List<string>();
+                    for (int i = 0; i < jh.Count; i++)
+                    {
+                        float ha, ja, st; jh.DevState(i, out ha, out ja, out st);
+                        if (Mathf.Abs(ha - ja * 0.5f) > 3f) bad.Add("помощник " + i + ": повёрнут на " + ha.ToString("0") + "° при сгибе " + ja.ToString("0") + "°");
+                        if (st < 0.999f || st > JointHelpers.MaxStretch + 0.001f) bad.Add("помощник " + i + ": растяжение " + st.ToString("0.00"));
+                        js.Add(ja.ToString("0") + "°→" + st.ToString("0.00"));
+                    }
+                    info.Add("помощники суставов (сгиб → растяжение): " + string.Join(", ", js.ToArray()));
+                }
             }
             CharacterAnim.IKDistance = ikD; CharacterAnim.LodDistance = lodD;
             UnityEngine.Object.Destroy(a.gameObject);

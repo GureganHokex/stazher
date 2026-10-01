@@ -743,6 +743,7 @@ namespace Intern.Game
             if (ap != null) ApplyLook(ap); else { ShowAccessory(-1); SetEmotion(0); }
             if (transform.Find("BlobShadow") == null) Look.Blob(transform, 0.42f);
             InitV4();
+            JointHelpers.Attach(gameObject, rig);   // локти и колени: помощники сустава (полсгиба и растяжение на сгибе)
         }
 
         static readonly string[] AccNodes = { null, "Acc_Glasses", "Acc_Headphones", "Acc_Cap", "Acc_Beanie", "Acc_Crown" };

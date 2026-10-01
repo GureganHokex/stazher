@@ -39,6 +39,10 @@ FINGER_NAMES = ["Thumb", "Index", "Middle", "Ring", "Pinky"]
 GROUPS = ["Hips", "Spine", "Spine2", "Torso", "Neck", "Head", "HipL", "KneeL", "FootL", "ToeL", "HipR", "KneeR", "FootR", "ToeR",
           "ClavicleL", "ShoulderL", "ElbowL", "HandL", "ClavicleR", "ShoulderR", "ElbowR", "HandR"]
 GROUPS += [f + str(i) + sd for sd in "LR" for f in FINGER_NAMES for i in (1, 2, 3)]
+# Помощники суставов (после спринта 7): кость в локте и колене поворачивается на половину сгиба и растягивает сечение
+# сустава поперёк сгиба (стык «на ус»), поэтому согнутая рука и нога не сминаются в «сосиску»
+HELPERS = {"ElbowHelp": ("Shoulder", "Elbow"), "KneeHelp": ("Hip", "Knee")}   # помощник: (родитель, кость, за которой идёт)
+GROUPS += [h + sd for h in HELPERS for sd in "LR"]
 FINGER_JOINTS = {"L": {}, "R": {}}   # build_hand записывает сюда суставы пальцев (по геометрии), bone_table строит по ним кости
 GI = {n: i for i, n in enumerate(GROUPS)}
 
@@ -74,7 +78,10 @@ def bone_table(eyes):
               ("Clavicle" + sd, mx((0.028, -0.012, 1.425), s), mx(SH, s), "Torso"),
               ("Shoulder" + sd, mx(SH, s), mx(EL, s), "Clavicle" + sd),
               ("Elbow" + sd, mx(EL, s), mx(WR, s), "Shoulder" + sd),
-              ("Hand" + sd, mx(WR, s), mw((0.294, -0.042, 0.757), s), "Elbow" + sd)]
+              ("Hand" + sd, mx(WR, s), mw((0.294, -0.042, 0.757), s), "Elbow" + sd),
+              # помощники: то же направление, что у кости сустава (одинаковые оси — «половина поворота» считается напрямую)
+              ("ElbowHelp" + sd, mx(EL, s), mx(V(EL) + (V(WR) - V(EL)) * 0.35, s), "Shoulder" + sd),
+              ("KneeHelp" + sd, mx((0.1, 0, 0.52), s), mx((0.1, 0, 0.38), s), "Hip" + sd)]
         for f in FINGER_NAMES:
             J = FINGER_JOINTS[sd].get(f)
             if not J: continue
@@ -96,7 +103,32 @@ def make_armature(coll, eyes):
             if p: b.parent = arm.edit_bones[p]; b.use_connect = False
         bpy.ops.object.mode_set(mode='OBJECT')
     arm.display_type = 'STICK'; ob.show_in_front = True
+    helper_rig(ob)
     return ob
+
+def helper_rig(ob):
+    """Помощники суставов в Blender (для просмотра анимаций): половина поворота кости сустава и растяжение сечения
+    поперёк сгиба 1/cos(угол/2), не больше 1,5. В Unity то же делает JointHelpers.cs (в FBX ограничения не попадают)."""
+    for sd in "LR":
+        for h, (par, j) in HELPERS.items():
+            hb = ob.data.bones.get(h + sd); jb = ob.data.bones.get(j + sd)
+            if hb is None or jb is None: continue
+            pb = ob.pose.bones[h + sd]
+            for c in list(pb.constraints): pb.constraints.remove(c)
+            c = pb.constraints.new('COPY_ROTATION'); c.target = ob; c.subtarget = j + sd
+            c.owner_space = 'LOCAL'; c.target_space = 'LOCAL'; c.mix_mode = 'REPLACE'; c.influence = 0.5
+            M = hb.matrix_local.to_3x3()
+            ax = [M.col[i].normalized() for i in range(3)]
+            hinge = max((0, 2), key=lambda i: abs(ax[i].x))        # ось сгиба — поперёк тела (мировая X)
+            wide = 2 if hinge == 0 else 0                          # растягиваем вперёд-назад
+            try: pb.driver_remove("scale", wide)
+            except TypeError: pass
+            fc = pb.driver_add("scale", wide); d = fc.driver; d.type = 'SCRIPTED'
+            for v in list(d.variables): d.variables.remove(v)
+            v = d.variables.new(); v.name = "a"; v.type = 'TRANSFORMS'
+            t = v.targets[0]; t.id = ob; t.bone_target = j + sd
+            t.transform_type = 'ROT_X' if hinge == 0 else 'ROT_Z'; t.rotation_mode = 'SWING_TWIST_Y'; t.transform_space = 'LOCAL_SPACE'
+            d.expression = "min(1.5, 1 / cos(min(abs(a), 1.7) / 2))"
 
 def parent_to_bone(ob, arm_ob, bone):
     mw = ob.matrix_world.copy()
@@ -123,6 +155,18 @@ def ring_pts(c, axis, rx, ry, n, ref=FWD, p=2.0, phase=0.0):
         a = TAU * (k + phase) / n; ca, sa = math.cos(a), math.sin(a)
         ex = math.copysign(abs(ca) ** (2 / p), ca); ey = math.copysign(abs(sa) ** (2 / p), sa)
         out.append(c + x * (ex * ry) + y * (ey * rx))
+    return out
+
+def bump(pts, c, bumps):
+    """Рельеф кольца: кость или мышца выпирает в сторону dir (мировые оси) на amt; p — острота выступа."""
+    if not bumps: return pts
+    c = V(c); out = []
+    for q in pts:
+        d = q - c; r = d.length
+        if r < 1e-9: out.append(q); continue
+        n = d / r; add = 0.0
+        for dirv, amt, p in bumps: add += amt * max(0.0, n.dot(V(dirv).normalized())) ** p
+        out.append(q + n * add)
     return out
 
 def angle_in(v, c, x, y): d = v.co - c; return math.atan2(d.dot(y), d.dot(x)) % TAU
@@ -236,33 +280,49 @@ NECK = [(1.500, 0.052, 0.050, 0.004, {"Torso": 0.45, "Neck": 0.55}),
         (1.565, 0.048, 0.047, -0.004, {"Neck": 0.6, "Head": 0.4}),
         (1.635, 0.045, 0.044, -0.012, {"Head": 1})]
 
+FR, BK = (0, -1, 0), (0, 1, 0)     # вперёд и назад (персонаж смотрит в −Y)
+
 def arm_rings(s):
+    """Кольца руки сверху вниз: центр, ось, полуширины (вбок, вперёд-назад), веса, параметр t, рельеф.
+    Рельеф (после спринта 7): дельта, бицепс и трицепс, мыщелки локтя и локтевой отросток сзади, брюшко предплечья,
+    плоское запястье. У локтя кольцо целиком на помощнике ElbowHelp: оно поворачивается на полсгиба и растягивается."""
     dU = (V(EL) - mw((0.226, 0.002, 1.30), 1)).normalized(); dF = (V(WR) - V(EL)).normalized()
-    S, E = "Shoulder", "Elbow"
-    R = [((0.207, 0.000, 1.368), V((1, 0, -0.75)), 0.056, 0.056, {S: 0.6, "Clavicle": 0.3, "Torso": 0.1}, 0.08),
-         ((0.226, 0.002, 1.300), dU, 0.048, 0.048, {S: 1}, 0.20),
-         ((0.242, 0.005, 1.220), dU, 0.045, 0.045, {S: 1}, 0.35),
-         ((0.257, 0.008, 1.150), dU, 0.041, 0.041, {S: 0.75, E: 0.25}, 0.47),
-         ((0.265, 0.010, 1.110), (dU + dF).normalized(), 0.039, 0.039, {S: 0.5, E: 0.5}, 0.53),
-         ((0.269, 0.005, 1.065), dF, 0.038, 0.038, {S: 0.2, E: 0.8}, 0.60),
-         ((0.279, -0.013, 0.970), dF, 0.035, 0.038, {E: 1}, 0.80),
-         ((0.289, -0.033, 0.868), dF, 0.026, 0.033, {E: 0.6, "Hand": 0.4}, 1.00)]
+    S, E, H = "Shoulder", "Elbow", "ElbowHelp"
+    OUT = (1, 0, 0)
+    R = [((0.207, 0.000, 1.368), V((1, 0, -0.75)), 0.056, 0.056, {S: 0.6, "Clavicle": 0.3, "Torso": 0.1}, 0.08, []),
+         ((0.226, 0.002, 1.300), dU, 0.048, 0.048, {S: 1}, 0.20, [(OUT, 0.003, 2)]),
+         ((0.236, 0.004, 1.245), dU, 0.044, 0.046, {S: 1}, 0.30, [(FR, 0.004, 3), (BK, 0.002, 2)]),
+         ((0.246, 0.006, 1.195), dU, 0.042, 0.044, {S: 0.9, H: 0.1}, 0.40, [(FR, 0.004, 3), (BK, 0.002, 2)]),
+         ((0.254, 0.008, 1.155), dU, 0.040, 0.038, {S: 0.55, H: 0.45}, 0.46, []),
+         ((0.265, 0.010, 1.110), (dU + dF).normalized(), 0.041, 0.033, {H: 1}, 0.53, [(BK, 0.010, 6)]),
+         ((0.268, 0.005, 1.070), dF, 0.040, 0.038, {H: 0.4, E: 0.6}, 0.60, [(BK, 0.003, 4)]),
+         ((0.273, -0.003, 1.025), dF, 0.041, 0.040, {E: 0.9, H: 0.1}, 0.68, [(OUT, 0.003, 2), (FR, 0.003, 2)]),
+         ((0.279, -0.014, 0.965), dF, 0.036, 0.039, {E: 1}, 0.80, []),
+         ((0.285, -0.025, 0.912), dF, 0.030, 0.035, {E: 1}, 0.90, []),
+         ((0.289, -0.033, 0.868), dF, 0.026, 0.033, {E: 0.6, "Hand": 0.4}, 1.00, [])]
     out = []
-    for c, ax, rx, ry, w, t in R:
+    for c, ax, rx, ry, w, t, bm in R:
         ax = V((ax[0] * s, ax[1], ax[2]))
-        w = {(k + ("L" if s > 0 else "R") if k in (S, E, "Hand", "Clavicle") else k): x for k, x in w.items()}
-        out.append((mw(c, s), ax, rx * K8, ry * K8, w, t))
+        w = {(k + ("L" if s > 0 else "R") if k in (S, E, H, "Hand", "Clavicle") else k): x for k, x in w.items()}
+        bm = [((d[0] * s, d[1], d[2]), a, p) for d, a, p in bm]
+        out.append((mw(c, s), ax, rx * K8, ry * K8, w, t, bm))
     return out
 
-LEG = [((0.093, 0.002, 0.775), 0.066, 0.072, {"Hip": 0.85, "Hips": 0.15}, 0.08, P_LEG),
-       ((0.098, 0.000, 0.665), 0.063, 0.066, {"Hip": 1}, 0.30, P_LEG),
-       ((0.100, -0.002, 0.578), 0.056, 0.058, {"Hip": 0.8, "Knee": 0.2}, 0.46, P_LEG),
-       ((0.100, -0.006, 0.520), 0.052, 0.055, {"Hip": 0.5, "Knee": 0.5}, 0.55, P_LEG),
-       ((0.100, -0.002, 0.462), 0.051, 0.054, {"Hip": 0.2, "Knee": 0.8}, 0.62, P_LEG),
-       ((0.100, 0.007, 0.365), 0.052, 0.058, {"Knee": 1}, 0.75, P_LEG),
-       ((0.100, 0.004, 0.240), 0.042, 0.045, {"Knee": 1}, 0.88, P_LEG),
-       ((0.100, 0.000, 0.130), 0.036, 0.038, {"Knee": 1}, 1.00, P_LEG),
-       ((0.100, -0.012, 0.070), 0.036, 0.042, {"Knee": 0.3, "Foot": 0.7}, 1.08, P_FOOT)]
+# Кольца ноги сверху вниз: центр, полуширины, веса, t, часть, рельеф. Бедро сужается к колену, у колена надколенник
+# спереди, ниже — бугристость голени, икра сзади и чуть внутрь, узкая щиколотка. Кольцо колена — на помощнике KneeHelp.
+IN = (-1, 0, 0)       # внутрь (для левой ноги; для правой зеркалится)
+LEG = [((0.093, 0.002, 0.775), 0.066, 0.072, {"Hip": 0.85, "Hips": 0.15}, 0.08, P_LEG, []),
+       ((0.097, 0.000, 0.690), 0.064, 0.068, {"Hip": 1}, 0.26, P_LEG, [(FR, 0.003, 2)]),
+       ((0.099, -0.002, 0.620), 0.059, 0.062, {"Hip": 1}, 0.38, P_LEG, [(FR, 0.004, 2), (IN, 0.002, 2)]),
+       ((0.100, -0.004, 0.568), 0.054, 0.055, {"Hip": 0.7, "KneeHelp": 0.3}, 0.47, P_LEG, [(IN, 0.004, 3)]),
+       ((0.100, -0.006, 0.522), 0.050, 0.048, {"KneeHelp": 1}, 0.55, P_LEG, [(FR, 0.011, 6)]),
+       ((0.100, -0.004, 0.478), 0.048, 0.049, {"KneeHelp": 0.4, "Knee": 0.6}, 0.61, P_LEG, [(FR, 0.004, 4)]),
+       ((0.100, 0.004, 0.420), 0.050, 0.054, {"Knee": 0.9, "KneeHelp": 0.1}, 0.68, P_LEG, [(BK, 0.006, 2), (IN, 0.002, 2)]),
+       ((0.100, 0.006, 0.350), 0.050, 0.055, {"Knee": 1}, 0.76, P_LEG, [(BK, 0.008, 2), (IN, 0.003, 2)]),
+       ((0.100, 0.004, 0.270), 0.043, 0.047, {"Knee": 1}, 0.85, P_LEG, [(BK, 0.003, 2)]),
+       ((0.100, 0.002, 0.195), 0.038, 0.040, {"Knee": 1}, 0.92, P_LEG, []),
+       ((0.100, 0.000, 0.130), 0.036, 0.038, {"Knee": 1}, 1.00, P_LEG, []),
+       ((0.100, -0.012, 0.070), 0.036, 0.042, {"Knee": 0.3, "Foot": 0.7}, 1.08, P_FOOT, [])]
 
 FINGERS = [((0.026, 0.021, 0.017), 6), ((0.028, 0.023, 0.018), 1),
            ((0.026, 0.021, 0.017), -4), ((0.021, 0.017, 0.014), -9)]
@@ -388,8 +448,8 @@ def build_body(coll):
             for gi in list(d.keys()): d[gi] = d[gi] / tot * 0.5
             d[c] = d.get(c, 0.0) + 0.25; d[GI["Shoulder" + sd]] = d.get(GI["Shoulder" + sd], 0.0) + 0.25
         prev = hole
-        for c, ax, rx, ry, w, t in arm_rings(s):
-            R = cg.ring(ring_pts(c, ax, rx, ry, 8), w, t)
+        for c, ax, rx, ry, w, t, bms in arm_rings(s):
+            R = cg.ring(bump(ring_pts(c, ax, rx, ry, 8), c, bms), w, t)
             cg.bridge(prev, R, P_ARM); prev = R
         build_hand(cg, prev, s)
     # ноги
@@ -397,9 +457,10 @@ def build_body(coll):
     for sd, s in (("L", 1), ("R", -1)):
         top = (T[0][0:7] if s > 0 else T[0][6:12] + [T[0][0]]) + [M]
         prev = top
-        for c, rx, ry, w, t, part in LEG:
-            w = {(k + sd if k in ("Hip", "Knee", "Foot") else k): x for k, x in w.items()}
-            R = cg.ring(ring_pts(mx(c, s), (0, 0, -1), rx * K8, ry * K8, 8), w, t)
+        for c, rx, ry, w, t, part, bms in LEG:
+            w = {(k + sd if k in ("Hip", "Knee", "Foot", "KneeHelp") else k): x for k, x in w.items()}
+            bms = [((d[0] * s, d[1], d[2]), a, p) for d, a, p in bms]
+            R = cg.ring(bump(ring_pts(mx(c, s), (0, 0, -1), rx * K8, ry * K8, 8), mx(c, s), bms), w, t)
             cg.bridge(prev, R, part, axis=V((0, 0, -1))); prev = R
         cg.cap(prev, P_FOOT, V((0, 0, -1)))
     loose = [v for v in cg.bm.verts if not v.link_faces]
@@ -1478,8 +1539,9 @@ def EXPORT_ONE(name, path):
     for o in arm.children_recursive:      # пустые группы весов не пишем: у каждой сетки — только её кости
         if o.type != 'MESH' or not o.vertex_groups: continue
         used = {g.group for v in o.data.vertices for g in v.groups if g.weight > 1e-5}
-        for vg in list(o.vertex_groups):
-            if vg.index not in used: o.vertex_groups.remove(vg)
+        # по именам: после удаления группы номера следующих сдвигаются, и проверка по номеру удаляла бы нужные группы
+        drop = [vg.name for vg in o.vertex_groups if vg.index not in used]
+        for n in drop: o.vertex_groups.remove(o.vertex_groups[n])
     objs = [arm] + list(arm.children_recursive)
     vis = {o: (o.hide_viewport, o.hide_get(), o.hide_render) for o in objs}
     for o in bpy.context.view_layer.objects: o.select_set(False)

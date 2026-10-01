@@ -79,6 +79,7 @@ namespace Intern.Game
             if (tag.Contains(" ")) { var p = tag.Split(' '); tag = p[0]; only = p[1]; }
             log.AppendLine("animtest " + tag + " " + DateTime.Now.ToString("HH:mm:ss") + ", клипов " + AnimLib.Count + (AnimLib.Error != null ? " (" + AnimLib.Error + ")" : ""));
             CharacterAnim.UseV4 = tag != "before";
+            JointHelpers.Stretch = !tag.Contains("nostretch");
             gr = FindFirstObjectByType<GameRoot>();
             pl = FindFirstObjectByType<PlayerController>();
             if (gr == null || pl == null) { Finish("нет игры"); yield break; }
@@ -547,6 +548,7 @@ namespace Intern.Game
         {
             Time.captureFramerate = 0;
             InputX.DevDrive = false;
+            JointHelpers.Stretch = true;
             GameRoot.DevHideUi = false;
             CharacterAnim.UseV4 = true;
             log.AppendLine(msg);

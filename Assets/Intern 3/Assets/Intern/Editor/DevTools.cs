@@ -530,7 +530,8 @@ namespace Intern.EditorTools
         {
             var sb = new StringBuilder("скелет " + DateTime.Now.ToString("HH:mm:ss") + "\n");
             var anims = UnityEngine.Object.FindObjectsByType<Intern.Game.CharacterAnim>(FindObjectsSortMode.None);
-            var a = anims.FirstOrDefault(x => x.imported && x.rig != null);
+            string want = File.Exists(Path.Combine(Root, "Temp", "rigname.txt")) ? File.ReadAllText(Path.Combine(Root, "Temp", "rigname.txt")).Trim() : "";
+            var a = anims.FirstOrDefault(x => x.imported && x.rig != null && (want == "" || x.model == want || x.name == want));
             if (a == null) { File.WriteAllText(Out, sb + "нет персонажа с моделью\n", new UTF8Encoding(false)); return; }
             sb.AppendLine("модель " + a.model + " на " + PathOf(a.transform));
             var ci = System.Globalization.CultureInfo.InvariantCulture;
@@ -545,7 +546,63 @@ namespace Intern.EditorTools
             };
             walk(a.rig, 0);
             foreach (var smr in a.rig.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-                sb.AppendLine("сетка " + smr.name + ": костей " + smr.bones.Length + ", вершин " + (smr.sharedMesh != null ? smr.sharedMesh.vertexCount : 0));
+            {
+                int nul = smr.bones.Count(b => b == null), outside = smr.bones.Count(b => b != null && !b.IsChildOf(a.rig));
+                int bp = smr.sharedMesh != null ? smr.sharedMesh.bindposes.Length : 0;
+                sb.AppendLine("сетка " + smr.name + ": костей " + smr.bones.Length + " (пустых " + nul + ", вне скелета " + outside + "), bindposes " + bp +
+                              ", вершин " + (smr.sharedMesh != null ? smr.sharedMesh.vertexCount : 0) + ", rootBone " + (smr.rootBone != null ? smr.rootBone.name : "-") +
+                              ", вкл " + (smr.enabled && smr.gameObject.activeInHierarchy) + ", кадр " + smr.sharedMesh.name);
+            }
+            // кости сетки тела: к какому узлу скелета привязаны и совпадает ли имя (ошибка привязки — тело не гнётся)
+            var body = a.rig.GetComponentsInChildren<SkinnedMeshRenderer>(true).FirstOrDefault(x => x.name.StartsWith("Body"));
+            if (body != null)
+            {
+                int bad = 0;
+                foreach (var b in body.bones)
+                {
+                    if (b == null) continue;
+                    string bn = b.name.Replace("_bind", "");
+                    bool ok = b.parent != null && b.parent.name == bn;
+                    if (!ok) bad++;
+                    if (!ok || bn.Contains("Help") || bn == "KneeL" || bn == "ElbowL")
+                        sb.AppendLine("  кость " + b.name + " → " + (b.parent != null ? b.parent.name : "-") + string.Format(ci, ", сдвиг {0:0.000}, масштаб {1}", (b.position - b.parent.position).magnitude, b.parent.localScale.ToString("0.00")));
+                }
+                sb.AppendLine("кости тела не на своём месте: " + bad);
+                var baked = new Mesh(); body.BakeMesh(baked, true);
+                var vs = baked.vertices; float lo = float.MaxValue, hi = float.MinValue;
+                foreach (var v in vs) { var w = body.transform.TransformPoint(v); lo = Mathf.Min(lo, w.y); hi = Mathf.Max(hi, w.y); }
+                sb.AppendLine(string.Format(ci, "тело по высоте: {0:0.00}…{1:0.00} (корень {2:0.00})", lo, hi, a.transform.position.y));
+                UnityEngine.Object.Destroy(baked);
+            }
+            // веса костей: у сетки, что рисуется, и у исходной сетки из FBX
+            Action<string, Mesh> wstat = (tag, m) =>
+            {
+                if (m == null) { sb.AppendLine(tag + ": нет сетки"); return; }
+                var bw = m.boneWeights; int zero = 0; var used = new HashSet<int>();
+                foreach (var w in bw) { if (w.weight0 + w.weight1 + w.weight2 + w.weight3 < 0.01f) zero++; if (w.weight0 > 0) used.Add(w.boneIndex0); }
+                var all = m.GetAllBoneWeights();
+                sb.AppendLine(tag + " " + m.name + ": вершин " + m.vertexCount + ", без весов " + zero + ", костей-хозяев " + used.Count + ", всех весов " + all.Length + ", bindposes " + m.bindposes.Length + ", readable " + m.isReadable);
+            };
+            if (body != null) wstat("рисуется", body.sharedMesh);
+            var pf = Intern.Game.ModelLib.Prefab("Characters/" + a.model);
+            var pb = pf != null ? pf.GetComponentsInChildren<SkinnedMeshRenderer>(true).FirstOrDefault(x => x.name.StartsWith("Body")) : null;
+            if (pb != null)
+            {
+                wstat("из FBX", pb.sharedMesh);
+                var cnt = new Dictionary<int, int>();
+                foreach (var w in pb.sharedMesh.boneWeights) { int c; cnt.TryGetValue(w.boneIndex0, out c); cnt[w.boneIndex0] = c + 1; }
+                sb.AppendLine("  главные кости: " + string.Join(", ", cnt.OrderByDescending(kv => kv.Value).Select(kv => (kv.Key < pb.bones.Length && pb.bones[kv.Key] != null ? pb.bones[kv.Key].name : "#" + kv.Key) + " " + kv.Value).ToArray()));
+                sb.AppendLine("  кости сетки: " + string.Join(" ", pb.bones.Select(b => b != null ? b.name : "-").ToArray()));
+            }
+            // все видимые части рядом с персонажем: что именно рисуется
+            foreach (var r in UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+            {
+                if (!r.enabled || !r.gameObject.activeInHierarchy) continue;
+                if ((r.bounds.center - a.transform.position).magnitude > 3f) continue;
+                var sk = r as SkinnedMeshRenderer;
+                sb.AppendLine("рисуется " + PathOf(r.transform) + " [" + r.GetType().Name + "] центр " + (r.bounds.center - a.transform.position).ToString("0.00") + " размер " + r.bounds.size.ToString("0.00") +
+                              (sk != null ? " сетка " + (sk.sharedMesh != null ? sk.sharedMesh.name : "-") + " вес/вершина " + (sk.sharedMesh != null ? sk.sharedMesh.GetBonesPerVertex().Length + "/" + sk.sharedMesh.vertexCount + " bw " + sk.sharedMesh.boneWeights.Length : "") + " quality " + sk.quality : ""));
+            }
             File.WriteAllText(Out, sb.ToString(), new UTF8Encoding(false));
         }
 
