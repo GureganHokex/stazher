@@ -80,6 +80,7 @@ namespace Intern.Game
             log.AppendLine("animtest " + tag + " " + DateTime.Now.ToString("HH:mm:ss") + ", клипов " + AnimLib.Count + (AnimLib.Error != null ? " (" + AnimLib.Error + ")" : ""));
             CharacterAnim.UseV4 = tag != "before";
             JointHelpers.Stretch = !tag.Contains("nostretch");
+            { var mm = System.Text.RegularExpressions.Regex.Match(tag, "miter(\\d+)"); JointHelpers.MiterShare = mm.Success ? int.Parse(mm.Groups[1].Value) / 100f : 0.45f; }
             gr = FindFirstObjectByType<GameRoot>();
             pl = FindFirstObjectByType<PlayerController>();
             if (gr == null || pl == null) { Finish("нет игры"); yield break; }
@@ -105,6 +106,7 @@ namespace Intern.Game
                 new KeyValuePair<string, Func<IEnumerator>>("weapons", WeaponsScene),
                 new KeyValuePair<string, Func<IEnumerator>>("hits", HitsScene),
                 new KeyValuePair<string, Func<IEnumerator>>("hand", HandScene),
+                new KeyValuePair<string, Func<IEnumerator>>("joints", JointsScene),
             };
             foreach (var sc in scenes)
             {
@@ -423,6 +425,32 @@ namespace Intern.Game
                 a.typing = t > 2.5f && t < 5.5f;
                 a.handsOnDesk = t > 2.2f && t < 5.8f;
                 CamFixed(camP, a.transform.position + Vector3.up * 0.8f, 42f);
+                t += Time.deltaTime;
+                yield return Tick();
+            }
+        }
+
+        // Сгибы локтей и коленей крупно (D-11): сидит и печатает (колени и локти ~90°), потом бежит на месте
+        IEnumerator JointsScene()
+        {
+            var a = Actor("Intern", SP, 180f); watch = null;
+            yield return null;
+            float t = 0f;
+            var tr = a.transform;
+            while (t < 9f)
+            {
+                a.sitTarget = t < 5.6f ? 1f : 0f;
+                a.typing = t > 1.2f && t < 5.4f; a.handsOnDesk = t > 1.0f && t < 5.5f;
+                a.moveSpeed = t > 6.4f ? 3.8f : 0f;
+                Vector3 c = tr.position;
+                if (t < 2.8f)       // колено сбоку (левое)
+                    CamFixed(c - tr.right * 0.85f + Vector3.up * 0.55f + tr.forward * 0.25f, c + Vector3.up * 0.5f + tr.forward * 0.25f - tr.right * 0.1f, 40f);
+                else if (t < 4.2f)  // локоть сбоку
+                    CamFixed(c - tr.right * 0.8f + Vector3.up * 1.05f + tr.forward * 0.1f, c + Vector3.up * 1.0f + tr.forward * 0.15f - tr.right * 0.2f, 40f);
+                else if (t < 5.6f)  // локоть сзади-сбоку
+                    CamFixed(c - tr.right * 0.6f + Vector3.up * 1.15f - tr.forward * 0.55f, c + Vector3.up * 1.0f + tr.forward * 0.1f - tr.right * 0.2f, 40f);
+                else                // бег на месте: колено и локоть сбоку
+                    CamFixed(c - tr.right * 1.6f + Vector3.up * 0.9f, c + Vector3.up * 0.85f, 40f);
                 t += Time.deltaTime;
                 yield return Tick();
             }

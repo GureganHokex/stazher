@@ -13,6 +13,7 @@ namespace Intern.Game
     public class JointHelpers : MonoBehaviour
     {
         public const float MaxStretch = 1.5f;
+        public static float MiterShare = 0.45f;    // доля растяжения «на ус» (1 — как у трубы)
         public static bool Stretch = true;          // проверка: без растяжения сечения (только полсгиба)
         static readonly string[][] Pairs =
         {
@@ -56,7 +57,9 @@ namespace Intern.Game
                 x.help.localRotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(a, b), 0.5f);
                 Vector3 k = Vector3.Cross(a, b);
                 float hinge = k.sqrMagnitude > 1e-10f ? Mathf.Abs(k.normalized.x) : 1f;   // сгиб вокруг поперечной оси
-                float s = 1f / Mathf.Cos(Mathf.Min(ang, 96f) * hinge * 0.5f * Mathf.Deg2Rad);
+                // полное «на ус» растяжение даёт острый угол снаружи, как у согнутой трубы; у человека сгиб скруглён —
+                // берём только часть растяжения (D-11): толщина почти сохраняется, угол снаружи мягче
+                float s = 1f + MiterShare * (1f / Mathf.Cos(Mathf.Min(ang, 96f) * hinge * 0.5f * Mathf.Deg2Rad) - 1f);
                 x.help.localScale = new Vector3(1f, 1f, Stretch ? Mathf.Min(MaxStretch, s) : 1f);   // вперёд-назад, в осях помощника
             }
         }

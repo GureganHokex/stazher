@@ -890,23 +890,44 @@ def pose_clip(name, fn, L, loop=False, fps=FPS, mask=None, **extra):
     d = dict(name=name, loop=loop, len=L, speed=0.0, dir=0.0, frames=[fn(t) for t in ts], contact=None, mask=mask)
     d.update(extra); return d
 
+# ---------- живые циклы шага из записей CMU (D-10): mocap_clips.json собирает Art/mocap_v1.py
+def load_mocap():
+    import os, json
+    cands = []
+    try: cands.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mocap_clips.json"))
+    except NameError: pass
+    try:
+        import bpy
+        if bpy.data.filepath: cands.append(os.path.join(os.path.dirname(bpy.data.filepath), "mocap_clips.json"))
+    except Exception: pass
+    cands.append("mocap_clips.json")
+    for c in cands:
+        if os.path.exists(c): return json.load(open(c, encoding="utf-8"))
+    return {}
+
+def mocap_clip(name, d):
+    frames = []
+    n = len(d["root"])
+    for i in range(n):
+        p = Pose(); p.root = tuple(d["root"][i])
+        for bn, qs in d["rot"].items(): p.rot[bn] = tuple(qs[i])
+        frames.append(p)
+    return dict(name=name, loop=True, len=d["len"], speed=d["speed"], dir=d["dir"], frames=frames, contact=d["contact"])
+
 def build_clips(sk):
     upper = [n for n in sk.names if n not in ("Hips",) and not n.startswith(("Hip", "Knee", "Foot", "Toe", "Lid"))]
     arm_r = [n for n in sk.names if n.endswith("R") and not n.startswith(("Hip", "Knee", "Foot", "Toe", "Lid"))]
     C = []
-    C.append(gait_clip("walk", WALK, sk))
-    C.append(gait_clip("walk_b", WALK_B, sk))
-    C.append(gait_clip("walk_l", WALK_L, sk))
-    C.append(gait_clip("walk_r", WALK_R, sk))
-    C.append(gait_clip("run", RUN, sk))
-    C.append(gait_clip("run_b", RUN_B, sk))
-    C.append(gait_clip("run_l", RUN_L, sk))
-    C.append(gait_clip("run_r", RUN_R, sk))
-    C.append(gait_clip("sprint", SPRINT, sk))
-    C.append(gait_clip("jog", JOG, sk))
-    for n, d in (("walk_fr", WALK_FR), ("walk_fl", WALK_FL), ("walk_br", WALK_BR), ("walk_bl", WALK_BL),
-                 ("run_fr", RUN_FR), ("run_fl", RUN_FL), ("run_br", RUN_BR), ("run_bl", RUN_BL)):
-        C.append(gait_clip(n, d, sk))
+    MC = load_mocap()
+    proc = {"walk": WALK, "walk_b": WALK_B, "walk_l": WALK_L, "walk_r": WALK_R, "run": RUN, "run_b": RUN_B,
+            "run_l": RUN_L, "run_r": RUN_R, "sprint": SPRINT, "jog": JOG}
+    for n, d in proc.items():
+        C.append(mocap_clip(n, MC[n]) if n in MC else gait_clip(n, d, sk))
+    if not MC:
+        # без записей — диагонали формулами; с записями — четыре стороны, между ними смешивает игра
+        for n, d in (("walk_fr", WALK_FR), ("walk_fl", WALK_FL), ("walk_br", WALK_BR), ("walk_bl", WALK_BL),
+                     ("run_fr", RUN_FR), ("run_fl", RUN_FL), ("run_br", RUN_BR), ("run_bl", RUN_BL)):
+            C.append(gait_clip(n, d, sk))
     C.append(pose_clip("idle", lambda t: idle_pose(sk, t), 8.0, loop=True, fps=15))
     C.append(pose_clip("sit", lambda t: sit_pose(sk, t), 1.0))                       # 0..1 с = 0..1 посадки
     C.append(pose_clip("sit_idle", lambda t: sit_pose(sk, 1.0, t), 4.0, loop=True, fps=15))

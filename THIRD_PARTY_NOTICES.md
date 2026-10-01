@@ -9,6 +9,7 @@
 | [PolySharp](https://github.com/Sergio0694/PolySharp) | полифилы C#, встроенные в сборку Jint | MIT |
 | SQLite (системная winsqlite3.dll в Windows) | выполнение SQL-задач | Public Domain |
 | Unity 6 (URP, Input System) | движок | [Unity Terms of Service](https://unity.com/legal) |
+| [CMU Graphics Lab Motion Capture Database](http://mocap.cs.cmu.edu) (BVH-перевод B. Hahne) | ходьба, бег и шаги вбок и назад персонажей — записи движений живых людей, перенесённые на скелет игры | свободно для любых целей, включая коммерческие |
 
 ---
 
@@ -86,3 +87,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## CMU Graphics Lab Motion Capture Database
+
+```
+The data used in this project was obtained from mocap.cs.cmu.edu.
+The database was created with funding from NSF EIA-0196217.
+```
+
+Записи 07_01, 09_04, 16_35, 113_01, 113_18, 143_01 (BVH-перевод Bruce Hahne, cgspeed). CMU не ограничивает использование данных;
+перевод в BVH распространяется на тех же условиях. В игре хранятся не сами записи, а один цикл шага из каждой,
+перенесённый на скелет «Стажёра» (Art/mocap_v1.py → Art/mocap_clips.json).
