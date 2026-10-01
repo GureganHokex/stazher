@@ -77,6 +77,15 @@ namespace Intern.EditorTools
             finally { File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false)); Debug.Log("[Стажёр] " + log.ToString().Split('\n').Last(l => l.Length > 0)); }
         }
 
+        // Повторить пуш, если сеть оборвалась после коммита
+        public static void PushOnly()
+        {
+            var log = new StringBuilder("git push " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\n");
+            try { Git("push origin main", log); Git("log --oneline -1", log); }
+            catch (Exception e) { log.AppendLine("ошибка: " + e.Message); }
+            finally { File.WriteAllText(Out, log.ToString(), new UTF8Encoding(false)); }
+        }
+
         [MenuItem("Стажёр/Проверить Docker", false, 22)]
         public static void CheckDocker()
         {
@@ -347,6 +356,7 @@ namespace Intern.EditorTools
                     case "selftest": SelftestBuild(); break;
                     case "bench": BenchBuild(); break;
                     case "commit": CommitPush(); break;
+                    case "push": PushOnly(); break;
                     case "gallery": ModelGallery.Run(); break;
                     case "city": City(); break;
                     case "texts": Texts(); break;
