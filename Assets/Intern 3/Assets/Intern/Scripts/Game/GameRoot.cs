@@ -281,7 +281,7 @@ namespace Intern.Game
                     if (InputX.DebugBoard()) OpenBoard();       // F11: доска задач спринта
 #endif
                     if (InputX.Esc()) PauseFrom(Mode.Walk);
-                    else if (dayOverPending) ShowDaySummary();
+                    else if (dayOverPending && !DevHideUi) ShowDaySummary();   // в проверках из редактора итоги дня не всплывают
                     break;
                 case Mode.Lunch: LunchUpdate(); break;
                 case Mode.Shop: ShopUpdate(); break;

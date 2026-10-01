@@ -375,14 +375,17 @@ class Gait:
         ks, ke = self.swing_ends
         B = (a1 - a0) / Tsw + v * (1 - 0.5 * (ks + ke))
         along = a0 + Tsw * (v * (ks * (sw - 0.5 * sw * sw) + ke * 0.5 * sw * sw) + B * self.swing_cdf(sw)) - v * Tsw * sw
-        # вбок — по прямой с лёгкой дугой наружу
-        side0, side1 = vdot(P0, right), vdot(P1, right)
-        side = lerp(side0, side1, smooth(sw)) + s * self.arc * math.sin(math.pi * sw)
+        # поперёк движения — по прямой с лёгкой дугой наружу. Ось поперёк берётся от направления движения, а не от таза:
+        # при боковом ходе и по диагонали вся составляющая вдоль движения идёт по профилю скорости выше
+        # (стопа ставится без проскальзывания); раньше она шла по «плавной» кривой — стопа касалась земли на ходу (D-04)
+        perp = (dv[2], 0.0, -dv[0])
+        side0, side1 = vdot(P0, perp), vdot(P1, perp)
+        side = lerp(side0, side1, smooth(sw))
+        out = vsub(right, vmul(dv, vdot(right, dv)))     # «наружу» — часть оси таза поперёк движения
         # высота голеностопа: пятка уходит вверх, потом нога проходит низко и опускается
         h = curve([(0.0, P0[1]), (self.lift_at, P0[1] * 0.3 + self.lift), (self.clear_at, 0.100 + self.clear), (1.0, P1[1])], sw)
-        A = vadd(vadd(vmul(dv, along), vmul(right, side)), (0.0, h, 0.0))
-        # убираем составляющую dv вдоль right (если движение не вперёд) — она уже в along
-        A = vsub(A, vmul(right, vdot(vmul(dv, along), right)))
+        A = vadd(vadd(vmul(dv, along), vmul(perp, side)), (0.0, h, 0.0))
+        A = vadd(A, vmul(out, s * self.arc * math.sin(math.pi * sw)))
         pitch = curve([(0.0, self.push), (0.3, self.push * 0.35), (0.62, -2.0), (0.88, self.land * 0.8), (1.0, self.land)], sw)
         toe = qslerp(toe0, QI, smooth(sw / 0.35))
         return A, foot_q(yaw, pitch), toe, 0.0, pitch
@@ -802,21 +805,39 @@ def hit_pose(sk, t, L=0.55):
     return pose
 
 def air_pose(sk, rise):
-    """В воздухе: rise = 1 — толчок вверх (колени подтянуты, руки вверх), 0 — падение (ноги вниз к приземлению)."""
+    """В воздухе (доводка 0.9, D-04): rise = 1 — после толчка: одно колено впереди и выше, другая нога ещё сзади,
+    носки оттянуты, руки махнули вперёд-вверх навстречу ногам; 0 — падение: обе ноги выходят вперёд-вниз
+    к приземлению, колени мягкие, руки чуть в стороны для равновесия. Раньше был «прыжок бомбочкой»:
+    обе ноги поджаты к груди, руки прямые вперёд."""
     pose = Pose()
     pose.root = (0.0, 0.02, 0.0)
-    pose.rot["Hips"] = qaxis(X, 4.0)
-    for b in ("Spine", "Spine2", "Torso"): pose.rot[b] = qaxis(X, 2.0 - 2.0 * rise)
-    for sd, s, a in (("L", -1.0, 1.0), ("R", 1.0, 0.6)):
-        knee_up = 0.10 + 0.14 * rise * a
-        A = (s * 0.11, 0.9 - 0.62 + knee_up + 0.05, 0.06 + 0.10 * rise * a)
-        leg_ik(sk, pose, sd, vadd(A, (0, 0.0, 0.0)), foot_q(s * 6.0, -25.0 + 10 * rise), pole=Z)
-        pose.rot["Toe" + sd] = qaxis(X, 10.0)
-        pose.rot["Clavicle" + sd] = qaxis(Z, s * 8.0)
-        pose.rot["Shoulder" + sd] = qmul(qaxis(Z, s * (30.0 + 25.0 * (1 - rise))), qaxis(X, -30.0 * rise - 10.0))
-        pose.rot["Elbow" + sd] = qaxis(X, -(30.0 + 20.0 * rise))
-        hand_pose(pose, sd, curl=20.0, thumb=10.0, spread=8.0)
-    head_look(pose, sk, pitch=-4.0 * rise + 8.0 * (1 - rise))
+    lean = 4.0 + 4.0 * (1.0 - rise)
+    pose.rot["Hips"] = qaxis(X, lean * 0.4)
+    for b in ("Spine", "Spine2", "Torso"): pose.rot[b] = qaxis(X, lean * 0.2)
+    posture_spine(pose)
+    wp, wr = sk.fk(pose)
+    la = vlen(vsub(sk.rest["KneeL"], sk.rest["HipL"])); lb = vlen(vsub(sk.rest["FootL"], sk.rest["KneeL"]))
+    #           бедро вперёд, колено:  толчок      падение
+    LEG = {"L": ((42.0, 78.0), (30.0, 40.0)), "R": ((8.0, 42.0), (22.0, 34.0))}
+    for sd, s in (("L", -1.0), ("R", 1.0)):
+        (t1, k1), (t0, k0) = LEG[sd]
+        th = math.radians(lerp(t0, t1, rise)); kn = math.radians(lerp(k0, k1, rise))
+        H = wp["Hip" + sd]
+        thigh = (0.0, -la * math.cos(th), la * math.sin(th))
+        shin = (0.0, -lb * math.cos(th - kn), lb * math.sin(th - kn))
+        A = vadd(vadd(H, thigh), shin); A = (A[0] + s * 0.015, A[1], A[2])
+        leg_ik(sk, pose, sd, A, foot_q(s * 7.0, lerp(-14.0, -38.0, rise)), pole=Z)
+        pose.rot["Toe" + sd] = qaxis(X, lerp(4.0, 12.0, rise))
+    # руки — навстречу ногам: правая рука вперёд с левым коленом
+    for sd, s, opp in (("L", -1.0, -1.0), ("R", 1.0, 1.0)):
+        flex = lerp(12.0, 30.0 + 10.0 * opp, rise); abd = lerp(26.0, 12.0, rise)
+        pose.rot["Clavicle" + sd] = qaxis(Z, s * lerp(6.0, 4.0, rise))
+        pose.rot["Shoulder" + sd] = qmul(qaxis(Z, s * abd), qaxis(X, -flex))
+        pose.rot["Elbow" + sd] = qaxis(X, -lerp(30.0, 48.0 + 8.0 * opp, rise))
+        hand_pose(pose, sd, curl=lerp(18.0, 28.0, rise), thumb=12.0, spread=lerp(10.0, 4.0, rise))
+    posture_shoulders(pose)
+    head_look(pose, sk, pitch=lerp(10.0, -2.0, rise))
+    posture_neck(pose)
     return pose
 
 def land_pose(sk, t, L=0.4):

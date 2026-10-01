@@ -968,6 +968,8 @@ def deploy(env=""staging""):
         // ======================= кадр =======================
         public void Tick(float dt)
         {
+            // проверки из редактора (AnimTest): кадры без интерфейса — и без итогов дня, если день успел кончиться
+            root.style.display = GameRoot.DevHideUi ? DisplayStyle.None : DisplayStyle.Flex;
             var m = g.CurMode;
             bool inMenu = m == GameRoot.Mode.Menu, inPause = m == GameRoot.Mode.Pause, inWalk = m == GameRoot.Mode.Walk || m == GameRoot.Mode.Dialog;
             bool inLunch = m == GameRoot.Mode.Lunch;
