@@ -2,13 +2,14 @@
 //  • «Git: коммит и пуш в GitLab» — берёт Temp/commit.txt: сначала пути файлов (по одному в строке), потом строка «---»,
 //    потом сообщение коммита. Добавляет только эти файлы, коммитит и пушит в origin (GitLab). На GitHub этот пункт не пушит.
 //  • «Релиз: проверить GitHub» — только чтение: теги на GitHub, есть ли gh и вошёл ли он в аккаунт.
-//  • «Релиз: выложить на GitHub» — по Temp/release.txt (тег, архив, заголовок, «---», текст релиза): тег, пуш main и тега
-//    в remote github и релиз с архивом через gh. Запускать только после решения владельца выпустить релиз.
+//  • «Релиз: выложить на GitHub» — по Temp/release.txt (тег, файлы через «|», заголовок, «---», текст релиза): тег, пуш main
+//    и тега в remote github и релиз с файлами (установщик и zip) через gh. Запускать только после решения владельца выпустить релиз.
 //  • «Проверить ветки языков в Docker» — эталоны задач с запуском (Go и дальше) проходят go test, заготовки — нет; итог в Temp/langcheck.txt.
 //  • «Selftest последней сборки» — запускает Builds/Stazher-*-win64/Stazher.exe -selftest в окне и, когда он закончит,
 //    копирует отчёт в Temp/selftest_build.txt.
 //  • «Графика: замер FPS последней сборки» — Stazher.exe -bench: FPS на каждом пресете и снимки, итог в Temp/bench_build.txt.
-//  • Команды без меню: слово в Temp/devcmd.txt — shots, pose, dump, resume, play, stop, refresh, builddev, selftest, bench, commit, gallery, city, continue.
+//  • Команды без меню: слово в Temp/devcmd.txt — shots, pose, dump, resume, play, stop, refresh, builddev, selftest, bench, commit, gallery, city, continue;
+//    для релиза — release (релизная сборка + zip + установщик), installer, inno, insttest, ghcheck, publish.
 // Итог каждой команды — в Temp/devtools.txt.
 using System;
 using System.Collections.Generic;
@@ -304,21 +305,26 @@ namespace Intern.EditorTools
             var lines = File.ReadAllLines(file, Encoding.UTF8);
             int sep = Array.IndexOf(lines, "---");
             if (sep < 3) { File.WriteAllText(Out, log + "Temp/release.txt: тег, архив, заголовок, потом «---» и текст\n", new UTF8Encoding(false)); return; }
-            string tag = lines[0].Trim(), zip = lines[1].Trim(), title = lines[2].Trim();
+            // вторая строка — файлы релиза через «|»: установщик и zip (спринт 9)
+            string tag = lines[0].Trim(), title = lines[2].Trim();
+            var files = lines[1].Split('|').Select(x => x.Trim()).Where(x => x.Length > 0).ToArray();
             string notes = Path.Combine(Root, "Temp", "release_notes.md");
             File.WriteAllText(notes, string.Join("\n", lines.Skip(sep + 1).ToArray()).Trim() + "\n", new UTF8Encoding(false));
             new System.Threading.Thread(() =>
             {
                 try
                 {
-                    string zipPath = Path.Combine(Root, zip);
-                    if (!File.Exists(zipPath)) { log.AppendLine("нет архива " + zipPath); return; }
-                    log.AppendLine("архив: " + zipPath + ", " + (new FileInfo(zipPath).Length / 1048576.0).ToString("0.0") + " МБ");
+                    var paths = files.Select(f => Path.Combine(Root, f)).ToArray();
+                    foreach (var fp in paths)
+                    {
+                        if (!File.Exists(fp)) { log.AppendLine("нет файла " + fp); return; }
+                        log.AppendLine("файл: " + fp + ", " + (new FileInfo(fp).Length / 1048576.0).ToString("0.0") + " МБ");
+                    }
                     if (Cmd("git", "rev-parse -q --verify refs/tags/" + tag, log, 10000) != 0 && Cmd("git", "tag -a " + tag + " -m " + Quote(title), log, 30000) != 0) return;
                     if (Cmd("git", "push github main", log) != 0) return;
                     if (Cmd("git", "push github " + tag, log) != 0) return;
                     if (Cmd("gh", "--version", log, 20000) != 0) { log.AppendLine("gh нет — релиз с архивом нужно создать на сайте GitHub, тег уже там"); return; }
-                    if (Cmd("gh", "release create " + tag + " " + Quote(zipPath) + " --repo " + GitHubRepo + " --verify-tag --title " + Quote(title) + " --notes-file " + Quote(notes), log, 20 * 60000) != 0) return;
+                    if (Cmd("gh", "release create " + tag + " " + string.Join(" ", paths.Select(Quote).ToArray()) + " --repo " + GitHubRepo + " --verify-tag --title " + Quote(title) + " --notes-file " + Quote(notes), log, 30 * 60000) != 0) return;
                     Cmd("gh", "release view " + tag + " --repo " + GitHubRepo, log, 30000);
                 }
                 catch (Exception e) { log.AppendLine("ошибка: " + e.Message); }
@@ -354,6 +360,15 @@ namespace Intern.EditorTools
                         else ReleaseBuild.BuildDev();
                         break;
                     case "selftest": SelftestBuild(); break;
+                    case "release":
+                        if (EditorApplication.isPlaying) File.WriteAllText(Out, "release: сначала выйти из Play\n", new UTF8Encoding(false));
+                        else ReleaseBuild.BuildWindows();
+                        break;
+                    case "installer": Installer.BuildLatest(); break;
+                    case "inno": Installer.InstallInno(); break;
+                    case "insttest": Installer.Test(); break;
+                    case "ghcheck": CheckGitHub(); break;
+                    case "publish": PublishGitHub(); break;
                     case "bench": BenchBuild(); break;
                     case "commit": CommitPush(); break;
                     case "push": PushOnly(); break;

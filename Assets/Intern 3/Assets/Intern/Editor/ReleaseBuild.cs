@@ -1,7 +1,8 @@
 // Сборка для Windows: меню «Стажёр → Собрать релиз для Windows» (Builds/Stazher-<версия>-win64) и
 // «Стажёр → Сборка для проверки» (версия 0.9.0-dev, Builds/Stazher-0.9.0-dev-<дата>-win64 — не релиз, никуда не выкладывается).
 // Выставляет имя игры, студию, версию и иконку и пишет короткий отчёт в Temp/release_build.txt.
-// Релиз сам кладёт в папку «Прочитай.txt» с версией и упаковывает Builds/Stazher-<версия>-win64.zip (без папок DoNotShip/DontShip).
+// Релиз сам кладёт в папку «Прочитай.txt» с версией и упаковывает Builds/Stazher-<версия>-win64.zip (без папок DoNotShip/DontShip),
+// а если на компьютере есть Inno Setup — ещё и установщик Builds/Stazher-<версия>-setup/Stazher-Setup.exe (Installer.cs).
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -16,15 +17,20 @@ namespace Intern.EditorTools
 {
     public static class ReleaseBuild
     {
-        public const string Version = "0.8.0";
-        public const string DevVersion = "0.9.0-dev";   // следующий бэклог — между спринтами только сборки для проверки
+        public const string Version = "0.9.0";
+        public const string DevVersion = "0.10.0-dev";  // следующий бэклог — между спринтами только сборки для проверки
         const string IconPath = "Assets/Intern 3/Assets/Intern/Branding/icon.png";
 
         [MenuItem("Стажёр/Собрать релиз для Windows", false, 1)]
         public static void BuildWindows()
         {
             string folder = "Stazher-" + Version + "-win64";
-            if (Build(Version, folder)) Package(Version, folder);
+            if (!Build(Version, folder)) return;
+            Package(Version, folder);
+            // установщик Stazher-Setup.exe (спринт 9) — рядом, в Builds/Stazher-<версия>-setup; без Inno Setup — только zip
+            string dir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", folder));
+            if (Installer.Iscc() != null) Installer.Build(Version, dir, true);
+            else File.AppendAllText(Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Temp", "release_build.txt")), "установщик: нет Inno Setup — только zip\n", new UTF8Encoding(false));
         }
 
         [MenuItem("Стажёр/Сборка для проверки (dev)", false, 3)]
@@ -83,6 +89,8 @@ namespace Intern.EditorTools
         // Текст «Прочитай.txt» в архиве релиза; {0} — версия
         const string Readme =
             "Стажёр {0} — симулятор стажёра в IT-компании (Codezilla Games)\r\n\r\n" +
+            "Проще поставить игру установщиком Stazher-Setup.exe со страницы релиза: ярлыки, обновление поверх,\r\n" +
+            "удаление через «Параметры → Приложения». Этот архив — запасной вариант без установки.\r\n\r\n" +
             "Запуск: Stazher.exe. Если Windows покажет «Система Windows защитила ваш компьютер» —\r\n" +
             "«Подробнее» → «Выполнить в любом случае» (игра не подписана сертификатом).\r\n\r\n" +
             "Управление: WASD — ходить, Shift — бег, Space — прыжок, E — действие, V — вид, Esc — пауза, F12 — скриншот.\r\n" +
