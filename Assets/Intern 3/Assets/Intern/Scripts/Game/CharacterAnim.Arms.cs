@@ -9,7 +9,7 @@ namespace Intern.Game
     public partial class CharacterAnim
     {
         // середина кулака левой руки в осях кисти — зеркало PalmR (ладонь смотрит внутрь, +X)
-        public static readonly Vector3 PalmL = new Vector3(0.03f, -0.065f, 0.015f);
+        public static readonly Vector3 PalmL = new Vector3(0.036f, -0.088f, 0.008f);
         Transform clavR, clavL, armsFor;
         int[] fingersL;
         float elbowSign = -1f;
@@ -47,6 +47,15 @@ namespace Intern.Game
                 handRot = Quaternion.Slerp(ha.rotation, handRot, w);
             }
             ArmSolver.Solve(cl, up, fo, ha, palm, elbowSign, target, handRot, pole, twist, 24f);
+        }
+
+        public Transform[] FingerBones(bool right)
+        {
+            if (!ArmsReady()) return null;
+            int[] f = right ? fingersR : fingersL; if (f == null || vb == null) return null;
+            var t = new Transform[15];
+            for (int k = 0; k < 15; k++) t[k] = f[k] >= 0 ? vb[f[k]] : null;
+            return t;
         }
 
         // Пальцы: curl — средний, безымянный, мизинец; index — указательный (на спуске меньше); thumb — большой
@@ -149,6 +158,25 @@ namespace Intern.Game
                 ha.localRotation = Quaternion.Inverse(part) * qh;
             }
             else ha.localRotation = qh;
+        }
+
+        // Указательный на спуске: сгиб, при котором подушечка ближе всего к точке спуска (+ дожим при выстреле)
+        public static float TriggerIndex(Transform[] f, bool right, Vector3 target, float squeeze)
+        {
+            if (f == null || f.Length < 3 || f[0] == null || f[1] == null || f[2] == null) return 0f;
+            Vector3 ax = right ? Vector3.back : Vector3.forward;
+            float best = 0f, bd = float.MaxValue;
+            float tip = 0.011f * f[2].lossyScale.y;   // подушечка — около сантиметра за последним суставом
+            for (float a = 0f; a <= 95f; a += 2.5f)
+            {
+                f[0].localRotation = Quaternion.AngleAxis(a * 0.7f, ax); f[1].localRotation = Quaternion.AngleAxis(a, ax); f[2].localRotation = Quaternion.AngleAxis(a * 0.8f, ax);
+                Vector3 pad = f[2].position + f[2].rotation * Vector3.down * tip;
+                float d = Vector3.Distance(pad, target);
+                if (d < bd) { bd = d; best = a; }
+            }
+            best += squeeze;
+            f[0].localRotation = Quaternion.AngleAxis(best * 0.7f, ax); f[1].localRotation = Quaternion.AngleAxis(best, ax); f[2].localRotation = Quaternion.AngleAxis(best * 0.8f, ax);
+            return bd;
         }
 
         // Пальцы (15 костей: указательный, средний, безымянный, мизинец, большой — по три)

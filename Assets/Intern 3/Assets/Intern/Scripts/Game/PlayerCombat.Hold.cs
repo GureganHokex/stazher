@@ -16,8 +16,8 @@ namespace Intern.Game
         public Vector3 fpHip = new Vector3(0.085f, -0.085f, 0.32f);       // точка Eye в осях камеры: от бедра
         public float fpAds = 0.18f; public float fpAdsUp = 0f;                                       // и в прицеле: на оси взгляда, на таком удалении
         public Vector3 fR = new Vector3(0f, -0.42f, 0.9f), nR = Vector3.left;          // правая: пальцы, ладонь (оси оружия)
-        public Vector3 fL = new Vector3(0.62f, 0.12f, 0.78f), nL = new Vector3(-0.25f, 1f, 0f), offL = new Vector3(0f, 0.012f, 0f);
-        public float curlR = 80f, indexR = 32f, thumbR = 45f, curlL = 72f, indexL = 66f, thumbL = 28f;
+        public Vector3 fL = new Vector3(0.62f, 0.12f, 0.78f), nL = new Vector3(-0.25f, 1f, 0f), offL = new Vector3(0f, 0.02f, 0f);
+        public float curlR = 50f, indexR = 32f, thumbR = 40f, curlL = 46f, indexL = 44f, thumbL = 25f;
         public float twist = 34f;
         public float kickBack = 0.02f, kickPitch = 3.5f, kickRoll = 1.2f, body = 0.6f;
         public float flash = 0.1f, flashLen = 1.9f, light = 4f; public int spikes = 4, sparks = 4, smoke = 2;
@@ -34,8 +34,8 @@ namespace Intern.Game
                 all["pistol"] = new GunSpec
                 {
                     longGun = false, fpHip = new Vector3(0.07f, -0.075f, 0.38f), fpAds = 0.40f, twist = 4f,
-                    fR = new Vector3(0f, -0.37f, 0.93f), fL = new Vector3(0.05f, -0.62f, 0.78f), nL = Vector3.right, offL = new Vector3(-0.014f, -0.01f, 0.01f),
-                    curlL = 82f, indexL = 84f, thumbL = 20f,
+                    fR = new Vector3(0f, -0.37f, 0.93f), fL = new Vector3(0.05f, -0.62f, 0.78f), nL = Vector3.right, offL = new Vector3(-0.006f, -0.016f, 0.02f),
+                    curlL = 58f, indexL = 58f, thumbL = 20f,
                     kickBack = 0.03f, kickPitch = 9f, kickRoll = 2f, body = 0.3f,
                     flash = 0.09f, flashLen = 1.6f, light = 3f, spikes = 4, sparks = 4, smoke = 2,
                     casingD = 0.0095f, casingL = 0.019f, ejectSpeed = 2.4f, cycle = "slide",
@@ -50,7 +50,7 @@ namespace Intern.Game
                 all["shotgun"] = new GunSpec
                 {
                     fpHip = new Vector3(0.09f, -0.09f, 0.34f), fpAds = 0.4f, fpAdsUp = 0.025f,
-                    fL = new Vector3(0.55f, 0.18f, 0.82f), offL = new Vector3(0f, 0.018f, 0f),
+                    fL = new Vector3(0.55f, 0.18f, 0.82f), offL = new Vector3(0f, 0.026f, 0f),
                     kickBack = 0.06f, kickPitch = 12f, kickRoll = 2.5f, body = 2.5f,
                     flash = 0.2f, flashLen = 2.6f, light = 7f, spikes = 6, sparks = 12, smoke = 5, flashTint = new Color(1f, 0.66f, 0.3f),
                     casingD = 0.02f, casingL = 0.065f, ejectSpeed = 2.2f, shell = true, cycle = "pump",
@@ -65,7 +65,7 @@ namespace Intern.Game
                 all["sniper"] = new GunSpec
                 {
                     fpHip = new Vector3(0.09f, -0.09f, 0.34f), fpAds = 0.3f,
-                    fL = new Vector3(0.5f, 0.15f, 0.85f), offL = new Vector3(0f, 0.016f, 0f),
+                    fL = new Vector3(0.5f, 0.15f, 0.85f), offL = new Vector3(0f, 0.024f, 0f),
                     kickBack = 0.07f, kickPitch = 11f, kickRoll = 2f, body = 3f,
                     flash = 0.18f, flashLen = 2.4f, light = 6f, spikes = 5, sparks = 6, smoke = 4,
                     casingD = 0.012f, casingL = 0.07f, ejectSpeed = 1.6f, cycle = "boltaction",
@@ -73,7 +73,7 @@ namespace Intern.Game
                 all["mg"] = new GunSpec
                 {
                     fpHip = new Vector3(0.09f, -0.10f, 0.34f), fpAds = 0.28f,
-                    fL = new Vector3(0.6f, 0.05f, 0.8f), offL = new Vector3(0f, -0.012f, 0f),
+                    fL = new Vector3(0.6f, 0.05f, 0.8f), offL = new Vector3(0f, 0f, 0f),
                     kickBack = 0.018f, kickPitch = 2.4f, kickRoll = 1.4f, body = 0.8f,
                     flash = 0.15f, flashLen = 2f, light = 5f, spikes = 5, sparks = 5, smoke = 2,
                     casingD = 0.0095f, casingL = 0.045f, ejectSpeed = 2.2f, cycle = "mg",
@@ -232,7 +232,15 @@ namespace Intern.Game
             if (leftW > 0f) { tL = Vector3.Lerp(tL, leftAt, leftW); hl = Quaternion.Slerp(hl, leftRot, leftW); }
             bool onTrigger = Time.time - shotAt < 0.07f;
             float idx = Mathf.Lerp(sp.indexR, sp.indexR + 22f, onTrigger ? 1f : 0f);
-            if (fp && FpReady())
+            // спуск: подушечка указательного — на передней грани спускового крючка
+            Vector3 trig = g.trigger != null ? g.trigger.position + rot * new Vector3(0f, -0.011f, 0.003f) : tR;
+            float squeeze = onTrigger ? 14f : 0f;
+            if (hide)
+            {
+                // в оптике рук не видно: прицел закрывает кадр
+                if (FpReady()) fpArms.Conceal();
+            }
+            else if (fp && FpReady())
             {
                 // от первого лица — отдельные руки у камеры
                 fpArms.Show(true);
@@ -242,6 +250,7 @@ namespace Intern.Game
                 if (g.gripL != null) fpArms.IK(false, tL, hl, dn * 1f - cr2 * 0.35f - camT.forward * 0.1f, 0.5f);
                 fpArms.Fingers(true, sp.curlR, idx, sp.thumbR, 1f - rightW * 0.7f);
                 if (g.gripL != null) fpArms.Fingers(false, sp.curlL, sp.indexL, sp.thumbL, 1f - leftW * 0.6f);
+                if (rightW < 0.3f && g.trigger != null) ArmSolver.TriggerIndex(fpArms.FingerBones(true), true, trig, squeeze);
             }
             else
             {
@@ -250,6 +259,7 @@ namespace Intern.Game
                 Av.ArmIK(false, tL, hl, poleL, g.gripL != null ? 1f : 0f, 0.5f);
                 Av.Fingers(true, sp.curlR, idx, sp.thumbR, 1f - rightW * 0.7f);
                 if (g.gripL != null) Av.Fingers(false, sp.curlL, sp.indexL, sp.thumbL, 1f - leftW * 0.6f);
+                if (rightW < 0.3f && g.trigger != null) ArmSolver.TriggerIndex(Av.FingerBones(true), true, trig, squeeze);
             }
             leftW = Mathf.MoveTowards(leftW, leftFree ? 1f : 0f, dt * 8f);
             rightW = Mathf.MoveTowards(rightW, rightFree ? 1f : 0f, dt * 8f);
@@ -332,7 +342,8 @@ namespace Intern.Game
                         {
                             rightFree = u > -0.1f && u < 1.05f;
                             rightAt = g.KnobW();
-                            rightRot = g.transform.rotation * CharacterAnim.HandRot(true, new Vector3(-0.2f, -0.75f, 0.6f), new Vector3(-0.6f, 0f, -0.5f));
+                            // рукоять берётся сбоку справа-сзади: ладонь влево и чуть вниз, пальцы вперёд
+                            rightRot = g.transform.rotation * CharacterAnim.HandRot(true, new Vector3(-0.15f, -0.35f, 0.92f), new Vector3(-0.85f, -0.35f, 0f));
                         }
                     }
                     break;

@@ -26,8 +26,8 @@ namespace Intern.Game
         static Vector3 V(float x, float y, float z) { return new Vector3(x, y, z); }
 
         // Стойка: кулак, клинок, сторона лезвия (оси персонажа, от правого плеча)
-        static Vector3 GuardP(string id) { return id == "bat" ? V(-0.12f, -0.1f, 0.15f) : id == "katana" ? V(-0.2f, -0.34f, 0.32f) : V(-0.07f, -0.2f, 0.3f); }
-        static Vector3 GuardB(string id) { return id == "bat" ? V(0.25f, 0.85f, -0.45f) : id == "katana" ? V(0f, 0.5f, 0.87f) : V(0.05f, 0.45f, 0.89f); }
+        static Vector3 GuardP(string id) { return id == "bat" ? V(-0.08f, -0.22f, 0.2f) : id == "katana" ? V(-0.2f, -0.34f, 0.32f) : V(-0.07f, -0.2f, 0.3f); }
+        static Vector3 GuardB(string id) { return id == "bat" ? V(0.5f, 0.62f, -0.6f) : id == "katana" ? V(0f, 0.5f, 0.87f) : V(0.05f, 0.45f, 0.89f); }
         static Vector3 GuardE(string id) { return id == "bat" ? V(0f, 0f, 1f) : id == "katana" ? V(0f, -0.87f, 0.5f) : V(0f, -0.89f, 0.45f); }
         // от первого лица всё выше и ближе к центру кадра
         static Vector3 FpShift(string id) { return id == "bat" ? V(0f, 0.14f, 0.12f) : id == "katana" ? V(0f, 0.32f, 0.06f) : V(-0.02f, 0.24f, 0.1f); }
@@ -64,16 +64,16 @@ namespace Intern.Game
                 {
                     M("наотмашь справа", 0.62f, 0.58f, 1f, 75f, 2, Vector3.left,
                       new[] { 0f, 0.35f, 0.48f, 0.58f, 0.72f, 0.86f, 1f },
-                      new[] { gB, V(0.02f, 0.02f, -0.04f), V(0f, -0.14f, 0.2f), V(-0.2f, -0.2f, 0.4f), V(-0.45f, -0.15f, 0.25f), V(-0.45f, 0f, 0f), gB },
-                      new[] { bB, V(0.35f, 0.55f, -0.76f), V(1f, 0.15f, 0.1f), V(0.15f, 0.05f, 1f), V(-1f, 0.1f, 0.2f), V(-0.5f, 0.4f, -0.75f), bB },
-                      new[] { eB, V(-0.2f, 0f, 1f), V(0f, 0f, 1f), V(-1f, 0f, 0f), V(0f, 0f, -1f), V(0.5f, 0f, -0.8f), eB },
-                      new[] { 0f, 0.35f, 0.58f, 0.72f, 0.86f, 1f }, new[] { 0f, 35f, -5f, -35f, -45f, 0f }, null, 1.6f, 0.8f),
+                      new[] { gB, V(0.06f, -0.04f, 0.0f), V(0.02f, -0.16f, 0.22f), V(-0.2f, -0.2f, 0.42f), V(-0.42f, -0.18f, 0.3f), V(-0.42f, -0.06f, 0.18f), gB },
+                      new[] { bB, V(0.6f, 0.5f, -0.62f), V(1f, 0.12f, 0.15f), V(0.15f, 0.05f, 1f), V(-1f, 0.08f, 0.35f), V(-0.8f, 0.45f, 0.1f), bB },
+                      new[] { eB, V(-0.2f, 0f, 1f), V(0f, 0f, 1f), V(-1f, 0f, 0f), V(-0.3f, 0f, -1f), V(0.1f, 0f, -1f), eB },
+                      new[] { 0f, 0.35f, 0.58f, 0.72f, 0.86f, 1f }, new[] { 0f, 35f, -5f, -30f, -35f, 0f }, null, 1.6f, 0.8f),
                     M("наотмашь слева", 0.62f, 0.58f, 1f, 75f, 2, Vector3.right,
                       new[] { 0f, 0.35f, 0.48f, 0.58f, 0.72f, 0.86f, 1f },
-                      new[] { gB, V(-0.45f, 0f, 0.02f), V(-0.4f, -0.15f, 0.25f), V(-0.15f, -0.2f, 0.42f), V(0.05f, -0.18f, 0.3f), V(0.08f, 0f, 0f), gB },
-                      new[] { bB, V(-0.55f, 0.55f, -0.6f), V(-1f, 0.15f, 0.1f), V(0f, 0.05f, 1f), V(1f, 0.1f, 0.15f), V(0.55f, 0.5f, -0.65f), bB },
-                      new[] { eB, V(0.2f, 0f, 1f), V(0f, 0f, 1f), V(1f, 0f, 0f), V(0f, 0f, -1f), V(-0.5f, 0f, -0.8f), eB },
-                      new[] { 0f, 0.35f, 0.58f, 0.72f, 0.86f, 1f }, new[] { 0f, -35f, 5f, 30f, 35f, 0f }, null, 1.6f, 0.8f),
+                      new[] { gB, V(-0.45f, -0.06f, 0.12f), V(-0.4f, -0.16f, 0.28f), V(-0.15f, -0.2f, 0.44f), V(0.04f, -0.18f, 0.32f), V(0.06f, -0.06f, 0.18f), gB },
+                      new[] { bB, V(-0.7f, 0.5f, -0.5f), V(-1f, 0.12f, 0.15f), V(0f, 0.05f, 1f), V(1f, 0.08f, 0.35f), V(0.8f, 0.45f, 0.1f), bB },
+                      new[] { eB, V(0.2f, 0f, 1f), V(0f, 0f, 1f), V(1f, 0f, 0f), V(0.3f, 0f, -1f), V(-0.1f, 0f, -1f), eB },
+                      new[] { 0f, 0.35f, 0.58f, 0.72f, 0.86f, 1f }, new[] { 0f, -35f, 5f, 28f, 32f, 0f }, null, 1.6f, 0.8f),
                     M("сверху", 0.85f, 0.62f, 1.9f, 35f, 1, Vector3.down,
                       new[] { 0f, 0.4f, 0.62f, 0.8f, 1f },
                       new[] { gB, V(-0.15f, 0.32f, 0f), V(-0.2f, -0.22f, 0.45f), V(-0.2f, -0.42f, 0.32f), gB },
@@ -246,10 +246,13 @@ namespace Intern.Game
                 var lp = w.transform.localPosition; var lr = w.transform.localRotation;
                 w.transform.SetParent(hand, false); w.transform.localPosition = lp; w.transform.localRotation = lr;
             }
-            Vector3 bw = frame * b.normalized, ew = Vector3.ProjectOnPlane(frame * e, bw);
+            Vector3 bw = frame * b.normalized;
+            Vector3 target = shoulder + frame * (p * s);
+            // от третьего лица клинок и кулак не входят в тело: выталкиваем из капсул корпуса, головы и ног
+            if (!fp) KeepOutOfBody(w, ref target, ref bw, s);
+            Vector3 ew = Vector3.ProjectOnPlane(frame * e, bw);
             if (ew.sqrMagnitude < 1e-4f) ew = frame * Vector3.down;
             Quaternion hr = Quaternion.LookRotation(bw, -ew.normalized);
-            Vector3 target = shoulder + frame * (p * s);
             Vector3 poleR = frame * new Vector3(0.8f, -1f, -0.3f);
             if (fp) fpArms.IK(true, target, hr, poleR, 0.4f); else Av.ArmIK(true, target, hr, poleR, 1f, 0.4f);
             bool two = w.gripL != null && id != "knife";
@@ -258,12 +261,57 @@ namespace Intern.Game
                 Vector3 poleL = frame * new Vector3(-0.6f, -1f, -0.2f);
                 if (fp) fpArms.IK(false, w.gripL.position, hr, poleL, 0.4f); else Av.ArmIK(false, w.gripL.position, hr, poleL, 1f, 0.4f);
             }
-            if (fp) { fpArms.Fingers(true, 85f, 80f, 50f); if (two) fpArms.Fingers(false, 85f, 80f, 50f); }
-            else { Av.Fingers(true, 85f, 80f, 50f); if (two) Av.Fingers(false, 85f, 80f, 50f); }
+            // пальцы обхватывают рукоять (кулак не сжат намертво — рукоять внутри)
+            if (fp) { fpArms.Fingers(true, 55f, 55f, 40f); if (two) fpArms.Fingers(false, 55f, 55f, 40f); }
+            else { Av.Fingers(true, 55f, 55f, 40f); if (two) Av.Fingers(false, 55f, 55f, 40f); }
             // след: от середины клинка до острия, пока идёт сам удар
             if (trail == null || trail.Weapon != w) { if (trail != null) trail.Destroy(); trail = WeaponTrail.For(w, id); }
             bool cut = m != null && u > m.hitAt - 0.22f && u < m.hitAt + 0.2f;
             if (trail != null) trail.Emit(cut);
+        }
+
+        // Капсулы тела: корпус (таз — шея), голова (шар), ноги (таз — колени); запас — толщина оружия
+        void KeepOutOfBody(WeaponModel w, ref Vector3 grip, ref Vector3 dir, float s)
+        {
+            if (Av.hips == null || Av.neck == null || Av.head == null || w.grip == null) return;
+            var tip = w.tip ?? w.muzzle; if (tip == null) return;
+            float len = Vector3.Distance(w.transform.TransformPoint(w.Local(tip)), w.transform.TransformPoint(w.Local(w.grip)));
+            Vector3 up = Av.transform.up;
+            Vector3 t0 = Av.hips.position + up * 0.05f * s, t1 = Av.neck.position;
+            Vector3 hc = Av.head.position + Av.head.up * 0.13f * s + Av.head.forward * 0.03f * s;
+            Vector3 l1 = Av.kneeL != null && Av.kneeR != null ? (Av.kneeL.position + Av.kneeR.position) * 0.5f - up * 0.1f * s : Av.hips.position - up * 0.5f * s;
+            float rT = 0.17f * s, rH = 0.18f * s, rL = 0.17f * s, m = 0.04f * s;
+            // кулак — не в груди
+            {
+                Vector3 c = Closest(t0, t1, grip); float d = Vector3.Distance(grip, c), need = rT + 0.05f * s;
+                if (d < need && d > 1e-4f) grip = c + (grip - c) / d * need;
+            }
+            for (int it = 0; it < 6; it++)
+            {
+                float worst = 0f; Vector3 wp = Vector3.zero, wn = Vector3.zero;
+                for (int k = 1; k <= 10; k++)
+                {
+                    Vector3 pt = grip + dir * (len * k / 10f);
+                    Probe(pt, Closest(t0, t1, pt), rT + m, ref worst, ref wp, ref wn);
+                    Probe(pt, hc, rH + m, ref worst, ref wp, ref wn);
+                    Probe(pt, Closest(Av.hips.position, l1, pt), rL + m, ref worst, ref wp, ref wn);
+                }
+                if (worst < 0.002f) break;
+                Vector3 from = wp - grip, to = from + wn * (worst + 0.01f);
+                dir = (Quaternion.FromToRotation(from, to) * dir).normalized;
+            }
+        }
+
+        static void Probe(Vector3 pt, Vector3 c, float r, ref float worst, ref Vector3 wp, ref Vector3 wn)
+        {
+            Vector3 d = pt - c; float dist = d.magnitude, pen = r - dist;
+            if (pen > worst && dist > 1e-4f) { worst = pen; wp = pt; wn = d / dist; }
+        }
+
+        static Vector3 Closest(Vector3 a, Vector3 b, Vector3 p)
+        {
+            Vector3 ab = b - a; float t = Mathf.Clamp01(Vector3.Dot(p - a, ab) / Mathf.Max(1e-6f, ab.sqrMagnitude));
+            return a + ab * t;
         }
 
         static void Key3(float[] ku, Vector3[] kv, float u, ref Vector3 v)

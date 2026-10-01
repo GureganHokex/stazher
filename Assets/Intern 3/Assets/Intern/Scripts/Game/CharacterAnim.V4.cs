@@ -39,8 +39,10 @@ namespace Intern.Game
         public float DevTypeW { get { return typeW; } }
         public Transform spine;
         public Transform handR, handL;               // кисти (скелет v4): оружие и предметы держатся в ладони
-        // середина кулака правой руки в осях кисти (в покое оси кисти = оси персонажа: ладонь смотрит внутрь, −X)
-        public static readonly Vector3 PalmR = new Vector3(-0.03f, -0.065f, 0.015f);
+        // середина хвата правой руки в осях кисти (в покое оси кисти = оси персонажа: ладонь смотрит внутрь, −X):
+        // по замеру кисти (сцена hand) ладонь кончается на x −0,026, пальцы от костяшек (y −0,093) при сгибе ~50°
+        // обхватывают круг около (−0,036; −0,088) — сюда встаёт ось рукояти, пальцы ложатся вокруг неё
+        public static readonly Vector3 PalmR = new Vector3(-0.036f, -0.088f, 0.008f);
         public System.Collections.Generic.IEnumerable<Transform> V4Bones { get { if (vb != null) foreach (var t in vb) if (t != null) yield return t; } }
         public float DevContact(int i) { return contact[i]; }
         public bool DevPlanted(int i) { return feet[i].planted; }

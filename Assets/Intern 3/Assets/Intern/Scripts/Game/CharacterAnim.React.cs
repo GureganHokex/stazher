@@ -62,7 +62,7 @@ namespace Intern.Game
                 if (f.sqrMagnitude < 1e-4f) f = Vector3.down;
                 var hr = HandRot(woundRight, f, -n);
                 Vector3 pole = transform.right * (woundRight ? 1f : -1f) + Vector3.down * 0.6f + transform.forward * 0.2f;
-                ArmIK(woundRight, p + n * 0.035f, hr, pole, w, 0.5f);
+                ArmIK(woundRight, p + n * 0.022f, hr, pole, w, 0.5f);
                 Fingers(woundRight, 20f, 12f, 15f, w);
             }
         }

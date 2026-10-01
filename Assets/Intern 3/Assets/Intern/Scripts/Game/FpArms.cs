@@ -121,11 +121,20 @@ namespace Intern.Game
         // Показать руки у камеры (и спрятать руки тела) или вернуть как было
         public void Show(bool on)
         {
-            if (root == null || on == shown) return;
+            if (root == null) return;
+            if (on && !root.gameObject.activeSelf) root.gameObject.SetActive(true);
+            if (on == shown) return;
             shown = on;
             root.gameObject.SetActive(on);
             if (bodyUpR != null) bodyUpR.localScale = on ? Vector3.one * 0.001f : bodyScaleR;
             if (bodyUpL != null) bodyUpL.localScale = on ? Vector3.one * 0.001f : bodyScaleL;
+        }
+
+        // В оптике: руки тела сжаты, но и свои у камеры не видны
+        public void Conceal()
+        {
+            Show(true);
+            if (root != null && root.gameObject.activeSelf) root.gameObject.SetActive(false);
         }
 
         // Середина плечевых суставов — в точке mid (оси камеры), корпус повёрнут на twist (левое плечо вперёд)
@@ -144,6 +153,8 @@ namespace Intern.Game
             if (right) ArmSolver.Solve(clR, upR, foR, haR, CharacterAnim.PalmR, signR, target, handRot, pole, twist, 18f);
             else ArmSolver.Solve(clL, upL, foL, haL, CharacterAnim.PalmL, signL, target, handRot, pole, twist, 18f);
         }
+
+        public Transform[] FingerBones(bool right) { return right ? fR : fL; }
 
         public void Fingers(bool right, float curl, float index, float thumb, float w = 1f)
         {

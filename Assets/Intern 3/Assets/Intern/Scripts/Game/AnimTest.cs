@@ -104,6 +104,7 @@ namespace Intern.Game
                 new KeyValuePair<string, Func<IEnumerator>>("player", PlayerScene),
                 new KeyValuePair<string, Func<IEnumerator>>("weapons", WeaponsScene),
                 new KeyValuePair<string, Func<IEnumerator>>("hits", HitsScene),
+                new KeyValuePair<string, Func<IEnumerator>>("hand", HandScene),
             };
             foreach (var sc in scenes)
             {
@@ -330,6 +331,51 @@ namespace Intern.Game
                 a.transform.position += a.transform.forward * a.moveSpeed * Time.deltaTime;
                 CamFixed(camP, a.transform.position + Vector3.up * 1.0f, 42f);
                 t += Time.deltaTime;
+                yield return Tick();
+            }
+        }
+
+        // Замер кисти (спринт 8): где ладонь и пальцы в осях кости HandR — в покое и сжатые в кулак разной силы
+        IEnumerator HandScene()
+        {
+            var a = Actor("Intern", SP, 0f); watch = null;
+            yield return null; yield return null;
+            var hand = a.handR;
+            if (hand == null) { log.AppendLine("hand: нет HandR"); yield break; }
+            foreach (float curl in new[] { 0f, 45f, 60f, 80f })
+            {
+                yield return new WaitForEndOfFrame();
+                a.Fingers(true, curl, curl, curl * 0.5f);
+                var groups = new Dictionary<string, List<Vector3>>();
+                foreach (var smr in a.GetComponentsInChildren<SkinnedMeshRenderer>())
+                {
+                    if (smr.sharedMesh == null || !smr.sharedMesh.isReadable) continue;
+                    var m = new Mesh(); smr.BakeMesh(m, true);
+                    var v = m.vertices; var bw = smr.sharedMesh.boneWeights; var bones = smr.bones;
+                    for (int i = 0; i < v.Length && i < bw.Length; i++)
+                    {
+                        var b = bones[bw[i].boneIndex0]; if (b == null || bw[i].weight0 < 0.6f) continue;
+                        string n = b.name.Replace("_bind", "");
+                        if (!(n == "HandR" || n.StartsWith("Index") && n.EndsWith("R") || n.StartsWith("Middle") && n.EndsWith("R") || n.StartsWith("Thumb") && n.EndsWith("R") || n.StartsWith("Pinky") && n.EndsWith("R") || n.StartsWith("Ring") && n.EndsWith("R"))) continue;
+                        var lp = hand.InverseTransformPoint(smr.transform.TransformPoint(v[i]));
+                        List<Vector3> l; if (!groups.TryGetValue(n, out l)) groups[n] = l = new List<Vector3>();
+                        l.Add(lp);
+                    }
+                    UnityEngine.Object.Destroy(m);
+                }
+                log.AppendLine(string.Format(ci, "кулак {0:0}°:", curl));
+                foreach (var kv in groups.OrderBy(k => k.Key))
+                {
+                    var l = kv.Value; Vector3 mn = l[0], mx = l[0], sum = Vector3.zero;
+                    foreach (var q in l) { mn = Vector3.Min(mn, q); mx = Vector3.Max(mx, q); sum += q; }
+                    var c = sum / l.Count;
+                    log.AppendLine(string.Format(ci, "  {0}: n {1}, центр ({2:0.000} {3:0.000} {4:0.000}), x {5:0.000}…{6:0.000}, y {7:0.000}…{8:0.000}, z {9:0.000}…{10:0.000}", kv.Key, l.Count, c.x, c.y, c.z, mn.x, mx.x, mn.y, mx.y, mn.z, mx.z));
+                }
+                foreach (var fn in new[] { "Index1R", "Middle1R", "Middle3R", "Thumb1R", "Thumb3R" })
+                {
+                    var t = Find(a.transform, fn);
+                    if (t != null) { var lp = hand.InverseTransformPoint(t.position); log.AppendLine(string.Format(ci, "  кость {0}: ({1:0.000} {2:0.000} {3:0.000})", fn, lp.x, lp.y, lp.z)); }
+                }
                 yield return Tick();
             }
         }
