@@ -125,3 +125,8 @@ InitTestScene*.unity*
 
 # Файлы, отложенные на удаление
 /Art/_to_delete/
+
+# Local IGS prototype data
+Prototype/data/
+Prototype/.venv/
+__pycache__/

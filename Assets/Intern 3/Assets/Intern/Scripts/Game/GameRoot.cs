@@ -14,7 +14,7 @@ namespace Intern.Game
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
         {
-            if (FindFirstObjectByType<GameRoot>() != null || SelfTest.Requested) return;
+            if (FindFirstObjectByType<GameRoot>() != null || SelfTest.Requested || AdDemoShowcase.Requested) return;
             new GameObject("InternGame").AddComponent<GameRoot>();
         }
 

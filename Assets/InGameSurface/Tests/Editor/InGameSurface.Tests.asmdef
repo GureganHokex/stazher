@@ -1,0 +1,1 @@
+{"name":"InGameSurface.Tests","references":["InGameSurface.Runtime"],"includePlatforms":["Editor"],"optionalUnityReferences":["TestAssemblies"],"autoReferenced":false}
