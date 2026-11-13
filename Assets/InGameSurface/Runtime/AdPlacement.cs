@@ -19,6 +19,7 @@ namespace InGameSurface
         public bool MediaReady { get; private set; }
         public string MediaStatus { get; private set; } = "Загрузка";
         public float TotalVisible { get; private set; }
+        public double PlaybackSeconds => video!=null && MediaReady?video.time:0;
         Material material;
         Texture2D ownedImage;
         RenderTexture videoTexture;

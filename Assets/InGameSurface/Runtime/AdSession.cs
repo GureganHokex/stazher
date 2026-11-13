@@ -14,13 +14,14 @@ namespace InGameSurface
         public const string Endpoint = "http://127.0.0.1:8765";
         public Camera ViewingCamera;
         public bool Paused;
+        public Func<bool> ActivityPolicy;
         public string SessionId { get; private set; }
         public string ConnectionStatus { get; private set; } = "Встроенные креативы · подключение…";
         public int Pending => queue.events.Count;
         public int PendingPixels => pixels.requests.Count;
         public string PixelStatus { get; private set; } = "VAST-пиксели: ожидание видео";
         public readonly HashSet<string> PixelEvents = new HashSet<string>();
-        public bool IsActive => !Paused && Application.isFocused && !suspended;
+        public bool IsActive => !Paused && Application.isFocused && !suspended && (ActivityPolicy==null || ActivityPolicy());
         public readonly List<AdPlacement> Placements = new List<AdPlacement>();
         public readonly HashSet<string> Counted = new HashSet<string>();
         public int Impressions { get; private set; }

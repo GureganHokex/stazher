@@ -10,7 +10,7 @@ using UnityEngine.SceneManagement;
 namespace Intern.Game
 {
     // Game-specific adapter. The InGameSurface assembly does not reference Intern.Game.
-    public sealed class AdDemoShowcase : MonoBehaviour
+    public sealed partial class AdDemoShowcase : MonoBehaviour
     {
         public static bool Requested => SceneManager.GetActiveScene().name=="IGSDemo" || Environment.GetCommandLineArgs().Contains("-igs-demo");
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -28,7 +28,7 @@ namespace Intern.Game
         Texture2D background;
         Vector2 scroll;
         string message="";
-        float panelWidth=350;
+        float panelWidth=350,uiScale=1;
 
         void Start()
         {
@@ -40,38 +40,12 @@ namespace Intern.Game
             cameraView.tag="MainCamera";cameraView.nearClipPlane=.05f;cameraView.farClipPlane=700;
             cameraView.fieldOfView=60;cameraView.clearFlags=CameraClearFlags.SolidColor;cameraView.backgroundColor=new Color(.55f,.72f,.84f);
             session=gameObject.AddComponent<AdSession>();session.ViewingCamera=cameraView;
-            surfaces.Add(CreatePlacement("office_coffee",new Vector3(-10.9f,2.05f,-4.1f),Vector3.right,2.6f));
-            surfaces.Add(CreatePlacement("office_screen",new Vector3(10.65f,2.1f,-3.2f),Vector3.left,2.9f));
+            surfaces.Add(AdGameSurfaces.Coffee(transform,session));
+            surfaces.Add(AdGameSurfaces.Office(transform,session));
             blocker=GameObject.CreatePrimitive(PrimitiveType.Cube);blocker.name="DemoOccluder";
             blocker.transform.localScale=new Vector3(4,4,.15f);blocker.GetComponent<Renderer>().material.color=new Color(.22f,.27f,.32f);blocker.SetActive(false);
             GoTo(0);
             if(Environment.GetCommandLineArgs().Contains("-igs-tour")) { StartCoroutine(Tour()); }
-        }
-
-        AdPlacement CreatePlacement(string id,Vector3 position,Vector3 normal,float width)
-        {
-            float height=width*9/16;
-            var root=new GameObject("IGS_"+id).transform;root.SetParent(transform);root.SetPositionAndRotation(position,Quaternion.LookRotation(-normal));
-            var frame=GameObject.CreatePrimitive(PrimitiveType.Cube);frame.name="Frame";frame.transform.SetParent(root,false);
-            frame.transform.localPosition=new Vector3(0,0,.08f);frame.transform.localScale=new Vector3(width+.16f,height+.16f,.12f);
-            Destroy(frame.GetComponent<Collider>());frame.GetComponent<Renderer>().material.color=new Color(.025f,.04f,.06f);
-            var surface=GameObject.CreatePrimitive(PrimitiveType.Quad);surface.name="AdSurface";surface.transform.SetParent(root,false);
-            surface.transform.localScale=new Vector3(width,height,1);Destroy(surface.GetComponent<Collider>());
-            var template=Resources.Load<Material>("IGS/AdSurface");
-            var shader=Shader.Find("Universal Render Pipeline/Unlit")??Shader.Find("Unlit/Texture");
-            var material=template!=null?new Material(template):new Material(shader);
-            surface.GetComponent<Renderer>().sharedMaterial=material;
-            var brand=Text(root,"IGS",new Vector3(0,.12f,-.025f),width*.12f,Color.white);
-            var slogan=Text(root,"IN GAME SURFACE",new Vector3(0,-height*.19f,-.027f),width*.033f,new Color(.93f,.9f,.8f));
-            Text(root,"IGS  /  ДЕМОНСТРАЦИОННЫЙ КРЕАТИВ",new Vector3(0,-height*.43f,-.03f),width*.018f,new Color(.64f,.7f,.73f));
-            var p=root.gameObject.AddComponent<AdPlacement>();p.Initialize(session,id,surface.transform,material,brand,slogan);return p;
-        }
-        static TextMesh Text(Transform parent,string value,Vector3 position,float size,Color color)
-        {
-            var go=new GameObject("AdText");go.transform.SetParent(parent,false);go.transform.localPosition=position;
-            var text=go.AddComponent<TextMesh>();text.font=OfficeBuilder.DefaultFont;text.fontSize=100;text.characterSize=size/10;
-            text.anchor=TextAnchor.MiddleCenter;text.alignment=TextAlignment.Center;text.color=color;text.text=value;
-            go.GetComponent<Renderer>().sharedMaterial=text.font.material;return text;
         }
 
         void EnsureStreet()
@@ -79,7 +53,7 @@ namespace Intern.Game
             if(city!=null)return;
             city=CityBuilder.Build();
             // Near the bus stop. No LunchRun is created, so combat and timers are absent.
-            surfaces.Add(CreatePlacement("street_board",CityBuilder.Origin+new Vector3(5.8f,2.1f,26),Vector3.left,3.6f));
+            surfaces.Add(AdGameSurfaces.Street(transform,session));
         }
         public void GoTo(int index)
         {
@@ -93,7 +67,8 @@ namespace Intern.Game
         void Update()
         {
             if(session==null)return;
-            panelWidth=Mathf.Min(370,Screen.width*.35f);
+            uiScale=Mathf.Clamp(Screen.height/900f,.8f,2.25f);
+            panelWidth=Mathf.Min(370*uiScale,Screen.width*.35f);
             cameraView.rect=new Rect(panelWidth/Screen.width,0,1-panelWidth/Screen.width,1);
             session.Paused=paused;
             var kb=Keyboard.current;var mouse=Mouse.current;
@@ -133,8 +108,11 @@ namespace Intern.Game
         }
         void OnGUI()
         {
-            if(session==null)return;Styles();GUI.DrawTexture(new Rect(0,0,panelWidth,Screen.height),background);
-            GUILayout.BeginArea(new Rect(17,18,panelWidth-34,Screen.height-32));
+            if(session==null)return;Styles();
+            var previousMatrix=GUI.matrix;GUI.matrix=Matrix4x4.Scale(new Vector3(uiScale,uiScale,1));
+            float width=panelWidth/uiScale,height=Screen.height/uiScale;
+            GUI.DrawTexture(new Rect(0,0,width,height),background);
+            GUILayout.BeginArea(new Rect(17,18,width-34,height-32));
             scroll=GUILayout.BeginScrollView(scroll,GUIStyle.none,GUIStyle.none);
             GUILayout.Label("IGS  /  ПРОТОТИП 01",subtitle);GUILayout.Label("In Game Surface",title);
             GUILayout.Label("Реклама внутри игрового мира",small);GUILayout.Space(15);
@@ -145,6 +123,7 @@ namespace Intern.Game
             if(GUILayout.Button("03  Городской щит",button))GoTo(2);
             GUILayout.Space(13);var p=surfaces[selected];
             GUILayout.BeginVertical(card);GUILayout.Label(p.Creative?.title??"Загрузка",label);GUILayout.Label(p.MediaStatus,small);
+            GUILayout.Label($"Позиция видео: {p.PlaybackSeconds:0.0} с",small);
             GUILayout.Space(7);GUILayout.Label(paused?"Демонстрация на паузе":p.Visibility.reason,label);
             GUILayout.Label($"Видно: {p.Visibility.visibleFraction:P0}   В кадре: {p.Visibility.screenFraction:P1}\nУгол: {p.Visibility.angle:0}°   Непрерывно: {p.Gate.ContinuousSeconds:0.0} / 2 с",small);
             GUILayout.Label(p.Gate.Counted?"✓ Показ засчитан":"Ожидание видимого показа",subtitle);GUILayout.EndVertical();
@@ -159,10 +138,15 @@ namespace Intern.Game
             if(GUILayout.Button("Новый сеанс",button))session.NewSession();
             if(GUILayout.Button("Экспорт CSV",button)){message="CSV сохранён: "+session.ExportCsv();}
             GUILayout.EndHorizontal();
+#if UNITY_EDITOR
+            if(GUILayout.Button(recording?"Остановить запись":"Записать демонстрацию · MP4",button))
+            { if(recording)FinishRecording();else StartCoroutine(RecordTour()); }
+            if(recording)GUILayout.Label(recordingStatus,subtitle);
+#endif
             if(!string.IsNullOrEmpty(message))GUILayout.Label(message,small);
             GUILayout.Space(14);GUILayout.Label("Зажми ПКМ: обзор + WASD. Q/E: вниз/вверх. Esc: пауза. Кнопки мест возвращают к экрану.",small);
             GUILayout.Space(9);GUILayout.Label("Демо-правило: 50% поверхности, 1% кадра, угол до 60°, 2 секунды. Оценка перекрытий — сетка 5×5. Методика не сертифицирована.",small);
-            GUILayout.EndScrollView();GUILayout.EndArea();
+            GUILayout.EndScrollView();GUILayout.EndArea();GUI.matrix=previousMatrix;
         }
         IEnumerator Tour()
         {
@@ -173,6 +157,12 @@ namespace Intern.Game
             GoTo(2);yield return new WaitForSecondsRealtime(5);ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(session.Folder,"igs-city.png"));
             session.ExportCsv();
         }
-        void OnDestroy() { Cursor.lockState=CursorLockMode.None;Cursor.visible=true;if(background!=null)Destroy(background); }
+        void OnDestroy()
+        {
+#if UNITY_EDITOR
+            FinishRecording();
+#endif
+            Cursor.lockState=CursorLockMode.None;Cursor.visible=true;if(background!=null)Destroy(background);
+        }
     }
 }

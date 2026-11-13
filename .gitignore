@@ -128,5 +128,6 @@ InitTestScene*.unity*
 
 # Local IGS prototype data
 Prototype/data/
+Prototype/recordings/
 Prototype/.venv/
 __pycache__/

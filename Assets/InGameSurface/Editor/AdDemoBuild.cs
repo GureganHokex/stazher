@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace InGameSurface.Editor
 {
@@ -14,6 +15,13 @@ namespace InGameSurface.Editor
         public static void Open()
         { if(!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())return;Prepare();EditorSceneManager.OpenScene(Scene); }
 
+        [MenuItem("In Game Surface/Открыть игру с рекламой")]
+        public static void OpenGame()
+        { if(!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())return;Prepare();EditorSceneManager.OpenScene("Assets/Scenes/SampleScene.unity"); }
+
+        [MenuItem("In Game Surface/Открыть игру с рекламой",true)]
+        public static bool CanOpenGame() => !EditorApplication.isPlayingOrWillChangePlaymode;
+
         public static void Prepare()
         {
             Directory.CreateDirectory("Assets/InGameSurface/Resources/IGS");
@@ -21,7 +29,16 @@ namespace InGameSurface.Editor
             if(AssetDatabase.LoadAssetAtPath<Material>(mat)==null)
                 AssetDatabase.CreateAsset(new Material(Shader.Find("Universal Render Pipeline/Unlit")),mat);
             if(!File.Exists(Scene))
-            { var scene=EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Additive);EditorSceneManager.SaveScene(scene,Scene);EditorSceneManager.CloseScene(scene,true); }
+            {
+                // Unity cannot add a scene alongside an unsaved Untitled scene on first import.
+                bool untitled=false;
+                for(int i=0;i<SceneManager.sceneCount;i++)untitled|=string.IsNullOrEmpty(SceneManager.GetSceneAt(i).path);
+                if(untitled && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                    throw new OperationCanceledException("Создание демосцены отменено пользователем");
+                var scene=EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,untitled?NewSceneMode.Single:NewSceneMode.Additive);
+                if(!EditorSceneManager.SaveScene(scene,Scene))throw new IOException("Не удалось сохранить демосцену IGS");
+                if(!untitled)EditorSceneManager.CloseScene(scene,true);
+            }
             AssetDatabase.SaveAssets();AssetDatabase.Refresh();
         }
         [MenuItem("In Game Surface/Собрать демо для macOS")]
